@@ -1,16 +1,49 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/gofiber/fiber/v2/middleware/proxy"
+	"github.com/joho/godotenv"
 	"log"
+	"os"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
-func main() {
+var db *sql.DB
 
+func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	user := os.Getenv("DB_USER")
+	pass := os.Getenv("DB_PASS")
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	name := os.Getenv("DB_NAME")
+
+	connStr := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=disable", user, pass, host, port, name)
+
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Error connecting to the database: %v", err)
+	}
+
+	log.Println("Successfully connected to the database!")
+}
+
+func main() {
 	app := fiber.New()
 
 	// Update CORS configuration to allow WebSocket
@@ -37,15 +70,8 @@ func main() {
 		return c.SendString("API is up and running")
 	})
 
-	// Route to user service
-	app.All("/api/users/*", loginRegisterLimiter, func(c *fiber.Ctx) error {
-		return proxy.Do(c, "http://localhost:3001"+c.Path())
-	})
-
-	// Route to food service
-	app.All("/api/food/*", func(c *fiber.Ctx) error {
-		return proxy.Do(c, "http://localhost:3002"+c.Path())
-	})
+	app.Get("/login", loginRegisterLimiter, login)
+	app.Get("/traq", traq)
 
 	log.Fatal(app.Listen(":3000"))
 }
