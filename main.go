@@ -5,7 +5,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/joho/godotenv"
 	"log"
 	"os"
 	"time"
@@ -16,11 +15,11 @@ import (
 var db *sql.DB
 
 func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
-
+	//err := godotenv.Load()
+	//if err != nil {
+	//	log.Fatalf("Error loading .env file: %v", err)
+	//}
+	var err error
 	//user := os.Getenv("DB_USER")
 	//pass := os.Getenv("DB_PASS")
 	//host := os.Getenv("DB_HOST")
