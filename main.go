@@ -2,9 +2,11 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
 	"time"
@@ -15,18 +17,18 @@ import (
 var db *sql.DB
 
 func init() {
-	//err := godotenv.Load()
-	//if err != nil {
-	//	log.Fatalf("Error loading .env file: %v", err)
-	//}
-	var err error
-	//user := os.Getenv("DB_USER")
-	//pass := os.Getenv("DB_PASS")
-	//host := os.Getenv("DB_HOST")
-	//port := os.Getenv("DB_PORT")
-	//name := os.Getenv("DB_NAME")
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
 
-	connStr := os.Getenv("Postgres.DATABASE_URL")
+	user := os.Getenv("DB_USER")
+	pass := os.Getenv("DB_PASS")
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	name := os.Getenv("DB_NAME")
+
+	connStr := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=disable", user, pass, host, port, name)
 
 	db, err = sql.Open("postgres", connStr)
 	if err != nil {
