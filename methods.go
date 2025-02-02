@@ -12,10 +12,13 @@ import (
 func registerToken(c *fiber.Ctx) error {
 	var token PushToken
 	if err := c.BodyParser(&token); err != nil {
+		log.Printf("Error parsing request body: %v", err)
 		return c.Status(400).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
+
+	log.Printf("Registering token: %s", token.Token)
 
 	// Store token
 	tokenStore.Tokens[token.Token] = token
@@ -26,8 +29,10 @@ func registerToken(c *fiber.Ctx) error {
 			tokenStore.Groups[group] = make([]string, 0)
 		}
 		tokenStore.Groups[group] = append(tokenStore.Groups[group], token.Token)
+		log.Printf("Added token %s to group %s", token.Token, group)
 	}
 
+	log.Printf("Token %s registered successfully", token.Token)
 	return c.JSON(fiber.Map{
 		"message": "Token registered successfully",
 	})
