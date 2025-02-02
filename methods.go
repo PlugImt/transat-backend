@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/gofiber/fiber/v2"
 	"log"
@@ -15,11 +14,12 @@ func registerToken(c *fiber.Ctx) error {
 		Group string `json:"group"`
 	}
 	if err := c.BodyParser(&body); err != nil {
+		log.Println("Error parsing body:", err)
 		return c.Status(400).SendString("Invalid request")
 	}
 
 	tokenGroups[body.Group] = append(tokenGroups[body.Group], body.Token)
-	fmt.Println("Registered:", body)
+	log.Println("Registered token:", body.Token, "for group:", body.Group)
 	return c.SendString("Token registered")
 }
 
