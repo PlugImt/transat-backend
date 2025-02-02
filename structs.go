@@ -6,17 +6,16 @@ type TurnstileResponse struct {
 }
 
 type TraqArticle struct {
-	ID                int     `json:"id"`
-	Name              string  `json:"name"`
-	Description       string  `json:"description"`
-	Limited           bool    `json:"limited"`
-	LimitedExpiration string  `json:"limited_expiration"`
-	CreationDate      string  `json:"creation_date"`
-	Disabled          bool    `json:"disabled"`
-	OutOfStock        bool    `json:"out_of_stock"`
-	PriceHalf         float64 `json:"price_half"`
-	PriceFull         float64 `json:"price_full"`
-	IDType            int     `json:"id_type"`
-	Alcool            float32 `json:"alcool"`
-	Image             string  `json:"image"`
+	ID           int     `json:"id"`
+	Name         string  `json:"name"`
+	Disabled     bool    `json:"disabled"`
+	Limited      bool    `json:"limited"`
+	Alcool       float64 `json:"alcool"`
+	OutOfStock   bool    `json:"out_of_stock"`
+	CreationDate string  `json:"creation_date"`
+	Picture      string  `json:"picture"`
+	Description  string  `json:"description"`
+	Price        float64 `json:"price"`
+	PriceHalf    float64 `json:"price_half"`
+	Type         string  `json:"type"`
 }

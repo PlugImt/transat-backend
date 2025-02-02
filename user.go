@@ -11,21 +11,22 @@ func login(c *fiber.Ctx) error {
 }
 
 func traq(c *fiber.Ctx) error {
-	request := `SELECT 
-    			COALESCE(id, 0),
-    			COALESCE(name, ''),
-    			COALESCE(description, ''),
-    			COALESCE(limited, false),
-    			COALESCE(limited_expiration, ''),
-    			COALESCE(creation_date, ''),
-    			COALESCE(disabled, false),
-    			COALESCE(out_of_stock, false),
-    			COALESCE(price_half, 0.0),
-    			COALESCE(price_full, 0.0),
-    			COALESCE(id_type, 0),
-    			COALESCE(alcool, 0.0),
-    			COALESCE(image, '')
-    FROM transat.traq_articles`
+	request := `
+		SELECT id_traq,
+			traq.name,
+			COALESCE(disabled, false)     AS disabled,
+			COALESCE(limited, false)      AS limited,
+			COALESCE(alcool, 0)           AS alcool,
+			COALESCE(out_of_stock, false) AS out_of_stock,
+			creation_date,
+			picture,
+			COALESCE(description, '')     AS description,
+			price,
+			COALESCE(price_half, 0)       AS price_half,
+			traq_types.name               AS type
+		FROM traq
+			join traq_types on traq.id_traq_types = traq_types.id_traq_types;
+`
 
 	rows, err := db.Query(request)
 	if err != nil {
@@ -44,37 +45,35 @@ func traq(c *fiber.Ctx) error {
 	for rows.Next() {
 		var id int
 		var name string
-		var description string
-		var limited bool
-		var limited_expiration string
-		var creation_date string
 		var disabled bool
+		var limited bool
+		var alcool float64
 		var out_of_stock bool
+		var creation_date string
+		var picture string
+		var description string
+		var price float64
 		var price_half float64
-		var price_full float64
-		var id_type int
-		var alcool float32
-		var image string
+		var tpe string
 
-		err := rows.Scan(&id, &name, &description, &limited, &limited_expiration, &creation_date, &disabled, &out_of_stock, &price_half, &price_full, &id_type, &alcool, &image)
+		err := rows.Scan(&id, &name, &disabled, &limited, &alcool, &out_of_stock, &creation_date, &picture, &description, &price, &price_half, &tpe)
 		if err != nil {
 			log.Fatalf("Error scanning rows: %v", err)
 		}
 
 		result = append(result, TraqArticle{
-			ID:                id,
-			Name:              name,
-			Description:       description,
-			Limited:           limited,
-			LimitedExpiration: limited_expiration,
-			CreationDate:      creation_date,
-			Disabled:          disabled,
-			OutOfStock:        out_of_stock,
-			PriceHalf:         price_half,
-			PriceFull:         price_full,
-			IDType:            id_type,
-			Alcool:            alcool,
-			Image:             image,
+			ID:           id,
+			Name:         name,
+			Disabled:     disabled,
+			Limited:      limited,
+			Alcool:       alcool,
+			OutOfStock:   out_of_stock,
+			CreationDate: creation_date,
+			Picture:      picture,
+			Description:  description,
+			Price:        price,
+			PriceHalf:    price_half,
+			Type:         tpe,
 		})
 	}
 

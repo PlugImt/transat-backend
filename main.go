@@ -18,29 +18,24 @@ var db *sql.DB
 
 func init() {
 	err := godotenv.Load()
+
+	// Connect to the database
+	db, err = sql.Open("postgres",
+		fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+			os.Getenv("DB_USER"),
+			os.Getenv("DB_PASS"),
+			os.Getenv("DB_HOST"),
+			os.Getenv("DB_PORT"),
+			os.Getenv("DB_NAME"),
+		),
+	)
+
+	// If there is an error connecting to the database, exit the program
 	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+		log.Fatalf("💥 Error connecting to the database : %v", err)
+	} else {
+		log.Println("Connected to the database")
 	}
-
-	user := os.Getenv("DB_USER")
-	pass := os.Getenv("DB_PASS")
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	name := os.Getenv("DB_NAME")
-
-	connStr := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=disable", user, pass, host, port, name)
-
-	db, err = sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatalf("Error opening database: %v", err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatalf("Error connecting to the database: %v", err)
-	}
-
-	log.Println("Successfully connected to the database!")
 }
 
 func main() {
