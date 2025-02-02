@@ -1,104 +1,58 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"fmt"
+	"github.com/go-resty/resty/v2"
 	"github.com/gofiber/fiber/v2"
-	"io"
 	"log"
-	"net/http"
 )
 
+var tokenGroups = make(map[string][]string)
+
 func registerToken(c *fiber.Ctx) error {
-	var token PushToken
-	if err := c.BodyParser(&token); err != nil {
-		log.Printf("Error parsing request body: %v", err)
-		return c.Status(400).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+	var body struct {
+		Token string `json:"token"`
+		Group string `json:"group"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).SendString("Invalid request")
 	}
 
-	log.Printf("Registering token: %s", token.Token)
-
-	// Store token
-	tokenStore.Tokens[token.Token] = token
-
-	// Update groups
-	for _, group := range token.Groups {
-		if _, exists := tokenStore.Groups[group]; !exists {
-			tokenStore.Groups[group] = make([]string, 0)
-		}
-		tokenStore.Groups[group] = append(tokenStore.Groups[group], token.Token)
-		log.Printf("Added token %s to group %s", token.Token, group)
-	}
-
-	log.Printf("Token %s registered successfully", token.Token)
-	return c.JSON(fiber.Map{
-		"message": "Token registered successfully",
-	})
+	tokenGroups[body.Group] = append(tokenGroups[body.Group], body.Token)
+	fmt.Println("Registered:", body)
+	return c.SendString("Token registered")
 }
 
 func sendNotification(c *fiber.Ctx) error {
-	type SendRequest struct {
-		Group string      `json:"group"`
-		Title string      `json:"title"`
-		Body  string      `json:"body"`
-		Data  interface{} `json:"data,omitempty"`
+	var body struct {
+		Group   string `json:"group"`
+		Title   string `json:"title"`
+		Message string `json:"message"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).SendString("Invalid request")
 	}
 
-	var req SendRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+	tokens, exists := tokenGroups[body.Group]
+	if !exists || len(tokens) == 0 {
+		return c.Status(400).SendString("No users in this group")
 	}
 
-	// Get tokens for the group
-	tokens, exists := tokenStore.Groups[req.Group]
-	if !exists {
-		return c.Status(404).JSON(fiber.Map{
-			"error": "Group not found",
-		})
-	}
-
-	// Send notification to each token in the group
+	client := resty.New()
 	for _, token := range tokens {
-		err := sendExpoNotification(NotificationPayload{
-			To:    token,
-			Title: req.Title,
-			Body:  req.Body,
-			Data:  req.Data,
-		})
+		_, err := client.R().
+			SetHeader("Content-Type", "application/json").
+			SetBody(map[string]interface{}{
+				"to":    token,
+				"title": body.Title,
+				"body":  body.Message,
+			}).
+			Post("https://exp.host/--/api/v2/push/send")
+
 		if err != nil {
-			log.Printf("Error sending notification to token %s: %v", token, err)
+			log.Println("Error sending notification:", err)
 		}
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Notifications sent successfully",
-	})
-}
-
-func sendExpoNotification(payload NotificationPayload) error {
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-
-	resp, err := http.Post(
-		"https://exp.host/--/api/v2/push/send",
-		"application/json",
-		bytes.NewBuffer(jsonData),
-	)
-	if err != nil {
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("Error closing response body: %v", err)
-		}
-	}(resp.Body)
-
-	return nil
+	return c.SendString("Notification sent")
 }
