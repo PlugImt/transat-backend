@@ -66,7 +66,9 @@ func main() {
 	})
 
 	app.Get("/login", loginRegisterLimiter, login)
-	app.Get("/traq", traq)
 
+	app.Post("/register-token", registerToken)
+	app.Post("/send-notification", sendNotification)
+	
 	log.Fatal(app.Listen(":3000"))
 }

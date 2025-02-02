@@ -1,94 +1,99 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"io"
 	"log"
 	"net/http"
-	"strings"
 )
 
-func TurnstileMiddleware() fiber.Handler {
-	secretKey := "0x4AAAAAAA4L7ghKZum5gV9UyrY85Fg-C7g"
-
-	return func(c *fiber.Ctx) error {
-		token := c.Get("X-Turnstile-Token")
-		if token == "" {
-			log.Printf("Missing Turnstile token")
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Missing Turnstile verification",
-			})
-		}
-
-		formData := fmt.Sprintf("secret=%s&response=%s", secretKey, token)
-
-		resp, err := http.Post(
-			"https://challenges.cloudflare.com/turnstile/v0/siteverify",
-			"application/x-www-form-urlencoded",
-			strings.NewReader(formData),
-		)
-		if err != nil {
-			log.Printf("Error making request to Turnstile API: %v", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to verify Turnstile token",
-			})
-		}
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				log.Printf("Error closing response body: %v", err)
-			}
-		}(resp.Body)
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Printf("Error reading Turnstile response: %v", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to verify Turnstile token",
-			})
-		}
-
-		var result TurnstileResponse
-		if err := json.Unmarshal(body, &result); err != nil {
-			log.Printf("Error parsing Turnstile response: %v", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to verify Turnstile token",
-			})
-		}
-
-		if !result.Success {
-			log.Printf("Invalid Turnstile token. Errors: %v", result.Error)
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid Turnstile verification",
-			})
-		}
-
-		return c.Next()
-	}
-}
-
-func authMiddleware(c *fiber.Ctx) error {
-	token := c.Get("Authorization")
-	if token == "" {
-		return c.Status(401).JSON(fiber.Map{
-			"error": "No token provided",
+func registerToken(c *fiber.Ctx) error {
+	var token PushToken
+	if err := c.BodyParser(&token); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request body",
 		})
 	}
 
-	// Verify JWT token (implementation omitted)
-	if !verifyJWT(token) {
-		return c.Status(401).JSON(fiber.Map{
-			"error": "Invalid token",
+	// Store token
+	tokenStore.Tokens[token.Token] = token
+
+	// Update groups
+	for _, group := range token.Groups {
+		if _, exists := tokenStore.Groups[group]; !exists {
+			tokenStore.Groups[group] = make([]string, 0)
+		}
+		tokenStore.Groups[group] = append(tokenStore.Groups[group], token.Token)
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Token registered successfully",
+	})
+}
+
+func sendNotification(c *fiber.Ctx) error {
+	type SendRequest struct {
+		Group string      `json:"group"`
+		Title string      `json:"title"`
+		Body  string      `json:"body"`
+		Data  interface{} `json:"data,omitempty"`
+	}
+
+	var req SendRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request body",
 		})
 	}
 
-	return c.Next()
+	// Get tokens for the group
+	tokens, exists := tokenStore.Groups[req.Group]
+	if !exists {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "Group not found",
+		})
+	}
+
+	// Send notification to each token in the group
+	for _, token := range tokens {
+		err := sendExpoNotification(NotificationPayload{
+			To:    token,
+			Title: req.Title,
+			Body:  req.Body,
+			Data:  req.Data,
+		})
+		if err != nil {
+			log.Printf("Error sending notification to token %s: %v", token, err)
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Notifications sent successfully",
+	})
 }
 
-func verifyJWT(token string) bool {
-	// JWT verification logic would go here
-	// This is just a placeholder that always returns true
-	return true
+func sendExpoNotification(payload NotificationPayload) error {
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post(
+		"https://exp.host/--/api/v2/push/send",
+		"application/json",
+		bytes.NewBuffer(jsonData),
+	)
+	if err != nil {
+		return err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}(resp.Body)
+
+	return nil
 }
