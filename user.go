@@ -67,6 +67,8 @@ func register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
+	// TODO: Send verification email
+
 	log.Println("║ ✅ Newf registered successfully")
 	log.Println("║ 📧 Email: ", newf.Email)
 	log.Println("╚=========================================╝")
@@ -74,50 +76,44 @@ func register(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusCreated)
 }
 
-func verifyAccount(c *fiber.Ctx) error {
+func login(c *fiber.Ctx) error {
 	var newf Newf
+	var candidate Newf
 
-	log.Println("╔======== 📧 Verify Account 📧 ========╗")
+	log.Println("╔======== 🔐 Login 🔐 ========╗")
 
-	if err := c.BodyParser(&newf); err != nil {
+	if err := c.BodyParser(&candidate); err != nil {
 		log.Println("║ 💥 Failed to parse request body: ", err)
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
 	}
 
 	request := `
-		UPDATE newf_roles
-		SET id_roles = (SELECT id_roles FROM roles WHERE name = 'NEWF')
-		WHERE email = $1 AND id_roles = (SELECT id_roles FROM roles WHERE name = 'VERIFYING')
-  			AND (SELECT verification_code FROM newf WHERE email = $1) = $2
-  			AND (SELECT verification_code_expiration FROM newf WHERE email = $1) > NOW();;
-		;
+		SELECT email, password
+		FROM newf
+		WHERE email = $1;
 	`
 	// Execute the SQL query
-	res, err := db.Exec(request, newf.Email, newf.VerificationCode)
+	row := db.QueryRow(request, candidate.Email)
+	err := row.Scan(&newf.Email, &newf.Password)
 	if err != nil {
-		log.Println("║ 💥 Failed to verify account: ", err)
+		log.Println("║ 💥 Failed to fetch newf: ", err)
 		log.Println("║ 📧 Email: ", newf.Email)
 		log.Println("╚=========================================╝")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
 
-	rows, err := res.RowsAffected()
+	err = bcrypt.CompareHashAndPassword([]byte(newf.Password), []byte(candidate.Password))
 	if err != nil {
-		log.Println("║ 💥 Failed to get rows affected: ", err)
+		log.Println("║ 💥 Failed to compare password: ", err)
 		log.Println("║ 📧 Email: ", newf.Email)
 		log.Println("╚=========================================╝")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
 
-	if rows == 0 {
-		log.Println("║ 💥 Failed to verify account: ", err)
-		log.Println("║ 📧 Email: ", newf.Email)
-		log.Println("╚=========================================╝")
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid verification code"})
-	}
+	// TODO: Generate JWT token and send it to the user
 
-	log.Println("║ ✅ Account verified successfully")
+	log.Println("║ ✅ Login successful")
 	log.Println("║ 📧 Email: ", newf.Email)
 	log.Println("╚=========================================╝")
 

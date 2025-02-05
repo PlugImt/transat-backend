@@ -79,7 +79,7 @@ func main() {
 
 	// Auth routes
 	auth := api.Group("/auth")
-	//auth.Post("/login", login)
+	auth.Post("/login", login)
 	auth.Post("/verify-account", verifyAccount)
 
 	// Traq routes
