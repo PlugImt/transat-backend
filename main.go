@@ -65,10 +65,37 @@ func main() {
 		return c.SendString("API is up and running")
 	})
 
-	app.Get("/login", loginRegisterLimiter, login)
+	api := app.Group("/api")
 
-	app.Post("/register-token", registerToken)
-	app.Post("/send-notification", sendNotification)
-	
+	// User routes
+	newf := api.Group("/newf", loginRegisterLimiter)
+	newf.Post("/", register)
+	newf.Get("/", getAllNewfs)
+	newf.Get(":id", getNewf)
+	newf.Put(":id", updateNewf)
+	newf.Delete(":id", deleteNewf)
+	newf.Patch("/register-token", registerToken)
+	newf.Post("/send-notification", sendNotification)
+
+	// Auth routes
+	auth := api.Group("/auth")
+	auth.Post("/login", login)
+
+	// Traq routes
+	traq := api.Group("/traq")
+	traq.Post("/", createTraqArticle)
+	traq.Get("/", getAllTraqArticles)
+	traq.Get(":id", getTraqArticle)
+	traq.Put(":id", updateTraqArticle)
+	traq.Delete(":id", deleteTraqArticle)
+
+	// Restorant routes
+	restorant := api.Group("/restorant")
+	restorant.Post("/", createRestorant)
+	restorant.Get("/", getAllRestorants)
+	restorant.Get(":id", getRestorant)
+	restorant.Put(":id", updateRestorant)
+	restorant.Delete(":id", deleteRestorant)
+
 	log.Fatal(app.Listen(":3000"))
 }
