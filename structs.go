@@ -1,5 +1,21 @@
 package main
 
+type Newf struct {
+	ID                         string `json:"id"`
+	Email                      string `json:"email"`
+	Password                   string `json:"password"`
+	PasswordUpdatedDate        string `json:"password_updated"`
+	VerificationCode           string `json:"verification_code"`
+	VerificationCodeExpiration string `json:"verification_code_expiration"`
+	CreationDate               string `json:"creation_date"`
+	FirstName                  string `json:"first_name"`
+	LastName                   string `json:"last_name"`
+	PhoneCountryCode           string `json:"phone_country_code"`
+	PhoneNumber                string `json:"phone_number"`
+	ProfilePicture             string `json:"profile_picture"`
+	NotificationToken          string `json:"notification_token"`
+}
+
 type PushToken struct {
 	Token  string   `json:"token"`
 	UserID string   `json:"userId"`
