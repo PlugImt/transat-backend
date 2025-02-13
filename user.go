@@ -165,7 +165,7 @@ func login(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func resetPassword(c *fiber.Ctx) error {
+func verificationCode(c *fiber.Ctx) error {
 	var newf Newf
 
 	log.Println("╔======== 🔐 Reset Password 🔐 ========╗")
@@ -199,9 +199,9 @@ func resetPassword(c *fiber.Ctx) error {
 		}
 	}(stmt)
 
-	verificationCode := generate2FACode(6)
+	code := generate2FACode(6)
 
-	_, err = stmt.Exec(verificationCode, newf.Email)
+	_, err = stmt.Exec(code, newf.Email)
 	if err != nil {
 		log.Println("║ 💥 Failed to reset password: ", err)
 		log.Println("║ 📧 Email: ", newf.Email)
@@ -213,7 +213,7 @@ func resetPassword(c *fiber.Ctx) error {
 
 	log.Println("║ ✅ Reset password verification code sent")
 	log.Println("║ 📧 Email: ", newf.Email)
-	log.Println("║ 📧 Verification Code: ", verificationCode)
+	log.Println("║ 📧 Verification Code: ", code)
 	log.Println("╚=========================================╝")
 
 	return c.SendStatus(fiber.StatusOK)
@@ -296,13 +296,48 @@ func changePassword(c *fiber.Ctx) error {
 	}
 
 	if newf.Password != "" {
+		requestOldPassword := `
+			SELECT password
+			FROM newf
+			WHERE email = $1;
+		`
+		stmt, err := db.Prepare(requestOldPassword)
+		if err != nil {
+			log.Println("║ 💥 Failed to prepare statement: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+		defer func(stmt *sql.Stmt) {
+			err := stmt.Close()
+			if err != nil {
+				log.Println("║ 💥 Failed to close statement: ", err)
+				log.Println("╚=========================================╝")
+				return
+			}
+		}(stmt)
+
+		var oldPassword string
+		err = stmt.QueryRow(newf.Email).Scan(&oldPassword)
+		if err != nil {
+			log.Println("║ 💥 Failed to get old password: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+
+		err = bcrypt.CompareHashAndPassword([]byte(oldPassword), []byte(newf.Password))
+		if err != nil {
+			log.Println("║ 💥 Failed to compare password: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
+		}
+
 		request := `
 			UPDATE newf
 			SET password = $1,
 			    password_updated_date = CURRENT_TIMESTAMP
 			WHERE email = $2;
 		`
-		stmt, err := db.Prepare(request)
+		stmt, err = db.Prepare(request)
 		if err != nil {
 			log.Println("║ 💥 Failed to prepare statement: ", err)
 			log.Println("╚=========================================╝")
