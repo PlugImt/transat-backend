@@ -74,13 +74,15 @@ func main() {
 	//newf.Get(":id", getNewf)
 	//newf.Put(":id", updateNewf)
 	//newf.Delete(":id", deleteNewf)
-	newf.Patch("/register-token", registerToken)
+	//newf.Patch("/register-token", registerToken)
 	newf.Post("/send-notification", sendNotification)
 
 	// Auth routes
 	auth := api.Group("/auth")
 	auth.Post("/login", login)
 	auth.Post("/verify-account", verifyAccount)
+	auth.Post("/reset-password", resetPassword)
+	auth.Post("/change-password", changePassword)
 
 	// Traq routes
 	//traq := api.Group("/traq")

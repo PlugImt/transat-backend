@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 	"log"
@@ -41,10 +42,24 @@ func register(c *fiber.Ctx) error {
 		INSERT INTO newf (email, password, first_name, last_name)
 		VALUES ($1, $2, $3, $4);
 	`
-	// Execute the SQL query
-	_, err = db.Exec(request, newf.Email, newf.Password, newf.FirstName, newf.LastName)
+
+	stmt, err := db.Prepare(request)
 	if err != nil {
-		// Check if the error is a unique violation (PostgreSQL error code for unique violation)
+		log.Println("║ 💥 Failed to prepare statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return
+		}
+	}(stmt)
+
+	_, err = stmt.Exec(newf.Email, newf.Password, newf.FirstName, newf.LastName)
+	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") {
 			log.Println("║ 💥 User already exists: ", err)
 			log.Println("╚=========================================╝")
@@ -60,7 +75,23 @@ func register(c *fiber.Ctx) error {
 		INSERT INTO newf_roles (email, id_roles)
 		VALUES ($1, (SELECT id_roles FROM roles WHERE name = 'VERIFYING'));
 	`
-	_, err = db.Exec(addRole, newf.Email)
+
+	stmt, err = db.Prepare(addRole)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return
+		}
+	}(stmt)
+
+	_, err = stmt.Exec(newf.Email)
 	if err != nil {
 		log.Println("║ 💥 Failed to add role: ", err)
 		log.Println("╚=========================================╝")
@@ -93,9 +124,23 @@ func login(c *fiber.Ctx) error {
 		FROM newf
 		WHERE email = $1;
 	`
-	// Execute the SQL query
-	row := db.QueryRow(request, candidate.Email)
-	err := row.Scan(&newf.Email, &newf.Password)
+	stmt, err := db.Prepare(request)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return
+		}
+	}(stmt)
+
+	row := stmt.QueryRow(candidate.Email)
+	err = row.Scan(&newf.Email, &newf.Password)
 	if err != nil {
 		log.Println("║ 💥 Failed to fetch newf: ", err)
 		log.Println("║ 📧 Email: ", newf.Email)
@@ -114,6 +159,194 @@ func login(c *fiber.Ctx) error {
 	// TODO: Generate JWT token and send it to the user
 
 	log.Println("║ ✅ Login successful")
+	log.Println("║ 📧 Email: ", newf.Email)
+	log.Println("╚=========================================╝")
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func resetPassword(c *fiber.Ctx) error {
+	var newf Newf
+
+	log.Println("╔======== 🔐 Reset Password 🔐 ========╗")
+
+	if err := c.BodyParser(&newf); err != nil {
+		log.Println("║ 💥 Failed to parse request body: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
+	}
+
+	request := `
+		UPDATE newf
+		SET 
+		    verification_code = $1,
+		    verification_code_expiration = CURRENT_TIMESTAMP + INTERVAL '10 minutes'
+		WHERE email = $2;
+	`
+
+	stmt, err := db.Prepare(request)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return
+		}
+	}(stmt)
+
+	verificationCode := generate2FACode(6)
+
+	_, err = stmt.Exec(verificationCode, newf.Email)
+	if err != nil {
+		log.Println("║ 💥 Failed to reset password: ", err)
+		log.Println("║ 📧 Email: ", newf.Email)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
+	// TODO Send reset password verification code to user email
+
+	log.Println("║ ✅ Reset password verification code sent")
+	log.Println("║ 📧 Email: ", newf.Email)
+	log.Println("║ 📧 Verification Code: ", verificationCode)
+	log.Println("╚=========================================╝")
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func changePassword(c *fiber.Ctx) error {
+	var newf Newf
+
+	log.Println("╔======== 🔐 Change Password 🔐 ========╗")
+
+	if err := c.BodyParser(&newf); err != nil {
+		log.Println("║ 💥 Failed to parse request body: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
+	}
+
+	if newf.NewPassword == "" || newf.NewPasswordConfirmation == "" {
+		log.Println("║ 💥 New passwords are missing")
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "New passwords are missing"})
+	}
+
+	if newf.NewPassword != newf.NewPasswordConfirmation {
+		log.Println("║ 💥 Passwords do not match")
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Passwords do not match"})
+	}
+
+	if newf.VerificationCode != "" {
+		request := `
+			UPDATE newf
+			SET password = $1,
+			    password_updated_date = CURRENT_TIMESTAMP
+			WHERE email = $2
+			AND verification_code = $3
+			AND verification_code_expiration > NOW();
+		`
+		stmt, err := db.Prepare(request)
+		if err != nil {
+			log.Println("║ 💥 Failed to prepare statement: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+		defer func(stmt *sql.Stmt) {
+			err := stmt.Close()
+			if err != nil {
+				log.Println("║ 💥 Failed to close statement: ", err)
+				log.Println("╚=========================================╝")
+				return
+			}
+		}(stmt)
+
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newf.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			log.Println("║ 💥 Failed to hash password: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+
+		result, err := stmt.Exec(string(hashedPassword), newf.Email, newf.VerificationCode)
+		if err != nil {
+			log.Println("║ 💥 Failed to change password: ", err)
+			log.Println("║ 📧 Email: ", newf.Email)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Println("║ 💥 Failed to get affected rows: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+
+		if rowsAffected == 0 {
+			log.Println("║ 💥 No rows were updated")
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid verification code or expired"})
+		}
+	}
+
+	if newf.Password != "" {
+		request := `
+			UPDATE newf
+			SET password = $1,
+			    password_updated_date = CURRENT_TIMESTAMP
+			WHERE email = $2;
+		`
+		stmt, err := db.Prepare(request)
+		if err != nil {
+			log.Println("║ 💥 Failed to prepare statement: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+		defer func(stmt *sql.Stmt) {
+			err := stmt.Close()
+			if err != nil {
+				log.Println("║ 💥 Failed to close statement: ", err)
+				log.Println("╚=========================================╝")
+				return
+			}
+		}(stmt)
+
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newf.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			log.Println("║ 💥 Failed to hash password: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+
+		result, err := stmt.Exec(string(hashedPassword), newf.Email)
+		if err != nil {
+			log.Println("║ 💥 Failed to change password: ", err)
+			log.Println("║ 📧 Email: ", newf.Email)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Println("║ 💥 Failed to get affected rows: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+
+		if rowsAffected == 0 {
+			log.Println("║ 💥 No rows were updated")
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid verification code or expired"})
+		}
+	}
+
+	log.Println("║ ✅ Password changed successfully")
 	log.Println("║ 📧 Email: ", newf.Email)
 	log.Println("╚=========================================╝")
 
