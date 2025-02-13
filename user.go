@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 	"log"
@@ -98,7 +99,27 @@ func register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
-	// TODO: Send verification email
+	verifCode, err := getVerificationCode(newf)
+	if err != nil {
+		log.Println("║ 💥 Failed to get verification code: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
+	errEmail := sendEmail(Email{
+		Recipient: newf.Email,
+		Subject:   fmt.Sprintf("🔐 Ton code de vérification : %s", verifCode.VerificationCode),
+		Template:  "email_templates/email_template_verif_code.html",
+		Sender: EmailSender{
+			Name:  "Transat Email Service",
+			Email: "admin@destimt.fr",
+		},
+	}, verifCode)
+	if errEmail != nil {
+		log.Println("║ 💥 Failed to send verification email: ", errEmail)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
 
 	log.Println("║ ✅ Newf registered successfully")
 	log.Println("║ 📧 Email: ", newf.Email)
@@ -111,12 +132,18 @@ func login(c *fiber.Ctx) error {
 	var newf Newf
 	var candidate Newf
 
-	log.Println("╔======== 🔐 Login 🔐 ========╗")
+	log.Println("╔============== 🔐 Login 🔐 ============╗")
 
 	if err := c.BodyParser(&candidate); err != nil {
 		log.Println("║ 💥 Failed to parse request body: ", err)
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
+	}
+
+	if !isValidated(candidate) {
+		log.Println("║ 💥 Newf is not validated")
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Validate your account first"})
 	}
 
 	request := `
@@ -156,19 +183,26 @@ func login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
 
-	// TODO: Generate JWT token and send it to the user
+	token, err := generateJWT(newf)
+	if err != nil {
+		log.Println("║ 💥 Failed to generate JWT: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
+	// TODO: Send an email to the user letting them know someone logged in
 
 	log.Println("║ ✅ Login successful")
 	log.Println("║ 📧 Email: ", newf.Email)
 	log.Println("╚=========================================╝")
 
-	return c.SendStatus(fiber.StatusOK)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"token": token})
 }
 
 func verificationCode(c *fiber.Ctx) error {
 	var newf Newf
 
-	log.Println("╔======== 🔐 Reset Password 🔐 ========╗")
+	log.Println("╔======== 📧 Verification Code 📧 ========╗")
 
 	if err := c.BodyParser(&newf); err != nil {
 		log.Println("║ 💥 Failed to parse request body: ", err)
@@ -203,15 +237,35 @@ func verificationCode(c *fiber.Ctx) error {
 
 	_, err = stmt.Exec(code, newf.Email)
 	if err != nil {
-		log.Println("║ 💥 Failed to reset password: ", err)
+		log.Println("║ 💥 Failed to send the code: ", err)
 		log.Println("║ 📧 Email: ", newf.Email)
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
-	// TODO Send reset password verification code to user email
+	verifCode, err := getVerificationCode(newf)
+	if err != nil {
+		log.Println("║ 💥 Failed to get verification code: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
 
-	log.Println("║ ✅ Reset password verification code sent")
+	errEmail := sendEmail(Email{
+		Recipient: newf.Email,
+		Subject:   fmt.Sprintf("🔐 Ton code de vérification : %s", verifCode.VerificationCode),
+		Template:  "email_templates/email_template_verif_code.html",
+		Sender: EmailSender{
+			Name:  "Transat Email Service",
+			Email: "admin@destimt.fr",
+		},
+	}, verifCode)
+	if errEmail != nil {
+		log.Println("║ 💥 Failed to send verification email: ", errEmail)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
+	log.Println("║ ✅ Verification code sent")
 	log.Println("║ 📧 Email: ", newf.Email)
 	log.Println("║ 📧 Verification Code: ", code)
 	log.Println("╚=========================================╝")
@@ -383,6 +437,46 @@ func changePassword(c *fiber.Ctx) error {
 
 	log.Println("║ ✅ Password changed successfully")
 	log.Println("║ 📧 Email: ", newf.Email)
+	log.Println("╚=========================================╝")
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func deleteNewf(c *fiber.Ctx) error {
+	email := c.Params("email")
+
+	log.Println("╔======== 🚫 Delete Newf 🚫 ========╗")
+
+	request := `
+		DELETE FROM newf
+		WHERE email = $1;
+	`
+
+	stmt, err := db.Prepare(request)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return
+		}
+	}(stmt)
+
+	_, err = stmt.Exec(email)
+	if err != nil {
+		log.Println("║ 💥 Failed to delete newf: ", err)
+		log.Println("║ 📧 Email: ", email)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
+	log.Println("║ ✅ Newf deleted successfully")
+	log.Println("║ 📧 Email: ", email)
 	log.Println("╚=========================================╝")
 
 	return c.SendStatus(fiber.StatusOK)

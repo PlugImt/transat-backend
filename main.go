@@ -15,6 +15,7 @@ import (
 )
 
 var db *sql.DB
+var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
 func init() {
 	err := godotenv.Load()

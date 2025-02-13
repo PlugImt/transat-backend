@@ -22,8 +22,6 @@ type EmailSender struct {
 }
 
 func sendEmail(mailDetails Email, emailData interface{}) error {
-	fmt.Println(emailData)
-
 	// Read the HTML template file
 	htmlTemplate, err := os.ReadFile(mailDetails.Template)
 	if err != nil {
