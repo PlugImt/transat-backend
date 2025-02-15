@@ -45,8 +45,8 @@ func main() {
 	// Update CORS configuration to allow WebSocket
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Turnstile-Token",
-		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+		AllowHeaders: "*",
+		AllowMethods: "*",
 	}))
 
 	loginRegisterLimiter := limiter.New(limiter.Config{

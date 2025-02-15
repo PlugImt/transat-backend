@@ -140,12 +140,6 @@ func login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
 	}
 
-	if !isValidated(candidate) {
-		log.Println("║ 💥 Newf is not validated")
-		log.Println("╚=========================================╝")
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Validate your account first"})
-	}
-
 	request := `
 		SELECT email, password
 		FROM newf
@@ -181,6 +175,12 @@ func login(c *fiber.Ctx) error {
 		log.Println("║ 📧 Email: ", newf.Email)
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
+	}
+
+	if !isValidated(candidate) {
+		log.Println("║ 💥 Newf is not validated")
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Validate your account first"})
 	}
 
 	token, err := generateJWT(newf)
