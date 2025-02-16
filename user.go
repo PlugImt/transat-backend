@@ -514,14 +514,16 @@ func getNewf(c *fiber.Ctx) error {
 	log.Println("╔======== 📧 Get Newf 📧 ========╗")
 
 	request := `
-		SELECT 
-		    email, 
-		    first_name, 
-		    last_name, 
-		    COALESCE(profile_picture, '') as profile_picture,
-		    COALESCE(phone_number, '') as phone_number,
-		    COALESCE(graduation_year, 0) as graduation_year,
-			COALESCE(campus, '') as campus
+		SELECT id_newf,
+		       email,
+		       first_name,
+		       last_name,
+		       COALESCE(profile_picture, '') as profile_picture,
+		       COALESCE(phone_number, '')    as phone_number,
+		       COALESCE(graduation_year, 0)  as graduation_year,
+		       COALESCE(campus, '')          as campus,
+		       (SELECT COUNT(*)
+		        FROM newf)                   as total_newf
 		FROM newf
 		WHERE email = $1;
 	`
@@ -542,7 +544,7 @@ func getNewf(c *fiber.Ctx) error {
 	}(stmt)
 
 	var newf Newf
-	err = stmt.QueryRow(email).Scan(&newf.Email, &newf.FirstName, &newf.LastName, &newf.ProfilePicture, &newf.PhoneNumber, &newf.GraduationYear, &newf.Campus)
+	err = stmt.QueryRow(email).Scan(&newf.ID, &newf.Email, &newf.FirstName, &newf.LastName, &newf.ProfilePicture, &newf.PhoneNumber, &newf.GraduationYear, &newf.Campus, &newf.TotalUsers)
 	if err != nil {
 		log.Println("║ 💥 Failed to get newf: ", err)
 		log.Println("║ 📧 Email: ", email)
@@ -556,6 +558,9 @@ func getNewf(c *fiber.Ctx) error {
 
 	response := make(map[string]interface{})
 
+	if newf.ID != 0 {
+		response["id_newf"] = newf.ID
+	}
 	if newf.Email != "" {
 		response["email"] = newf.Email
 	}
@@ -576,6 +581,9 @@ func getNewf(c *fiber.Ctx) error {
 	}
 	if newf.Campus != "" {
 		response["campus"] = newf.Campus
+	}
+	if newf.TotalUsers != 0 {
+		response["total_users"] = newf.TotalUsers
 	}
 
 	return c.Status(fiber.StatusOK).JSON(response)

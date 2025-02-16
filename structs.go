@@ -1,6 +1,7 @@
 package main
 
 type Newf struct {
+	ID                      int    `json:"id_newf"`
 	Email                   string `json:"email"`
 	Password                string `json:"password"`
 	NewPassword             string `json:"new_password"`
@@ -15,6 +16,7 @@ type Newf struct {
 	NotificationToken string `json:"notification_token"`
 	GraduationYear    string `json:"graduation_year"`
 	Campus            string `json:"campus"`
+	TotalUsers        int    `json:"total_users"`
 }
 
 type verificationCodeData struct {

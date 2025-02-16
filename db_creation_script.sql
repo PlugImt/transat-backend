@@ -1,5 +1,6 @@
 CREATE TABLE newf
 (
+    id_newf                      SERIAL,
     email                        VARCHAR(100),
     password                     VARCHAR(200) NOT NULL,
     password_updated_date        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
