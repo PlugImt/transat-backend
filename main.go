@@ -51,7 +51,7 @@ func main() {
 
 	loginRegisterLimiter := limiter.New(limiter.Config{
 		Max:        3,
-		Expiration: 300 * time.Second,
+		Expiration: 200 * time.Second,
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return c.IP()
 		},
@@ -69,8 +69,8 @@ func main() {
 	api := app.Group("/api")
 
 	// User routes
-	newf := api.Group("/newf", loginRegisterLimiter)
-	newf.Post("/", register)
+	newf := api.Group("/newf")
+	newf.Post("/", loginRegisterLimiter, register)
 	newf.Delete("/", deleteNewf)
 	newf.Get("/me", jwtMiddleware, getNewf)
 	newf.Patch("/me", jwtMiddleware, updateNewf)
@@ -82,7 +82,7 @@ func main() {
 
 	// Auth routes
 	auth := api.Group("/auth")
-	auth.Post("/login", login)
+	auth.Post("/login", loginRegisterLimiter, login)
 	auth.Post("/verify-account", verifyAccount)
 	auth.Post("/verification-code", verificationCode)
 	auth.Post("/change-password", changePassword)
