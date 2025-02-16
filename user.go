@@ -20,11 +20,16 @@ func register(c *fiber.Ctx) error {
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
 	}
-	_, err := checkEmail(newf.Email)
+	emailValid, err := checkEmail(newf.Email)
 	if err != nil {
 		log.Println("║ 💥 Failed to check email: ", err)
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "There is an error with your email"})
+	}
+	if !emailValid {
+		log.Println("║ 💥 Invalid email: ", newf.Email)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid email"})
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newf.Password), bcrypt.DefaultCost)
