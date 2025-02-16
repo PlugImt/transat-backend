@@ -524,7 +524,8 @@ func getNewf(c *fiber.Ctx) error {
 		       COALESCE(graduation_year, 0)  as graduation_year,
 		       COALESCE(campus, '')          as campus,
 		       (SELECT COUNT(*)
-		        FROM newf)                   as total_newf
+		        FROM newf)                   as total_newf,
+		    	password_updated_date
 		FROM newf
 		WHERE email = $1;
 	`
@@ -545,7 +546,7 @@ func getNewf(c *fiber.Ctx) error {
 	}(stmt)
 
 	var newf Newf
-	err = stmt.QueryRow(email).Scan(&newf.ID, &newf.Email, &newf.FirstName, &newf.LastName, &newf.ProfilePicture, &newf.PhoneNumber, &newf.GraduationYear, &newf.Campus, &newf.TotalUsers)
+	err = stmt.QueryRow(email).Scan(&newf.ID, &newf.Email, &newf.FirstName, &newf.LastName, &newf.ProfilePicture, &newf.PhoneNumber, &newf.GraduationYear, &newf.Campus, &newf.TotalUsers, &newf.PasswordUpdatedDate)
 	if err != nil {
 		log.Println("║ 💥 Failed to get newf: ", err)
 		log.Println("║ 📧 Email: ", email)
@@ -585,6 +586,9 @@ func getNewf(c *fiber.Ctx) error {
 	}
 	if newf.TotalUsers != 0 {
 		response["total_newf"] = newf.TotalUsers
+	}
+	if newf.PasswordUpdatedDate != "" {
+		response["password_updated_date"] = newf.PasswordUpdatedDate
 	}
 
 	return c.Status(fiber.StatusOK).JSON(response)
