@@ -469,6 +469,7 @@ func changePassword(c *fiber.Ctx) error {
 }
 
 func deleteNewf(c *fiber.Ctx) error {
+	// TODO: change this to use the JWT token
 	email := c.Params("email")
 
 	log.Println("╔======== 🚫 Delete Newf 🚫 ========╗")
@@ -576,7 +577,7 @@ func getNewf(c *fiber.Ctx) error {
 	if newf.PhoneNumber != "" {
 		response["phone_number"] = newf.PhoneNumber
 	}
-	if newf.GraduationYear != "0" {
+	if newf.GraduationYear != 0 {
 		response["graduation_year"] = newf.GraduationYear
 	}
 	if newf.Campus != "" {
@@ -587,4 +588,92 @@ func getNewf(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(response)
+}
+
+func updateNewf(c *fiber.Ctx) error {
+	var newf Newf
+
+	log.Println("╔======== 📧 Update Newf 📧 ========╗")
+
+	if err := c.BodyParser(&newf); err != nil {
+		log.Println("║ 💥 Failed to parse request body: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
+	}
+
+	email := c.Locals("email").(string)
+
+	updateFields := make(map[string]interface{})
+
+	if newf.FirstName != "" {
+		updateFields["first_name"] = newf.FirstName
+	}
+	if newf.LastName != "" {
+		updateFields["last_name"] = newf.LastName
+	}
+	if newf.PhoneNumber != "" {
+		updateFields["phone_number"] = newf.PhoneNumber
+	}
+	if newf.GraduationYear != 0 {
+		updateFields["graduation_year"] = newf.GraduationYear
+	}
+	if newf.Campus != "" {
+		updateFields["campus"] = newf.Campus
+	}
+	if newf.NotificationToken != "" {
+		updateFields["notification_token"] = newf.NotificationToken
+	}
+	if newf.ProfilePicture != "" {
+		updateFields["profile_picture"] = newf.ProfilePicture
+	}
+
+	if len(updateFields) == 0 {
+		log.Println("║ ⚠️ No fields provided for update")
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No data provided to update"})
+	}
+
+	var queryParts []string
+	var values []interface{}
+	i := 1
+
+	for column, value := range updateFields {
+		queryParts = append(queryParts, fmt.Sprintf("%s = $%d", column, i))
+		values = append(values, value)
+		i++
+	}
+
+	values = append(values, email)
+
+	query := fmt.Sprintf("UPDATE newf SET %s WHERE email = $%d;", strings.Join(queryParts, ", "), i)
+
+	stmt, err := db.Prepare(query)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return
+		}
+	}(stmt)
+
+	_, err = stmt.Exec(values...)
+	if err != nil {
+		log.Println("║ 💥 Failed to update newf: ", err)
+		log.Println("║ 📧 Email: ", email)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
+	log.Println("║ ✅ Newf updated successfully")
+	log.Println("║ 🗽 Update Fields: ", updateFields)
+	log.Println("║ 📧 Email: ", email)
+	log.Println("╚=========================================╝")
+
+	return c.SendStatus(fiber.StatusOK)
 }

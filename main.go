@@ -71,12 +71,13 @@ func main() {
 	// User routes
 	newf := api.Group("/newf", loginRegisterLimiter)
 	newf.Post("/", register)
+	newf.Delete("/", deleteNewf)
 	newf.Get("/me", jwtMiddleware, getNewf)
+	newf.Patch("/me", jwtMiddleware, updateNewf)
 	//newf.Get("/", getAllNewfs)
 	//newf.Get(":id", getNewf)
 	//newf.Put(":id", updateNewf)
 	//newf.Delete(":id", deleteNewf)
-	//newf.Patch("/register-token", registerToken)
 	newf.Post("/send-notification", sendNotification)
 
 	// Auth routes
