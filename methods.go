@@ -119,7 +119,7 @@ func getVerificationCode(newf Newf) (verificationCodeData, error) {
 		return data, err
 	}
 
-	data.VerificationCodeExpiration = t.Format("15h04m05s")
+	data.VerificationCodeExpiration = t.Format("15h04")
 
 	return data, nil
 }
