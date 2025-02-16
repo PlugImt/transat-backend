@@ -584,7 +584,7 @@ func getNewf(c *fiber.Ctx) error {
 		response["campus"] = newf.Campus
 	}
 	if newf.TotalUsers != 0 {
-		response["total_users"] = newf.TotalUsers
+		response["total_newf"] = newf.TotalUsers
 	}
 
 	return c.Status(fiber.StatusOK).JSON(response)

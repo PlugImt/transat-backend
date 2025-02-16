@@ -16,7 +16,7 @@ type Newf struct {
 	NotificationToken string `json:"notification_token"`
 	GraduationYear    int    `json:"graduation_year"`
 	Campus            string `json:"campus"`
-	TotalUsers        int    `json:"total_users"`
+	TotalUsers        int    `json:"total_newf"`
 }
 
 type verificationCodeData struct {
