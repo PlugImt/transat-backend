@@ -91,14 +91,19 @@ func verifyAccount(c *fiber.Ctx) error {
 }
 
 func jwtMiddleware(c *fiber.Ctx) error {
-	tokenString := c.Get("Authorization")
+	authHeader := c.Get("Authorization")
 
 	log.Println("╔======== 📧 JWT Middleware 📧 ========╗")
 
-	if tokenString == "" {
+	if authHeader == "" {
 		log.Println("║ 💥 Missing token")
 		log.Println("╚=======================================╝")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Missing token"})
+	}
+
+	tokenString := authHeader
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		tokenString = authHeader[7:]
 	}
 
 	token, err := validateJWT(tokenString)
@@ -108,7 +113,6 @@ func jwtMiddleware(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token"})
 	}
 
-	// Extract claims (optional)
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
 		log.Println("║ 💥 Invalid claims")

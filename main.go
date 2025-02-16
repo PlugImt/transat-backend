@@ -71,6 +71,7 @@ func main() {
 	// User routes
 	newf := api.Group("/newf", loginRegisterLimiter)
 	newf.Post("/", register)
+	newf.Get("/me", jwtMiddleware, getNewf)
 	//newf.Get("/", getAllNewfs)
 	//newf.Get(":id", getNewf)
 	//newf.Put(":id", updateNewf)

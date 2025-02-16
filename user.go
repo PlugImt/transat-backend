@@ -507,3 +507,76 @@ func deleteNewf(c *fiber.Ctx) error {
 
 	return c.SendStatus(fiber.StatusOK)
 }
+
+func getNewf(c *fiber.Ctx) error {
+	email := c.Locals("email").(string)
+
+	log.Println("╔======== 📧 Get Newf 📧 ========╗")
+
+	request := `
+		SELECT 
+		    email, 
+		    first_name, 
+		    last_name, 
+		    COALESCE(profile_picture, '') as profile_picture,
+		    COALESCE(phone_number, '') as phone_number,
+		    COALESCE(graduation_year, 0) as graduation_year,
+			COALESCE(campus, '') as campus
+		FROM newf
+		WHERE email = $1;
+	`
+
+	stmt, err := db.Prepare(request)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return
+		}
+	}(stmt)
+
+	var newf Newf
+	err = stmt.QueryRow(email).Scan(&newf.Email, &newf.FirstName, &newf.LastName, &newf.ProfilePicture, &newf.PhoneNumber, &newf.GraduationYear, &newf.Campus)
+	if err != nil {
+		log.Println("║ 💥 Failed to get newf: ", err)
+		log.Println("║ 📧 Email: ", email)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
+	log.Println("║ ✅ Newf fetched successfully")
+	log.Println("║ 📧 Email: ", email)
+	log.Println("╚=========================================╝")
+
+	response := make(map[string]interface{})
+
+	if newf.Email != "" {
+		response["email"] = newf.Email
+	}
+	if newf.FirstName != "" {
+		response["first_name"] = newf.FirstName
+	}
+	if newf.LastName != "" {
+		response["last_name"] = newf.LastName
+	}
+	if newf.ProfilePicture != "" {
+		response["profile_picture"] = newf.ProfilePicture
+	}
+	if newf.PhoneNumber != "" {
+		response["phone_number"] = newf.PhoneNumber
+	}
+	if newf.GraduationYear != "0" {
+		response["graduation_year"] = newf.GraduationYear
+	}
+	if newf.Campus != "" {
+		response["campus"] = newf.Campus
+	}
+
+	return c.Status(fiber.StatusOK).JSON(response)
+}
