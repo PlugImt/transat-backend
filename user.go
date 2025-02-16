@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"log"
 	"strings"
+	"time"
 )
 
 func register(c *fiber.Ctx) error {
@@ -111,7 +112,7 @@ func register(c *fiber.Ctx) error {
 		Subject:   fmt.Sprintf("🔐 Ton code de vérification : %s", verifCode.VerificationCode),
 		Template:  "email_templates/email_template_verif_code.html",
 		Sender: EmailSender{
-			Name:  "Transat Email Service",
+			Name:  "Transat Team",
 			Email: "admin@destimt.fr",
 		},
 	}, verifCode)
@@ -190,7 +191,27 @@ func login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
-	// TODO: Send an email to the user letting them know someone logged in
+	errEmail := sendEmail(Email{
+		Recipient: newf.Email,
+		Subject:   "🔐 Nouvelle connexion à votre compte",
+		Template:  "email_templates/email_template_new_signin.html",
+		Sender: EmailSender{
+			Name:  "Transat Team",
+			Email: "admin@destimt.fr",
+		},
+	}, struct {
+		FirstName string
+		Date      string
+		Time      string
+	}{
+		FirstName: strings.ToUpper(strings.Split(newf.Email, ".")[0])[0:1] + strings.Split(newf.Email, ".")[0][1:],
+		Date:      time.Now().Format("02/01/2006"),
+		Time:      time.Now().Format("15:04:05"),
+	})
+	if errEmail != nil {
+		log.Println("║ 💥 Failed to send login email: ", errEmail)
+		log.Println("╚=========================================╝")
+	}
 
 	log.Println("║ ✅ Login successful")
 	log.Println("║ 📧 Email: ", newf.Email)
@@ -255,7 +276,7 @@ func verificationCode(c *fiber.Ctx) error {
 		Subject:   fmt.Sprintf("🔐 Ton code de vérification : %s", verifCode.VerificationCode),
 		Template:  "email_templates/email_template_verif_code.html",
 		Sender: EmailSender{
-			Name:  "Transat Email Service",
+			Name:  "Transat Team",
 			Email: "admin@destimt.fr",
 		},
 	}, verifCode)

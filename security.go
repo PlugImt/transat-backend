@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"log"
+	"strings"
 )
 
 func verifyAccount(c *fiber.Ctx) error {
@@ -64,6 +65,24 @@ func verifyAccount(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
+	errEmail := sendEmail(Email{
+		Recipient: newf.Email,
+		Subject:   "🐙 Bienvenue sur Transat",
+		Template:  "email_templates/email_template_welcome.html",
+		Sender: EmailSender{
+			Name:  "Transat Team",
+			Email: "admin@destimt.fr",
+		},
+	}, struct {
+		FirstName string
+	}{
+		FirstName: strings.ToUpper(strings.Split(newf.Email, ".")[0])[0:1] + strings.Split(newf.Email, ".")[0][1:],
+	})
+	if errEmail != nil {
+		log.Println("║ 💥 Failed to send welcome email: ", errEmail)
+		log.Println("╚=========================================╝")
+	}
+
 	log.Println("║ ✅ Account verified successfully")
 	log.Println("║ 📧 Email: ", newf.Email)
 	log.Println("╚=======================================╝")
@@ -96,6 +115,8 @@ func jwtMiddleware(c *fiber.Ctx) error {
 		log.Println("╚=======================================╝")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid claims"})
 	}
+
+	c.Locals("email", claims["email"])
 
 	log.Println("║ ✅ Token is valid")
 	log.Println("║ 📧 Email: ", claims["email"])

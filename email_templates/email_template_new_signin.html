@@ -7,7 +7,7 @@
     <meta name="x-apple-disable-message-reformatting">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta content="telephone=no" name="format-detection">
-    <title>Ton code de vérification Transat</title><!--[if (mso 16)]>
+    <title>{{.FirstName}}, si tu ne t'es pas connecté, change ton mot de passe immédiatement !</title><!--[if (mso 16)]>
     <style type="text/css">
         a {
             text-decoration: none;
@@ -316,7 +316,7 @@
                                                             <td align="center"
                                                                 style="Margin:0;padding-top:20px;padding-right:25px;padding-bottom:10px;padding-left:25px">
                                                                 <h1 style="Margin:0;font-family:roboto, 'helvetica neue', helvetica, arial, sans-serif;mso-line-height-rule:exactly;letter-spacing:0;font-size:30px;font-style:normal;font-weight:bold;line-height:36px;color:#ffe6cc">
-                                                                    <img src="https://em-content.zobj.net/source/apple/391/locked-with-key_1f510.png" alt="Key emoji" style="width:30px;height:30px;"> Ton code de vérification : <span style="color:#ec7f32">{{.VerificationCode}}</span>
+                                                                    Nouvelle connexion à <span style="color:#ec7f32">Transat</span>
                                                                 </h1></td>
                                                         </tr>
                                                         <tr>
@@ -324,17 +324,20 @@
                                                                 style="Margin:0;padding-top:10px;padding-bottom:30px;padding-right:25px;padding-left:25px">
                                                                 <p class="y"
                                                                    style="Margin:0;mso-line-height-rule:exactly;font-family:roboto, 'helvetica neue', helvetica, arial, sans-serif;line-height:24px;letter-spacing:0;color:#ffe6cc;font-size:16px">
-                                                                    <img src="https://em-content.zobj.net/source/apple/391/robot_1f916.png" alt="Robot emoji" style="width:20px;height:20px;"> Entre ton code de vérification unique :
-                                                                    <strong style="color:#0049a8">{{.VerificationCode}}</strong> sur l'application Transat&nbsp;</p>
+                                                                    Salut {{.FirstName}},&nbsp;</p>
                                                                 <p class="y"
                                                                    style="Margin:0;mso-line-height-rule:exactly;font-family:roboto, 'helvetica neue', helvetica, arial, sans-serif;line-height:24px;letter-spacing:0;color:#ffe6cc;font-size:16px">
                                                                     <br></p>
                                                                 <p class="y"
                                                                    style="Margin:0;mso-line-height-rule:exactly;font-family:roboto, 'helvetica neue', helvetica, arial, sans-serif;line-height:24px;letter-spacing:0;color:#ffe6cc;font-size:16px">
-                                                                    ⏳ Ce code est <strong style="color:#0049a8">valide 10 minutes</strong>
-                                                                    (jusqu'à {{.VerificationCodeExpiration}}). Si jamais tu n'as pas eu le temps
-                                                                    de le saisir, tu peux en demander un nouveau depuis
-                                                                    l'application.</p>
+                                                                    Le {{.Date}} à {{.Time}}, nous avons détecté une <strong
+                                                                        style="color:#0049a8">nouvelle
+                                                                    connexion</strong> à ton compte Transat. <strong
+                                                                        style="color:#0049a8">Si c'était toi, tout va
+                                                                    bien</strong>, aucune raison de paniquer. <strong>Dans
+                                                                    le cas contraire</strong>, nous te recommandons de
+                                                                    <strong style="color:#0049a8">changer <strong>immédiatement
+                                                                        ton mot de passe</strong></strong>.</p>
                                                                 <p class="y"
                                                                    style="Margin:0;mso-line-height-rule:exactly;font-family:roboto, 'helvetica neue', helvetica, arial, sans-serif;line-height:24px;letter-spacing:0;color:#ffe6cc;font-size:16px">
                                                                     <br></p>
@@ -343,7 +346,7 @@
                                                                     Gros bisous,</p>
                                                                 <p class="y"
                                                                    style="Margin:0;mso-line-height-rule:exactly;font-family:roboto, 'helvetica neue', helvetica, arial, sans-serif;line-height:24px;letter-spacing:0;color:#ffe6cc;font-size:16px">
-                                                                    La team Transat <img src="https://em-content.zobj.net/source/apple/391/octopus_1f419.png" alt="Key emoji" style="width:20px;height:20px;"></p></td>
+                                                                    La team Transat  <img src="https://em-content.zobj.net/source/apple/391/octopus_1f419.png" alt="Key emoji" style="width:20px;height:20px;"></p></td>
                                                         </tr>
                                                     </table>
                                                 </td>
