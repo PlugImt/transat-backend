@@ -681,3 +681,96 @@ func updateNewf(c *fiber.Ctx) error {
 
 	return c.SendStatus(fiber.StatusOK)
 }
+
+func addNotification(c *fiber.Ctx) error {
+	type NotificationService struct {
+		Service string `json:"service"`
+	}
+	var notificationService NotificationService
+
+	log.Println("╔======== 📞 Add Notification 📞 ========╗")
+
+	if err := c.BodyParser(&notificationService); err != nil {
+		log.Println("║ 💥 Failed to parse request body: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
+	}
+
+	email := c.Locals("email").(string)
+
+	request := `
+		INSERT INTO notifications (email, id_services)
+		VALUES ($1, (SELECT id_services FROM services WHERE name = $2));
+	`
+
+	stmt, err := db.Prepare(request)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return
+		}
+	}(stmt)
+
+	_, err = stmt.Exec(email, notificationService.Service)
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") {
+			log.Println("║ 💥 Notification already exists, unsubscribing instead")
+
+			request := `
+				DELETE FROM notifications		
+				WHERE email = $1	
+				AND id_services = (SELECT id_services FROM services WHERE name = $2);
+			`
+
+			stmt, err := db.Prepare(request)
+			if err != nil {
+				log.Println("║ 💥 Failed to prepare statement: ", err)
+				log.Println("╚=========================================╝")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+			}
+
+			defer func(stmt *sql.Stmt) {
+				err := stmt.Close()
+				if err != nil {
+					log.Println("║ 💥 Failed to close statement: ", err)
+					log.Println("╚=========================================╝")
+					return
+				}
+			}(stmt)
+
+			_, err = stmt.Exec(email, notificationService.Service)
+			if err != nil {
+				log.Println("║ 💥 Failed to delete notification: ", err)
+				log.Println("║ 📧 Email: ", email)
+				log.Println("╚=========================================╝")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+			}
+
+			log.Println("║ ✅ Notification deleted successfully")
+			log.Println("║ 📧 Email: ", email)
+			log.Println("║ 📞 Service: ", notificationService.Service)
+			log.Println("╚=========================================╝")
+
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": false})
+		}
+
+		log.Println("║ 💥 Failed to add notification: ", err)
+		log.Println("║ 📧 Email: ", email)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
+	log.Println("║ ✅ Notification added successfully")
+	log.Println("║ 📧 Email: ", email)
+	log.Println("║ 📞 Service: ", notificationService.Service)
+	log.Println("╚=========================================╝")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": true})
+}

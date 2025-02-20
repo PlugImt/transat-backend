@@ -1,5 +1,10 @@
 package main
 
+import (
+	"database/sql"
+	"github.com/go-resty/resty/v2"
+)
+
 type Newf struct {
 	ID                      int    `json:"id_newf"`
 	Email                   string `json:"email"`
@@ -24,25 +29,21 @@ type verificationCodeData struct {
 	VerificationCodeExpiration string `json:"verification_code_expiration"`
 }
 
-type PushToken struct {
-	Token  string   `json:"token"`
-	UserID string   `json:"userId"`
-	Groups []string `json:"groups"`
-}
-
-type TokenStore struct {
-	Tokens map[string]PushToken // Key: token
-	Groups map[string][]string  // Key: group name, Value: array of tokens
-}
-
-var tokenStore = TokenStore{
-	Tokens: make(map[string]PushToken),
-	Groups: make(map[string][]string),
-}
-
 type NotificationPayload struct {
-	To    string      `json:"to"`
-	Title string      `json:"title"`
-	Body  string      `json:"body"`
-	Data  interface{} `json:"data,omitempty"`
+	UserEmails []string `json:"userEmails,omitempty"`
+	Groups     []string `json:"groups,omitempty"`
+	Title      string   `json:"title"`
+	Message    string   `json:"message,omitempty"`
+	ImageURL   string   `json:"imageUrl,omitempty"`
+	Screen     string   `json:"screen,omitempty"`
+}
+
+type NotificationTarget struct {
+	Email             string
+	NotificationToken string
+}
+
+type NotificationService struct {
+	db     *sql.DB
+	client *resty.Client
 }

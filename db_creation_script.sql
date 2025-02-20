@@ -133,7 +133,6 @@ CREATE TABLE services
     id_services SERIAL,
     name        VARCHAR(50) NOT NULL,
     type        VARCHAR(50),
-    id_category VARCHAR(50),
     PRIMARY KEY (id_services),
     UNIQUE (name)
 );
