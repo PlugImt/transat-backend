@@ -764,6 +764,7 @@ func addNotification(c *fiber.Ctx) error {
 
 		log.Println("║ 💥 Failed to add notification: ", err)
 		log.Println("║ 📧 Email: ", email)
+		log.Println("║ 📞 Service: ", notificationService.Service)
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
