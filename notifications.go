@@ -209,3 +209,33 @@ func sendNotification(c *fiber.Ctx) error {
 		"failedTargets": failedTargets,
 	})
 }
+
+func (s *NotificationService) SendDailyMenuNotification() error {
+	log.Println("╔======== 🍽️ Send Daily Menu Notification 🍽️ ========╗")
+
+	targets, err := s.GetNotificationTargets([]string{}, []string{"RESTAURANT"})
+	if err != nil {
+		log.Println("║ 💥 Failed to get notification targets: ", err)
+		log.Println("╚=========================================╝")
+		return err
+	}
+
+	log.Printf("║ ℹ️ Found %d users subscribed to RESTAURANT notifications", len(targets))
+
+	payload := NotificationPayload{
+		Title:   "Menu du jour disponible !",
+		Message: "Le menu du RU est maintenant disponible. Découvrez-le sur Transat !",
+		Screen:  "Restaurant",
+	}
+
+	for _, target := range targets {
+		err := s.SendNotification(target, payload)
+		if err != nil {
+			log.Printf("║ ⚠️ Failed to send menu notification to %s: %v", target.Email, err)
+		}
+	}
+
+	log.Println("║ ✅ Daily menu notifications sent successfully")
+	log.Println("╚=========================================╝")
+	return nil
+}

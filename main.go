@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/joho/godotenv"
+	"github.com/robfig/cron/v3"
 	"log"
 	"os"
 	"time"
@@ -41,8 +42,23 @@ func init() {
 
 func main() {
 	app := fiber.New()
+	notificationService := NewNotificationService(db)
+	c := cron.New()
 
-	// Update CORS configuration to allow WebSocket
+	_, err := c.AddFunc("50 10 * * 1-5", func() {
+		err := notificationService.SendDailyMenuNotification()
+		if err != nil {
+			log.Printf("Error sending daily menu notification: %v", err)
+		}
+	})
+
+	if err != nil {
+		log.Fatalf("Error scheduling daily menu notification: %v", err)
+	}
+
+	c.Start()
+	defer c.Stop()
+
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowHeaders: "*",
