@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lib/pq"
@@ -17,6 +16,7 @@ func NewNotificationService(db *sql.DB) *NotificationService {
 }
 
 func (s *NotificationService) SendNotification(target NotificationTarget, payload NotificationPayload) error {
+	log.Println("╔======== 📤 Send Notification 📤 ========╗")
 	notificationBody := map[string]interface{}{
 		"to": target.NotificationToken,
 		"notification": map[string]interface{}{
@@ -31,23 +31,26 @@ func (s *NotificationService) SendNotification(target NotificationTarget, payloa
 			},
 		},
 	}
-
-	fmt.Println(notificationBody)
-
+	
 	_, err := s.client.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(notificationBody).
 		Post("https://exp.host/--/api/v2/push/send")
 
 	if err != nil {
-		log.Printf("Error sending notification to %s: %v\n", target.Email, err)
+		log.Printf("║ 💥 Error sending notification to %s: %v\n", target.Email, err)
+		log.Println("╚=========================================╝")
 		return err
 	}
 
+	log.Println("║ ✅ Notification sent successfully")
+	log.Println("║ 📧 Email: ", target.Email)
+	log.Println("╚=========================================╝")
 	return nil
 }
 
 func (s *NotificationService) GetNotificationTargets(emails []string, groups []string) ([]NotificationTarget, error) {
+	log.Println("╔======== 📧 Get Notification Targets 📧 ========╗")
 	var targets []NotificationTarget
 
 	if len(emails) > 0 {
@@ -59,18 +62,23 @@ func (s *NotificationService) GetNotificationTargets(emails []string, groups []s
         `
 		rows, err := s.db.Query(query, pq.Array(emails))
 		if err != nil {
+			log.Println("║ 💥 Failed to query emails: ", err)
+			log.Println("╚=========================================╝")
 			return nil, err
 		}
 		defer func(rows *sql.Rows) {
 			err := rows.Close()
 			if err != nil {
-				log.Println(err)
+				log.Println("║ 💥 Failed to close rows: ", err)
+				log.Println("╚=========================================╝")
 			}
 		}(rows)
 
 		for rows.Next() {
 			var target NotificationTarget
 			if err := rows.Scan(&target.Email, &target.NotificationToken); err != nil {
+				log.Println("║ 💥 Failed to scan row: ", err)
+				log.Println("╚=========================================╝")
 				return nil, err
 			}
 			targets = append(targets, target)
@@ -86,39 +94,80 @@ func (s *NotificationService) GetNotificationTargets(emails []string, groups []s
             WHERE s.name = ANY($1)
             AND nf.notification_token IS NOT NULL
         `
-		rows, err := s.db.Query(query, pq.Array(groups))
+
+		stmt, err := s.db.Prepare(query)
 		if err != nil {
+			log.Println("║ 💥 Failed to prepare statement: ", err)
+			log.Println("╚=========================================╝")
 			return nil, err
 		}
-		defer rows.Close()
+
+		rows, err := stmt.Query(pq.Array(groups))
+		if err != nil {
+			log.Println("║ 💥 Failed to query groups: ", err)
+			log.Println("╚=========================================╝")
+			return nil, err
+		}
+
+		defer func(rows *sql.Rows) {
+			err := rows.Close()
+			if err != nil {
+				log.Println("║ 💥 Failed to close rows: ", err)
+				log.Println("╚=========================================╝")
+			}
+		}(rows)
 
 		for rows.Next() {
 			var target NotificationTarget
 			if err := rows.Scan(&target.Email, &target.NotificationToken); err != nil {
+				log.Println("║ 💥 Failed to scan row: ", err)
+				log.Println("╚=========================================╝")
 				return nil, err
 			}
 			targets = append(targets, target)
 		}
+
+		if err := rows.Err(); err != nil {
+			log.Println("║ 💥 Failed to iterate rows: ", err)
+			log.Println("╚=========================================╝")
+			return nil, err
+		}
+
+		if err := stmt.Close(); err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return nil, err
+		}
+
 	}
 
+	log.Println("║ ✅ Notification targets retrieved successfully")
+	log.Println("╚=========================================╝")
 	return targets, nil
 }
 
 func sendNotification(c *fiber.Ctx) error {
+	log.Println("╔======== 📤 Send Notification 📤 ========╗")
 	var payload NotificationPayload
 	if err := c.BodyParser(&payload); err != nil {
+		log.Println("║ 💥 Failed to parse request body: ", err)
+		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
 
 	if payload.Title == "" {
+		log.Println("║ 💥 Title is required")
+		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Title is required",
 		})
 	}
 
 	if len(payload.UserEmails) == 0 && len(payload.Groups) == 0 {
+		log.Println("║ 💥 At least one user email or group must be specified")
+		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "At least one user email or group must be specified",
 		})
@@ -128,12 +177,16 @@ func sendNotification(c *fiber.Ctx) error {
 
 	targets, err := notificationService.GetNotificationTargets(payload.UserEmails, payload.Groups)
 	if err != nil {
+		log.Println("║ 💥 Failed to get notification targets: ", err)
+		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to get notification targets",
 		})
 	}
 
 	if len(targets) == 0 {
+		log.Println("║ 💥 No valid notification targets found")
+		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "No valid notification targets found",
 		})
@@ -146,6 +199,10 @@ func sendNotification(c *fiber.Ctx) error {
 		}
 	}
 
+	log.Println("║ ✅ Notification sent successfully")
+	log.Println("║ 📧 Total Targets: ", len(targets))
+	log.Println("║ 📧 Failed Targets: ", failedTargets)
+	log.Println("╚=========================================╝")
 	return c.JSON(fiber.Map{
 		"success":       true,
 		"totalTargets":  len(targets),
