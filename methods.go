@@ -19,7 +19,7 @@ func generate2FACode(digits int) string {
 }
 
 func generateJWT(newf Newf) (string, error) {
-	expirationTime := time.Now().Add(24 * time.Hour)
+	expirationTime := time.Now().Add(365 * 24 * time.Hour)
 
 	var role string
 
