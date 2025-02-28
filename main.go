@@ -45,7 +45,7 @@ func main() {
 	notificationService := NewNotificationService(db)
 	c := cron.New()
 
-	_, err := c.AddFunc("50 10 * * 1-5", func() {
+	_, err := c.AddFunc("50 09 * * 1-5", func() {
 		err := notificationService.SendDailyMenuNotification()
 		if err != nil {
 			log.Printf("Error sending daily menu notification: %v", err)
