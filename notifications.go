@@ -1,49 +1,73 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
-	"github.com/go-resty/resty/v2"
+	"encoding/json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lib/pq"
 	"log"
+	"net/http"
+	"time"
 )
 
 func NewNotificationService(db *sql.DB) *NotificationService {
 	return &NotificationService{
-		db:     db,
-		client: resty.New(),
+		db: db,
 	}
 }
 
 func (s *NotificationService) SendNotification(target NotificationTarget, payload NotificationPayload) error {
+	if payload.Data == nil {
+		payload.Data = map[string]interface{}{
+			"sentTime": time.Now().Format(time.RFC3339),
+		}
+	}
+
 	log.Println("╔======== 📤 Send Notification 📤 ========╗")
 	notificationBody := map[string]interface{}{
-		"to": target.NotificationToken,
-		"notification": map[string]interface{}{
-			"title": payload.Title,
-			"body":  payload.Message,
-			"android": map[string]interface{}{
-				"channelId": "default",
-				"imageUrl":  payload.ImageURL,
-			},
-			"data": map[string]interface{}{
-				"screen": payload.Screen,
-			},
-		},
+		"to":        target.NotificationToken,
+		"title":     payload.Title,
+		"ttl":       payload.TTL,
+		"subtitle":  payload.Subtitle,
+		"sound":     payload.Sound,
+		"body":      payload.Message,
+		"channelId": payload.ChannelID,
+		"badge":     payload.Badge,
+		"data":      payload.Data,
 	}
-	
-	_, err := s.client.R().
-		SetHeader("Content-Type", "application/json").
-		SetBody(notificationBody).
-		Post("https://exp.host/--/api/v2/push/send")
 
+	notificationBodyBytes, err := json.Marshal(notificationBody)
 	if err != nil {
-		log.Printf("║ 💥 Error sending notification to %s: %v\n", target.Email, err)
-		log.Println("╚=========================================╝")
 		return err
 	}
 
-	log.Println("║ ✅ Notification sent successfully")
+	response, err := http.Post("https://api.expo.dev/v2/push/send", "application/json", bytes.NewBuffer(notificationBodyBytes))
+
+	if response != nil {
+		defer func(response *http.Response) {
+			err := response.Body.Close()
+			if err != nil {
+				log.Printf("║ 💥 Error closing response body: %v\n", err)
+			}
+		}(response)
+
+		if response.StatusCode != http.StatusOK {
+			log.Printf("║ 💥 Failed to send notification to %s | %s | %s\n", target.Email, notificationBody, response.Status)
+			log.Println("╚=========================================╝")
+			return err
+		}
+
+	} else {
+		if err != nil {
+			log.Printf("║ 💥 Error sending notification to %s: %v\n", target.Email, err)
+			log.Println("╚=========================================╝")
+			return err
+
+		}
+	}
+
+	log.Printf("║ ✅ Notification sent successfully to %s | %s\n", target.Email, notificationBody)
 	log.Println("║ 📧 Email: ", target.Email)
 	log.Println("╚=========================================╝")
 	return nil
@@ -223,9 +247,8 @@ func (s *NotificationService) SendDailyMenuNotification() error {
 	log.Printf("║ ℹ️ Found %d users subscribed to RESTAURANT notifications", len(targets))
 
 	payload := NotificationPayload{
-		Title:   "Menu du jour disponible !",
-		Message: "Le menu du RU est maintenant disponible. Découvrez-le sur Transat !",
-		Screen:  "Restaurant",
+		Title:   "🧑‍🍳 Menu du jour disponible !",
+		Message: "Le menu du RU est prêt ! Grill, Migrateurs ou Végé, faites votre choix sur Transat. 😋️",
 	}
 
 	for _, target := range targets {
