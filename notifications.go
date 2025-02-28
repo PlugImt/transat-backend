@@ -249,6 +249,9 @@ func (s *NotificationService) SendDailyMenuNotification() error {
 	payload := NotificationPayload{
 		Title:   "🧑‍🍳 Menu du jour disponible !",
 		Message: "Le menu du RU est prêt ! Grill, Migrateurs ou Végé, faites votre choix sur Transat. 😋️",
+		Data: map[string]interface{}{
+			"screen": "Restaurant",
+		},
 	}
 
 	for _, target := range targets {
