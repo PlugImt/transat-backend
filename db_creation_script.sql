@@ -143,7 +143,7 @@ CREATE TABLE traq
     name          VARCHAR(50)    NOT NULL,
     disabled      BOOLEAN,
     limited       BOOLEAN,
-    alcool        NUMERIC(4, 2),
+    alcohol        NUMERIC(4, 2),
     out_of_stock  BOOLEAN,
     creation_date TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     picture       VARCHAR(500)   NOT NULL,

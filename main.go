@@ -105,12 +105,16 @@ func main() {
 	auth.Post("/change-password", changePassword)
 
 	// Traq routes
-	//traq := api.Group("/traq")
-	//traq.Post("/", createTraqArticle)
-	//traq.Get("/", getAllTraqArticles)
+	traq := api.Group("/traq")
+	traq.Post("/", createTraqArticle)
+	traq.Get("/", getAllTraqArticles)
 	//traq.Get(":id", getTraqArticle)
 	//traq.Put(":id", updateTraqArticle)
 	//traq.Delete(":id", deleteTraqArticle)
+
+	traqTypes := traq.Group("/types")
+	traqTypes.Post("/", createTraqTypes)
+	traqTypes.Get("/", getAllTraqTypes)
 
 	// Restorant routes
 	//restorant := api.Group("/restorant")
