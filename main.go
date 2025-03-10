@@ -102,7 +102,7 @@ func main() {
 	auth.Post("/login", loginRegisterLimiter, login)
 	auth.Post("/verify-account", verifyAccount)
 	auth.Post("/verification-code", verificationCode)
-	auth.Post("/change-password", changePassword)
+	auth.Patch("/change-password", changePassword)
 
 	// Traq routes
 	traq := api.Group("/traq")
