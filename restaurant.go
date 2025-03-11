@@ -2,17 +2,179 @@ package main
 
 import (
 	"database/sql"
-	"github.com/gofiber/fiber/v2"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
 )
+
+var (
+	lastFetchTime time.Time
+	cachedMenu    *MenuData
+	cacheMutex    sync.Mutex
+)
+
+func fetchMenuFromAPI() (*MenuData, error) {
+	const targetURL = "https://toast-js.ew.r.appspot.com/coteresto?key=1ohdRUdCYo6e71aLuBh7ZfF2lc_uZqp9D78icU4DPufA"
+	regex := regexp.MustCompile(`var loadingData = (\[\[.*?\]\])`)
+
+	resp, err := http.Get(targetURL)
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read response body: %w", err)
+	}
+
+	matches := regex.FindSubmatch(body)
+	if len(matches) < 2 {
+		return nil, fmt.Errorf("no match found in the response")
+	}
+
+	loadingData := string(matches[1])
+
+	var nestedItems [][]MenuItem
+	if err := json.Unmarshal([]byte(loadingData), &nestedItems); err != nil {
+		return nil, fmt.Errorf("unable to parse JSON: %w", err)
+	}
+
+	if len(nestedItems) == 0 || len(nestedItems[0]) == 0 {
+		return nil, fmt.Errorf("no menu items found in the response")
+	}
+
+	menuItems := nestedItems[0]
+
+	menuData := MenuData{
+		GrilladesMidi: []string{},
+		Migrateurs:    []string{},
+		Cibo:          []string{},
+		AccompMidi:    []string{},
+		GrilladesSoir: []string{},
+		AccompSoir:    []string{},
+	}
+
+	for _, item := range menuItems {
+		category := getMenuCategory(item.Pole, item.Accompagnement, item.Periode)
+		if category != "" {
+			menuItem := strings.TrimSpace(item.Nom + " " + item.Info1 + item.Info2)
+
+			switch category {
+			case "grilladesMidi":
+				if !contains(menuData.GrilladesMidi, menuItem) {
+					menuData.GrilladesMidi = append(menuData.GrilladesMidi, menuItem)
+				}
+			case "migrateurs":
+				if !contains(menuData.Migrateurs, menuItem) {
+					menuData.Migrateurs = append(menuData.Migrateurs, menuItem)
+				}
+			case "cibo":
+				if !contains(menuData.Cibo, menuItem) {
+					menuData.Cibo = append(menuData.Cibo, menuItem)
+				}
+			case "accompMidi":
+				if !contains(menuData.AccompMidi, menuItem) {
+					menuData.AccompMidi = append(menuData.AccompMidi, menuItem)
+				}
+			case "accompSoir":
+				if !contains(menuData.AccompSoir, menuItem) {
+					menuData.AccompSoir = append(menuData.AccompSoir, menuItem)
+				}
+			case "grilladesSoir":
+				if !contains(menuData.GrilladesSoir, menuItem) {
+					menuData.GrilladesSoir = append(menuData.GrilladesSoir, menuItem)
+				}
+			}
+		}
+	}
+
+	return &menuData, nil
+}
+
+func getMenuCategory(pole string, accompagnement string, periode string) string {
+	if accompagnement == "TRUE" {
+		if periode == "midi" {
+			return "accompMidi"
+		}
+		return "accompSoir"
+	}
+
+	switch pole {
+	case "Grillades / Plats traditions":
+		if periode == "midi" {
+			return "grilladesMidi"
+		}
+		return "grilladesSoir"
+	case "Les Cuistots migrateurs":
+		return "migrateurs"
+	case "Le Végétarien":
+		return "cibo"
+	default:
+		return ""
+	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+func updateRestaurantMenu(db *sql.DB, menuData *MenuData) (*Restaurant, error) {
+	menuJSON, err := json.Marshal(menuData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal menu data: %w", err)
+	}
+
+	if len(string(menuJSON)) > 5000 {
+		return nil, fmt.Errorf("menu data too large for database column (max 5000 characters)")
+	}
+
+	query := `INSERT INTO restaurant (articles) VALUES ($1) RETURNING id_restaurant, articles, updated_date`
+
+	var restaurant Restaurant
+	err = db.QueryRow(query, string(menuJSON)).Scan(&restaurant.ID, &restaurant.Articles, &restaurant.UpdatedDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update restaurant menu: %w", err)
+	}
+
+	return &restaurant, nil
+}
 
 func getRestaurant(c *fiber.Ctx) error {
 	log.Println("╔======== 🍽️ Get Restaurant 🍽️ ========╗")
+
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+
+	now := time.Now()
+	isSameDay := now.Year() == lastFetchTime.Year() &&
+		now.Month() == lastFetchTime.Month() &&
+		now.Day() == lastFetchTime.Day()
+
+	shouldFetchFromAPI := !isSameDay
+
 	request := `
-		SELECT restaurant.id_restaurant, restaurant.articles, restaurant.updated_date from restaurant
-		ORDER BY updated_date DESC
-		LIMIT 1;
-	`
+        SELECT restaurant.id_restaurant, restaurant.articles, restaurant.updated_date from restaurant
+        ORDER BY updated_date DESC
+        LIMIT 1;
+    `
 
 	stmt, err := db.Prepare(request)
 	if err != nil {
@@ -26,8 +188,6 @@ func getRestaurant(c *fiber.Ctx) error {
 		err := stmt.Close()
 		if err != nil {
 			log.Println("║ 💥 Failed to close statement: ", err)
-			log.Println("╚=========================================╝")
-			return
 		}
 	}(stmt)
 
@@ -35,13 +195,107 @@ func getRestaurant(c *fiber.Ctx) error {
 	err = stmt.QueryRow().Scan(&restaurant.ID, &restaurant.Articles, &restaurant.UpdatedDate)
 	if err != nil {
 		log.Println("║ 💥 Failed to get restaurant: ", err)
+		if err != sql.ErrNoRows {
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Something went wrong",
+			})
+		}
+
+		shouldFetchFromAPI = true
+	}
+
+	if !shouldFetchFromAPI {
+		log.Println("║ ✅ Returning cached restaurant menu")
+		log.Println("╚=========================================╝")
+		return c.JSON(restaurant)
+	}
+
+	log.Println("║ 🔄 Fetching menu from API")
+	menuData, err := fetchMenuFromAPI()
+	if err != nil {
+		log.Println("║ 💥 Failed to fetch menu from API: ", err)
+		if restaurant.ID != 0 {
+			log.Println("║ ⚠️ Returning existing menu from database")
+			log.Println("╚=========================================╝")
+			return c.JSON(restaurant)
+		}
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Something went wrong",
+			"error": "Failed to fetch menu",
 		})
 	}
 
-	log.Println("║ ✅ Restaurant retrieved successfully")
+	lastFetchTime = now
+	cachedMenu = menuData
+
+	var dbMenuData MenuData
+	if restaurant.ID != 0 {
+		if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err != nil {
+			log.Println("║ 💥 Failed to parse database menu: ", err)
+			// Continue with the update anyway
+		} else {
+			menuEqual := compareMenus(&dbMenuData, menuData)
+			if menuEqual {
+				log.Println("║ ℹ️ Menu hasn't changed, using existing data")
+				log.Println("╚=========================================╝")
+				return c.JSON(restaurant)
+			}
+		}
+	}
+
+	log.Println("║ 📝 Updating database with new menu")
+	updatedRestaurant, err := updateRestaurantMenu(db, menuData)
+	if err != nil {
+		log.Println("║ 💥 Failed to update restaurant menu: ", err)
+		if restaurant.ID != 0 {
+			log.Println("║ ⚠️ Returning existing menu from database")
+			log.Println("╚=========================================╝")
+			return c.JSON(restaurant)
+		}
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update menu",
+		})
+	}
+
+	log.Println("║ ✅ Restaurant menu updated successfully")
 	log.Println("╚=========================================╝")
-	return c.JSON(restaurant)
+	return c.JSON(updatedRestaurant)
+}
+
+func compareMenus(menu1, menu2 *MenuData) bool {
+	if !compareStringSlices(menu1.GrilladesMidi, menu2.GrilladesMidi) ||
+		!compareStringSlices(menu1.Migrateurs, menu2.Migrateurs) ||
+		!compareStringSlices(menu1.Cibo, menu2.Cibo) ||
+		!compareStringSlices(menu1.AccompMidi, menu2.AccompMidi) ||
+		!compareStringSlices(menu1.GrilladesSoir, menu2.GrilladesSoir) ||
+		!compareStringSlices(menu1.AccompSoir, menu2.AccompSoir) {
+		return false
+	}
+	return true
+}
+
+func compareStringSlices(slice1, slice2 []string) bool {
+	if len(slice1) != len(slice2) {
+		return false
+	}
+
+	map1 := make(map[string]int)
+	for _, s := range slice1 {
+		map1[s]++
+	}
+
+	map2 := make(map[string]int)
+	for _, s := range slice2 {
+		map2[s]++
+	}
+
+	for k, v := range map1 {
+		if map2[k] != v {
+			return false
+		}
+	}
+
+	return true
 }
