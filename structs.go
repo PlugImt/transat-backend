@@ -70,3 +70,29 @@ type TraqType struct {
 	IDType int    `json:"id_traq_types"`
 	Name   string `json:"name"`
 }
+
+type Restaurant struct {
+	ID          int    `json:"id_restaurant"`
+	Articles    string `json:"articles"`
+	UpdatedDate string `json:"updated_date"`
+}
+
+// MenuItem represents a single menu item
+type MenuItem struct {
+	Pole           string `json:"pole"`
+	Accompagnement string `json:"accompagnement"`
+	Periode        string `json:"periode"`
+	Nom            string `json:"nom"`
+	Info1          string `json:"info1"`
+	Info2          string `json:"info2"`
+}
+
+// MenuData represents categorized menu items
+type MenuData struct {
+	GrilladesMidi []string `json:"grilladesMidi"`
+	Migrateurs    []string `json:"migrateurs"`
+	Cibo          []string `json:"cibo"`
+	AccompMidi    []string `json:"accompMidi"`
+	GrilladesSoir []string `json:"grilladesSoir"`
+	AccompSoir    []string `json:"accompSoir"`
+}

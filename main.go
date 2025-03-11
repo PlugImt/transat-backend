@@ -116,13 +116,10 @@ func main() {
 	traqTypes.Post("/", createTraqTypes)
 	traqTypes.Get("/", getAllTraqTypes)
 
-	// Restorant routes
-	//restorant := api.Group("/restorant")
-	//restorant.Post("/", createRestorant)
-	//restorant.Get("/", getAllRestorants)
-	//restorant.Get(":id", getRestorant)
-	//restorant.Put(":id", updateRestorant)
-	//restorant.Delete(":id", deleteRestorant)
+	// restaurant routes
+	restaurant := api.Group("/restaurant")
+	//restaurant.Post("/", createrestaurant)
+	restaurant.Get("/", getRestaurant)
 
 	log.Fatal(app.Listen(":3000"))
 }

@@ -122,9 +122,8 @@ CREATE TABLE washing_machines
 CREATE TABLE restaurant
 (
     id_restaurant SERIAL,
-    article       VARCHAR(500) NOT NULL,
-    updated_date  TIMESTAMP    NOT NULL,
-    new_article   BOOLEAN      NOT NULL,
+    articles       VARCHAR(5000) NOT NULL,
+    updated_date  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id_restaurant)
 );
 
