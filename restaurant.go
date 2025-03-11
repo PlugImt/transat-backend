@@ -275,6 +275,11 @@ func getRestaurant(c *fiber.Ctx) error {
 	}
 
 	log.Println("║ ✅ Restaurant menu updated successfully")
+	log.Println("║ 🔔 Sending notification to subscribers")
+
+	notificationService := NewNotificationService(db)
+	err = notificationService.SendDailyMenuNotification()
+
 	log.Println("╚=========================================╝")
 
 	return c.JSON(menuData)
