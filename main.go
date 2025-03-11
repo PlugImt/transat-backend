@@ -10,6 +10,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -17,6 +18,8 @@ import (
 
 var db *sql.DB
 var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+var menuCheckedToday bool
+var menuCheckMutex sync.Mutex
 
 func init() {
 	err := godotenv.Load()
@@ -45,10 +48,41 @@ func main() {
 	notificationService := NewNotificationService(db)
 	c := cron.New()
 
-	_, err := c.AddFunc("50 09 * * 1-5", func() {
-		err := notificationService.SendDailyMenuNotification()
+	// Reset menuCheckedToday flag at midnight
+	_, err := c.AddFunc("0 0 * * *", func() {
+		menuCheckMutex.Lock()
+		menuCheckedToday = false
+		menuCheckMutex.Unlock()
+		log.Println("Reset menu check flag for new day")
+	})
+
+	if err != nil {
+		log.Fatalf("Error scheduling midnight reset: %v", err)
+	}
+
+	// Check for menu updates every 15 minutes
+	_, err = c.AddFunc("*/2 * * * *", func() {
+		fmt.Println("Checking for menu updates...")
+		menuCheckMutex.Lock()
+		if menuCheckedToday {
+			menuCheckMutex.Unlock()
+			log.Println("Menu already updated today, skipping check")
+			return
+		}
+		menuCheckMutex.Unlock()
+
+		log.Println("Checking for menu updates...")
+		updated, err := checkAndUpdateMenu(notificationService)
 		if err != nil {
-			log.Printf("Error sending daily menu notification: %v", err)
+			log.Printf("Error checking menu: %v", err)
+			return
+		}
+
+		if updated {
+			menuCheckMutex.Lock()
+			menuCheckedToday = true
+			menuCheckMutex.Unlock()
+			log.Println("Menu updated and notifications sent, won't check again today")
 		}
 	})
 
@@ -118,7 +152,6 @@ func main() {
 
 	// restaurant routes
 	restaurant := api.Group("/restaurant")
-	//restaurant.Post("/", createrestaurant)
 	restaurant.Get("/", getRestaurant)
 
 	log.Fatal(app.Listen(":3000"))

@@ -280,9 +280,73 @@ func getRestaurant(c *fiber.Ctx) error {
 	notificationService := NewNotificationService(db)
 	err = notificationService.SendDailyMenuNotification()
 
+	// Set flag to indicate menu has been updated for today
+	menuCheckMutex.Lock()
+	menuCheckedToday = true
+	menuCheckMutex.Unlock()
+
 	log.Println("╚=========================================╝")
 
 	return c.JSON(menuData)
+}
+
+func checkAndUpdateMenu(notificationService *NotificationService) (bool, error) {
+	log.Println("Fetching latest menu from API")
+
+	menuData, err := fetchMenuFromAPI()
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch menu: %w", err)
+	}
+
+	// Get the latest menu from the database for comparison
+	request := `
+        SELECT restaurant.id_restaurant, restaurant.articles, restaurant.updated_date from restaurant
+        ORDER BY updated_date DESC
+        LIMIT 1;
+    `
+
+	stmt, err := db.Prepare(request)
+	if err != nil {
+		return false, fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	var restaurant Restaurant
+	err = stmt.QueryRow().Scan(&restaurant.ID, &restaurant.Articles, &restaurant.UpdatedDate)
+	if err != nil && err != sql.ErrNoRows {
+		return false, fmt.Errorf("failed to get restaurant: %w", err)
+	}
+
+	// Check if we need to update the menu
+	needsUpdate := true
+	if err != sql.ErrNoRows && restaurant.ID != 0 {
+		var dbMenuData MenuData
+		if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err == nil {
+			if compareMenus(&dbMenuData, menuData) {
+				log.Println("Menu hasn't changed, no update needed")
+				return false, nil
+			}
+		}
+	}
+
+	if needsUpdate {
+		log.Println("Menu has changed, updating database")
+
+		_, err = updateRestaurantMenu(db, menuData)
+		if err != nil {
+			return false, fmt.Errorf("failed to update menu in database: %w", err)
+		}
+
+		log.Println("Sending notifications about updated menu")
+		err = notificationService.SendDailyMenuNotification()
+		if err != nil {
+			return true, fmt.Errorf("menu updated but failed to send notification: %w", err)
+		}
+
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func compareMenus(menu1, menu2 *MenuData) bool {
