@@ -168,6 +168,12 @@ func getRestaurant(c *fiber.Ctx) error {
 		now.Month() == lastFetchTime.Month() &&
 		now.Day() == lastFetchTime.Day()
 
+	if isSameDay && cachedMenu != nil {
+		log.Println("║ ✅ Returning cached menu data")
+		log.Println("╚=========================================╝")
+		return c.JSON(cachedMenu)
+	}
+
 	shouldFetchFromAPI := !isSameDay
 
 	request := `
@@ -205,10 +211,18 @@ func getRestaurant(c *fiber.Ctx) error {
 		shouldFetchFromAPI = true
 	}
 
-	if !shouldFetchFromAPI {
-		log.Println("║ ✅ Returning cached restaurant menu")
-		log.Println("╚=========================================╝")
-		return c.JSON(restaurant)
+	if !shouldFetchFromAPI && restaurant.ID != 0 {
+		var dbMenuData MenuData
+		if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err != nil {
+			log.Println("║ 💥 Failed to parse database menu: ", err)
+			// Need to fetch from API since DB data is invalid
+			shouldFetchFromAPI = true
+		} else {
+			cachedMenu = &dbMenuData
+			log.Println("║ ✅ Returning menu data from database")
+			log.Println("╚=========================================╝")
+			return c.JSON(&dbMenuData)
+		}
 	}
 
 	log.Println("║ 🔄 Fetching menu from API")
@@ -216,9 +230,17 @@ func getRestaurant(c *fiber.Ctx) error {
 	if err != nil {
 		log.Println("║ 💥 Failed to fetch menu from API: ", err)
 		if restaurant.ID != 0 {
-			log.Println("║ ⚠️ Returning existing menu from database")
+			var dbMenuData MenuData
+			if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err != nil {
+				log.Println("║ 💥 Failed to parse database menu: ", err)
+				log.Println("╚=========================================╝")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Failed to fetch menu and existing data is invalid",
+				})
+			}
+			log.Println("║ ⚠️ Returning existing menu data from database")
 			log.Println("╚=========================================╝")
-			return c.JSON(restaurant)
+			return c.JSON(&dbMenuData)
 		}
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -229,39 +251,33 @@ func getRestaurant(c *fiber.Ctx) error {
 	lastFetchTime = now
 	cachedMenu = menuData
 
-	var dbMenuData MenuData
 	if restaurant.ID != 0 {
+		var dbMenuData MenuData
 		if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err != nil {
 			log.Println("║ 💥 Failed to parse database menu: ", err)
-			// Continue with the update anyway
 		} else {
 			menuEqual := compareMenus(&dbMenuData, menuData)
 			if menuEqual {
 				log.Println("║ ℹ️ Menu hasn't changed, using existing data")
 				log.Println("╚=========================================╝")
-				return c.JSON(restaurant)
+				return c.JSON(menuData)
 			}
 		}
 	}
 
 	log.Println("║ 📝 Updating database with new menu")
-	updatedRestaurant, err := updateRestaurantMenu(db, menuData)
+	_, err = updateRestaurantMenu(db, menuData)
 	if err != nil {
-		log.Println("║ 💥 Failed to update restaurant menu: ", err)
-		if restaurant.ID != 0 {
-			log.Println("║ ⚠️ Returning existing menu from database")
-			log.Println("╚=========================================╝")
-			return c.JSON(restaurant)
-		}
+		log.Println("║ 💥 Failed to update restaurant menu in database: ", err)
+		log.Println("║ ⚠️ Returning fetched menu data despite DB update failure")
 		log.Println("╚=========================================╝")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update menu",
-		})
+		return c.JSON(menuData)
 	}
 
 	log.Println("║ ✅ Restaurant menu updated successfully")
 	log.Println("╚=========================================╝")
-	return c.JSON(updatedRestaurant)
+
+	return c.JSON(menuData)
 }
 
 func compareMenus(menu1, menu2 *MenuData) bool {
