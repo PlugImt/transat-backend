@@ -61,7 +61,7 @@ func main() {
 	}
 
 	// Check for menu updates every 15 minutes
-	_, err = c.AddFunc("*/2 * * * *", func() {
+	_, err = c.AddFunc("*/10 * * * *", func() {
 		fmt.Println("Checking for menu updates...")
 		menuCheckMutex.Lock()
 		if menuCheckedToday {
