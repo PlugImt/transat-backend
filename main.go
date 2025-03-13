@@ -160,7 +160,7 @@ func main() {
 	api.Get("/files", jwtMiddleware, listUserFiles)
 	api.Delete("/files/:filename", jwtMiddleware, deleteFile)
 
-	api.Get("all-files", jwtMiddleware, listAllFiles)
+	api.Get("/all-files", jwtMiddleware, listAllFiles)
 
 	log.Fatal(app.Listen(":3000"))
 }
