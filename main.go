@@ -60,8 +60,8 @@ func main() {
 		log.Fatalf("Error scheduling midnight reset: %v", err)
 	}
 
-	// Check for menu updates every 15 minutes
 	_, err = c.AddFunc("*/10 * * * *", func() {
+	// Check for menu updates every 10 minutes
 		fmt.Println("Checking for menu updates...")
 		menuCheckMutex.Lock()
 		if menuCheckedToday {

@@ -96,3 +96,8 @@ type MenuData struct {
 	GrilladesSoir []string `json:"grilladesSoir"`
 	AccompSoir    []string `json:"accompSoir"`
 }
+
+type FullMenuData struct {
+	MenuData
+	UpdatedDate string `json:"updated_date"`
+}

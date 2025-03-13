@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
@@ -29,13 +29,19 @@ func fetchMenuFromAPI() (*MenuData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("failed to close response body: %v\n", err)
+			return
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read response body: %w", err)
 	}
@@ -260,7 +266,10 @@ func getRestaurant(c *fiber.Ctx) error {
 			if menuEqual {
 				log.Println("║ ℹ️ Menu hasn't changed, using existing data")
 				log.Println("╚=========================================╝")
-				return c.JSON(menuData)
+				var menuToReturn FullMenuData
+				menuToReturn.MenuData = *menuData
+				menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02")
+				return c.JSON(menuToReturn)
 			}
 		}
 	}
@@ -271,7 +280,10 @@ func getRestaurant(c *fiber.Ctx) error {
 		log.Println("║ 💥 Failed to update restaurant menu in database: ", err)
 		log.Println("║ ⚠️ Returning fetched menu data despite DB update failure")
 		log.Println("╚=========================================╝")
-		return c.JSON(menuData)
+		var menuToReturn FullMenuData
+		menuToReturn.MenuData = *menuData
+		menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02")
+		return c.JSON(menuToReturn)
 	}
 
 	log.Println("║ ✅ Restaurant menu updated successfully")
@@ -287,7 +299,10 @@ func getRestaurant(c *fiber.Ctx) error {
 
 	log.Println("╚=========================================╝")
 
-	return c.JSON(menuData)
+	var menuToReturn FullMenuData
+	menuToReturn.MenuData = *menuData
+	menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02")
+	return c.JSON(menuToReturn)
 }
 
 func checkAndUpdateMenu(notificationService *NotificationService) (bool, error) {
@@ -309,7 +324,12 @@ func checkAndUpdateMenu(notificationService *NotificationService) (bool, error) 
 	if err != nil {
 		return false, fmt.Errorf("failed to prepare statement: %w", err)
 	}
-	defer stmt.Close()
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			return
+		}
+	}(stmt)
 
 	var restaurant Restaurant
 	err = stmt.QueryRow().Scan(&restaurant.ID, &restaurant.Articles, &restaurant.UpdatedDate)
