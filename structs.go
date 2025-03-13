@@ -99,5 +99,5 @@ type MenuData struct {
 
 type FullMenuData struct {
 	MenuData
-	UpdatedDate string `json:"updated_date"`
+	UpdatedDate string `json:"updatedDate"`
 }
