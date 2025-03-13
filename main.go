@@ -154,5 +154,8 @@ func main() {
 	restaurant := api.Group("/restaurant")
 	restaurant.Get("/", getRestaurant)
 
+	api.Post("/upload", uploadImage)
+	api.Get("/data/:filename", serveImage)
+
 	log.Fatal(app.Listen(":3000"))
 }
