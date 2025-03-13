@@ -272,3 +272,27 @@ func deleteFile(c *fiber.Ctx) error {
 		"message": "File deleted successfully",
 	})
 }
+
+func listAllFiles(c *fiber.Ctx) error {
+	// Look the /data folder and list all files. Return the list of files with their paths and metadata
+	files, err := os.ReadDir("/data")
+	if err != nil {
+		fmt.Println("Failed to read /data directory:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to read /data directory",
+		})
+	}
+
+	var fileList []fiber.Map
+	for _, file := range files {
+		fileList = append(fileList, fiber.Map{
+			"name": file.Name(),
+			"url":  "/api/data/" + file.Name(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"files":   fileList,
+	})
+}
