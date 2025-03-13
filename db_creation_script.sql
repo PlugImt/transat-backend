@@ -122,8 +122,8 @@ CREATE TABLE washing_machines
 CREATE TABLE restaurant
 (
     id_restaurant SERIAL,
-    articles       VARCHAR(5000) NOT NULL,
-    updated_date  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    articles      VARCHAR(5000) NOT NULL,
+    updated_date  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id_restaurant)
 );
 
@@ -142,7 +142,7 @@ CREATE TABLE traq
     name          VARCHAR(50)    NOT NULL,
     disabled      BOOLEAN,
     limited       BOOLEAN,
-    alcohol        NUMERIC(4, 2),
+    alcohol       NUMERIC(4, 2),
     out_of_stock  BOOLEAN,
     creation_date TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     picture       VARCHAR(500)   NOT NULL,
@@ -295,6 +295,18 @@ CREATE TABLE notifications
     PRIMARY KEY (email, id_services),
     FOREIGN KEY (email) REFERENCES newf (email) ON DELETE CASCADE,
     FOREIGN KEY (id_services) REFERENCES services (id_services) ON DELETE CASCADE
+);
+
+CREATE TABLE files
+(
+    id_files         SERIAL,
+    name             VARCHAR(100) NOT NULL,
+    path             VARCHAR(500) NOT NULL,
+    email            VARCHAR(100) NOT NULL,
+    creation_date    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_access_date TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id_files),
+    FOREIGN KEY (email) REFERENCES newf (email) ON DELETE CASCADE
 );
 
 INSERT INTO roles (name, description)
