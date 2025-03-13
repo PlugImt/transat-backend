@@ -177,7 +177,10 @@ func getRestaurant(c *fiber.Ctx) error {
 	if isSameDay && cachedMenu != nil {
 		log.Println("║ ✅ Returning cached menu data")
 		log.Println("╚=========================================╝")
-		return c.JSON(cachedMenu)
+		var menuToReturn FullMenuData
+		menuToReturn.MenuData = *cachedMenu
+		menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
+		return c.JSON(menuToReturn)
 	}
 
 	shouldFetchFromAPI := !isSameDay
@@ -268,7 +271,7 @@ func getRestaurant(c *fiber.Ctx) error {
 				log.Println("╚=========================================╝")
 				var menuToReturn FullMenuData
 				menuToReturn.MenuData = *menuData
-				menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02")
+				menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
 				return c.JSON(menuToReturn)
 			}
 		}
@@ -282,7 +285,7 @@ func getRestaurant(c *fiber.Ctx) error {
 		log.Println("╚=========================================╝")
 		var menuToReturn FullMenuData
 		menuToReturn.MenuData = *menuData
-		menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02")
+		menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
 		return c.JSON(menuToReturn)
 	}
 
@@ -301,7 +304,7 @@ func getRestaurant(c *fiber.Ctx) error {
 
 	var menuToReturn FullMenuData
 	menuToReturn.MenuData = *menuData
-	menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02")
+	menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
 	return c.JSON(menuToReturn)
 }
 
