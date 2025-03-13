@@ -33,6 +33,9 @@ func ensureDataFolder() error {
 func uploadImage(c *fiber.Ctx) error {
 	fmt.Println("Received file upload request")
 
+	fmt.Println("Received file upload request")
+	fmt.Println("Content-Type:", c.Get("Content-Type"))
+
 	// Get user email from JWT
 	email := c.Locals("email").(string)
 	if email == "" {
@@ -41,10 +44,24 @@ func uploadImage(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get uploaded file from the request
+	// Try direct file parsing first
 	file, err := c.FormFile("image")
 	if err != nil {
-		fmt.Println("No image uploaded or invalid file:", err)
+		// If standard parsing fails, try to parse multipart form manually
+		if form, err := c.MultipartForm(); err == nil {
+			if files := form.File["image"]; len(files) > 0 {
+				file = files[0]
+			} else {
+				fmt.Println("No files found in multipart form")
+			}
+		} else {
+			fmt.Println("Error parsing multipart form:", err)
+		}
+	}
+
+	// If we still don't have a file, return error
+	if file == nil {
+		fmt.Println("No image uploaded or invalid file")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "No image uploaded or invalid file",
 		})
