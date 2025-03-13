@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"io"
@@ -235,14 +236,14 @@ func listUserFiles(c *fiber.Ctx) error {
 }
 
 func deleteFile(c *fiber.Ctx) error {
-	fileID := c.Params("id")
+	fileName := c.Params("filename")
 	email := c.Locals("email").(string)
 
 	// First get the filepath to delete the actual file
 	var filePath string
-	err := db.QueryRow("SELECT path FROM files WHERE id_files = $1 AND email = $2", fileID, email).Scan(&filePath)
+	err := db.QueryRow("SELECT path FROM files WHERE name = $1 AND email = $2", fileName, email).Scan(&filePath)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "File not found or you don't have permission to delete it",
 			})
@@ -253,7 +254,7 @@ func deleteFile(c *fiber.Ctx) error {
 	}
 
 	// Delete from database
-	_, err = db.Exec("DELETE FROM files WHERE id_files = $1 AND email = $2", fileID, email)
+	_, err = db.Exec("DELETE FROM files WHERE name = $1 AND email = $2", fileName, email)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to delete file record",

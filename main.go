@@ -158,7 +158,7 @@ func main() {
 	api.Get("/data/:filename", serveImage)
 
 	api.Get("/files", jwtMiddleware, listUserFiles)
-	api.Delete("/files/:id", jwtMiddleware, deleteFile)
+	api.Delete("/files/:filename", jwtMiddleware, deleteFile)
 
 	log.Fatal(app.Listen(":3000"))
 }
