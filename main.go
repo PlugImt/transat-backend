@@ -80,7 +80,9 @@ func main() {
 
 		if updated {
 			menuCheckMutex.Lock()
-			menuCheckedToday = true
+			if time.Now().Hour() > 12 {
+				menuCheckedToday = true
+			}
 			menuCheckMutex.Unlock()
 			log.Println("Menu updated and notifications sent, won't check again today")
 		}

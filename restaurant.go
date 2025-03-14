@@ -297,7 +297,9 @@ func getRestaurant(c *fiber.Ctx) error {
 
 	// Set flag to indicate menu has been updated for today
 	menuCheckMutex.Lock()
-	menuCheckedToday = true
+	if now.Hour() > 12 {
+		menuCheckedToday = true
+	}
 	menuCheckMutex.Unlock()
 
 	log.Println("╚=========================================╝")
