@@ -247,8 +247,8 @@ func (s *NotificationService) SendDailyMenuNotification() error {
 	log.Printf("║ ℹ️ Found %d users subscribed to RESTAURANT notifications", len(targets))
 
 	payload := NotificationPayload{
-		Title:   "🧑‍🍳 Menu du jour disponible !",
-		Message: "Le menu du RU est prêt ! Grill, Migrateurs ou Végé, faites votre choix sur Transat. 😋️",
+		Title:   "Menu du jour disponible",
+		Message: "Vous avez faim ? C'est le moment de voir ce que vous allez manger ce midi 😋",
 		Data: map[string]interface{}{
 			"screen": "Restaurant",
 		},
