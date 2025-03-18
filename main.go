@@ -127,6 +127,7 @@ func main() {
 	newf.Get("/me", jwtMiddleware, getNewf)
 	newf.Patch("/me", jwtMiddleware, updateNewf)
 	newf.Post("/notification", jwtMiddleware, addNotification)
+	newf.Get("/notification", jwtMiddleware, getNotification)
 	//newf.Get("/", getAllNewfs)
 	//newf.Get(":id", getNewf)
 	//newf.Put(":id", updateNewf)

@@ -775,3 +775,178 @@ func addNotification(c *fiber.Ctx) error {
 	log.Println("╚=========================================╝")
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": true})
 }
+
+func getNotification(c *fiber.Ctx) error {
+	email := c.Locals("email").(string)
+	log.Println("╔======== 📞 Get Notification 📞 ========╗")
+
+	// Check if body is empty or contains data
+	body := c.Body()
+	if len(body) == 0 {
+		// No body provided, return all subscribed services
+		request := `
+			SELECT s.name 
+			FROM public.notifications n 
+			JOIN public.services s ON s.id_services = n.id_services
+			WHERE n.email = $1;
+		`
+
+		stmt, err := db.Prepare(request)
+		if err != nil {
+			log.Println("║ 💥 Failed to prepare statement: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+		defer func(stmt *sql.Stmt) {
+			err := stmt.Close()
+			if err != nil {
+				log.Println("║ 💥 Failed to close statement: ", err)
+				log.Println("╚=========================================╝")
+				return
+			}
+		}(stmt)
+
+		rows, err := stmt.Query(email)
+		if err != nil {
+			log.Println("║ 💥 Failed to get notifications: ", err)
+			log.Println("║ 📧 Email: ", email)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+		defer rows.Close()
+
+		var services []string
+		for rows.Next() {
+			var service string
+			if err := rows.Scan(&service); err != nil {
+				log.Println("║ 💥 Failed to scan service: ", err)
+				log.Println("╚=========================================╝")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+			}
+			services = append(services, service)
+		}
+
+		log.Println("║ ✅ All subscribed services fetched successfully")
+		log.Println("║ 📧 Email: ", email)
+		log.Println("╚=========================================╝")
+
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"services": services})
+	} else {
+		// Body contains data, check if it's a single service or array of services
+		var payload struct {
+			Services []string `json:"services"`
+			Service  string   `json:"service"`
+		}
+
+		if err := c.BodyParser(&payload); err != nil {
+			log.Println("║ 💥 Failed to parse request body: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
+		}
+
+		// Handle single service case (backward compatibility)
+		if payload.Service != "" && len(payload.Services) == 0 {
+			request := `
+				SELECT COUNT(*) FROM public.notifications n join public.services s on s.id_services = n.id_services
+				WHERE n.email = $1 AND s.name = $2;
+			`
+
+			stmt, err := db.Prepare(request)
+			if err != nil {
+				log.Println("║ 💥 Failed to prepare statement: ", err)
+				log.Println("╚=========================================╝")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+			}
+			defer func(stmt *sql.Stmt) {
+				err := stmt.Close()
+				if err != nil {
+					log.Println("║ 💥 Failed to close statement: ", err)
+					log.Println("╚=========================================╝")
+					return
+				}
+			}(stmt)
+
+			var count int
+			err = stmt.QueryRow(email, payload.Service).Scan(&count)
+			if err != nil {
+				log.Println("║ 💥 Failed to get notification: ", err)
+				log.Println("║ 📧 Email: ", email)
+				log.Println("║ 📞 Service: ", payload.Service)
+				log.Println("╚=========================================╝")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+			}
+
+			log.Println("║ ✅ Notification status fetched successfully")
+			log.Println("║ 📧 Email: ", email)
+			log.Println("║ 📞 Service: ", payload.Service)
+			log.Println("╚=========================================╝")
+
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": count > 0})
+		}
+
+		// Handle array of services
+		if len(payload.Services) > 0 {
+			// Generate placeholders for the SQL query
+			placeholders := make([]string, len(payload.Services))
+			args := make([]interface{}, len(payload.Services)+1)
+			args[0] = email
+
+			for i, service := range payload.Services {
+				placeholders[i] = fmt.Sprintf("$%d", i+2)
+				args[i+1] = service
+			}
+
+			query := fmt.Sprintf(`
+				SELECT s.name 
+				FROM public.notifications n 
+				JOIN public.services s ON s.id_services = n.id_services
+				WHERE n.email = $1 AND s.name IN (%s);
+			`, strings.Join(placeholders, ", "))
+
+			stmt, err := db.Prepare(query)
+			if err != nil {
+				log.Println("║ 💥 Failed to prepare statement: ", err)
+				log.Println("╚=========================================╝")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+			}
+			defer func(stmt *sql.Stmt) {
+				err := stmt.Close()
+				if err != nil {
+					log.Println("║ 💥 Failed to close statement: ", err)
+					log.Println("╚=========================================╝")
+					return
+				}
+			}(stmt)
+
+			rows, err := stmt.Query(args...)
+			if err != nil {
+				log.Println("║ 💥 Failed to query subscribed services: ", err)
+				log.Println("╚=========================================╝")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+			}
+			defer rows.Close()
+
+			subscribedServices := []string{}
+			for rows.Next() {
+				var service string
+				if err := rows.Scan(&service); err != nil {
+					log.Println("║ 💥 Failed to scan service: ", err)
+					log.Println("╚=========================================╝")
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+				}
+				subscribedServices = append(subscribedServices, service)
+			}
+
+			log.Println("║ ✅ Subscribed services fetched successfully")
+			log.Println("║ 📧 Email: ", email)
+			log.Println("╚=========================================╝")
+
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{"services": subscribedServices})
+		}
+
+		// No recognized format in the request
+		log.Println("║ 💥 Invalid request format")
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
+	}
+}
