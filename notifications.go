@@ -7,7 +7,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/lib/pq"
 	"log"
+	"math/rand"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -246,9 +248,29 @@ func (s *NotificationService) SendDailyMenuNotification() error {
 
 	log.Printf("║ ℹ️ Found %d users subscribed to RESTAURANT notifications", len(targets))
 
+	// Read messages from external JSON file
+	file, err := os.ReadFile("notifications.json")
+	if err != nil {
+		log.Println("║ 💥 Failed to read notification.json: ", err)
+		log.Println("╚=========================================╝")
+		return err
+	}
+
+	// Parse messages
+	var messages []string
+	if err := json.Unmarshal(file, &messages); err != nil {
+		log.Println("║ 💥 Failed to parse menu messages: ", err)
+		log.Println("╚=========================================╝")
+		return err
+	}
+
+	// Randomize selection
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomMessage := messages[r.Intn(len(messages))]
+
 	payload := NotificationPayload{
 		Title:   "Menu du jour disponible",
-		Message: "Vous avez faim ? C'est le moment de voir ce que vous allez manger ce midi 😋",
+		Message: randomMessage,
 		Data: map[string]interface{}{
 			"screen": "Restaurant",
 		},
