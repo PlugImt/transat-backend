@@ -1,10 +1,12 @@
 package main
 
 import (
+	"log"
+	"os"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
-	"log"
-	"strings"
 )
 
 func verifyAccount(c *fiber.Ctx) error {
@@ -71,7 +73,7 @@ func verifyAccount(c *fiber.Ctx) error {
 		Template:  "email_templates/email_template_welcome.html",
 		Sender: EmailSender{
 			Name:  "Transat Team",
-			Email: "admin@destimt.fr",
+			Email: os.Getenv("EMAIL_SENDER"),
 		},
 	}, struct {
 		FirstName string

@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"fmt"
-	gomail "gopkg.in/mail.v2"
 	"html/template"
 	"log"
 	"os"
+	"strconv"
+
+	gomail "gopkg.in/mail.v2"
 )
 
 type Email struct {
@@ -49,7 +51,8 @@ func sendEmail(mailDetails Email, emailData interface{}) error {
 	m.SetHeader("Subject", mailDetails.Subject)
 	m.SetBody("text/html", body.String())
 
-	d := gomail.NewDialer("smtp.gmail.com", 587, mailDetails.Sender.Email, os.Getenv("EMAIL_PASSWORD"))
+	port, _ := strconv.Atoi(os.Getenv("EMAIL_PORT"))
+	d := gomail.NewDialer(os.Getenv("EMAIL_HOST"), port, mailDetails.Sender.Email, os.Getenv("EMAIL_PASSWORD"))
 
 	if err := d.DialAndSend(m); err != nil {
 		log.Printf("error sending email: %v", err)

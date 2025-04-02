@@ -3,11 +3,13 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/gofiber/fiber/v2"
-	"golang.org/x/crypto/bcrypt"
 	"log"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func register(c *fiber.Ctx) error {
@@ -126,7 +128,7 @@ func register(c *fiber.Ctx) error {
 		Template:  "email_templates/email_template_verif_code.html",
 		Sender: EmailSender{
 			Name:  "Transat Team",
-			Email: "admin@destimt.fr",
+			Email: os.Getenv("EMAIL_SENDER"),
 		},
 	}, verifCode)
 	if errEmail != nil {
@@ -210,7 +212,7 @@ func login(c *fiber.Ctx) error {
 		Template:  "email_templates/email_template_new_signin.html",
 		Sender: EmailSender{
 			Name:  "Transat Team",
-			Email: "admin@destimt.fr",
+			Email: os.Getenv("EMAIL_SENDER"),
 		},
 	}, struct {
 		FirstName string
@@ -290,7 +292,7 @@ func verificationCode(c *fiber.Ctx) error {
 		Template:  "email_templates/email_template_verif_code.html",
 		Sender: EmailSender{
 			Name:  "Transat Team",
-			Email: "admin@destimt.fr",
+			Email: os.Getenv("EMAIL_SENDER"),
 		},
 	}, verifCode)
 	if errEmail != nil {
