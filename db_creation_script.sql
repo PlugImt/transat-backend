@@ -1,22 +1,10 @@
-CREATE TABLE newf
+CREATE TABLE languages
 (
-    id_newf                      SERIAL,
-    email                        VARCHAR(100),
-    password                     VARCHAR(200) NOT NULL,
-    password_updated_date        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    verification_code            VARCHAR(6)            DEFAULT LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0'),
-    verification_code_expiration TIMESTAMP             DEFAULT CURRENT_TIMESTAMP + INTERVAL '10 minutes',
-    creation_date                TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    first_name                   VARCHAR(50)  NOT NULL,
-    last_name                    VARCHAR(50)  NOT NULL,
-    phone_number                 VARCHAR(20),
-    profile_picture              VARCHAR(500),
-    notification_token           VARCHAR(50),
-    graduation_year              SMALLINT,
-    campus                       VARCHAR(50) CHECK (campus IN ('NANTES', 'BREST', 'RENNES') ),
-    language                     SMALLINT     NOT NULL DEFAULT 1,
-    FOREIGN KEY (language) REFERENCES languages (id_languages) ON DELETE CASCADE,
-    PRIMARY KEY (email)
+    id_languages SERIAL,
+    name         VARCHAR(50) NOT NULL,
+    code         VARCHAR(10) NOT NULL,
+    PRIMARY KEY (id_languages),
+    UNIQUE (name)
 );
 
 CREATE TABLE roles
@@ -37,56 +25,6 @@ CREATE TABLE games
     picture     VARCHAR(500),
     PRIMARY KEY (id_games),
     UNIQUE (name)
-);
-
-CREATE TABLE caps
-(
-    id_caps           SERIAL,
-    game_code         VARCHAR(6)   NOT NULL,
-    number_of_players SMALLINT     NOT NULL,
-    finished          BOOLEAN,
-    creation_date     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    finish_date       TIMESTAMP,
-    creator           VARCHAR(100) NOT NULL,
-    PRIMARY KEY (id_caps),
-    FOREIGN KEY (creator) REFERENCES newf (email) ON DELETE CASCADE
-);
-
-CREATE TABLE bassine
-(
-    id_bassine    SERIAL,
-    creation_date TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    creator       VARCHAR(100) NOT NULL,
-    PRIMARY KEY (id_bassine),
-    FOREIGN KEY (creator) REFERENCES newf (email) ON DELETE CASCADE
-);
-
-CREATE TABLE events
-(
-    id_events     SERIAL,
-    name          VARCHAR(100) NOT NULL,
-    description   VARCHAR(200),
-    link          VARCHAR(100),
-    start_date    TIMESTAMP    NOT NULL,
-    end_date      TIMESTAMP,
-    location      VARCHAR(100) NOT NULL,
-    creation_date TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    picture       VARCHAR(500),
-    slots         INTEGER,
-    price         NUMERIC(15, 2),
-    PRIMARY KEY (id_events)
-);
-
-CREATE TABLE rooms
-(
-    id_rooms    SERIAL,
-    name        VARCHAR(100) NOT NULL,
-    description VARCHAR(200),
-    picture     VARCHAR(500),
-    location    VARCHAR(100) NOT NULL,
-    PRIMARY KEY (id_rooms),
-    UNIQUE (name),
-    UNIQUE (location)
 );
 
 CREATE TABLE articles_types
@@ -113,6 +51,64 @@ CREATE TABLE traq_types
     UNIQUE (name)
 );
 
+CREATE TABLE services
+(
+    id_services SERIAL,
+    name        VARCHAR(50) NOT NULL,
+    type        VARCHAR(50),
+    PRIMARY KEY (id_services),
+    UNIQUE (name)
+);
+
+CREATE TABLE newf
+(
+    id_newf                      SERIAL,
+    email                        VARCHAR(100),
+    password                     VARCHAR(200) NOT NULL,
+    password_updated_date        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    verification_code            VARCHAR(6)            DEFAULT LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0'),
+    verification_code_expiration TIMESTAMP             DEFAULT CURRENT_TIMESTAMP + INTERVAL '10 minutes',
+    creation_date                TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    first_name                   VARCHAR(50)  NOT NULL,
+    last_name                    VARCHAR(50)  NOT NULL,
+    phone_number                 VARCHAR(20),
+    profile_picture              VARCHAR(500),
+    notification_token           VARCHAR(50),
+    graduation_year              SMALLINT,
+    campus                       VARCHAR(50) CHECK (campus IN ('NANTES', 'BREST', 'RENNES') ),
+    language                     SMALLINT     NOT NULL DEFAULT 1,
+    FOREIGN KEY (language) REFERENCES languages (id_languages) ON DELETE CASCADE,
+    PRIMARY KEY (email)
+);
+
+CREATE TABLE rooms
+(
+    id_rooms    SERIAL,
+    name        VARCHAR(100) NOT NULL,
+    description VARCHAR(200),
+    picture     VARCHAR(500),
+    location    VARCHAR(100) NOT NULL,
+    PRIMARY KEY (id_rooms),
+    UNIQUE (name),
+    UNIQUE (location)
+);
+
+CREATE TABLE events
+(
+    id_events     SERIAL,
+    name          VARCHAR(100) NOT NULL,
+    description   VARCHAR(200),
+    link          VARCHAR(100),
+    start_date    TIMESTAMP    NOT NULL,
+    end_date      TIMESTAMP,
+    location      VARCHAR(100) NOT NULL,
+    creation_date TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    picture       VARCHAR(500),
+    slots         INTEGER,
+    price         NUMERIC(15, 2),
+    PRIMARY KEY (id_events)
+);
+
 CREATE TABLE washing_machines
 (
     id_washing_machines SERIAL,
@@ -127,15 +123,6 @@ CREATE TABLE restaurant
     articles      VARCHAR(5000) NOT NULL,
     updated_date  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id_restaurant)
-);
-
-CREATE TABLE services
-(
-    id_services SERIAL,
-    name        VARCHAR(50) NOT NULL,
-    type        VARCHAR(50),
-    PRIMARY KEY (id_services),
-    UNIQUE (name)
 );
 
 CREATE TABLE traq
@@ -189,6 +176,28 @@ CREATE TABLE articles
     FOREIGN KEY (id_articles_types) REFERENCES articles_types (id_articles_types) ON DELETE CASCADE,
     FOREIGN KEY (seller) REFERENCES newf (email) ON DELETE CASCADE,
     FOREIGN KEY (buyer) REFERENCES newf (email) ON DELETE CASCADE
+);
+
+CREATE TABLE caps
+(
+    id_caps           SERIAL,
+    game_code         VARCHAR(6)   NOT NULL,
+    number_of_players SMALLINT     NOT NULL,
+    finished          BOOLEAN,
+    creation_date     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    finish_date       TIMESTAMP,
+    creator           VARCHAR(100) NOT NULL,
+    PRIMARY KEY (id_caps),
+    FOREIGN KEY (creator) REFERENCES newf (email) ON DELETE CASCADE
+);
+
+CREATE TABLE bassine
+(
+    id_bassine    SERIAL,
+    creation_date TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator       VARCHAR(100) NOT NULL,
+    PRIMARY KEY (id_bassine),
+    FOREIGN KEY (creator) REFERENCES newf (email) ON DELETE CASCADE
 );
 
 CREATE TABLE newf_roles
@@ -309,15 +318,6 @@ CREATE TABLE files
     last_access_date TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id_files),
     FOREIGN KEY (email) REFERENCES newf (email) ON DELETE CASCADE
-);
-
-CREATE TABLE languages
-(
-    id_languages SERIAL,
-    name         VARCHAR(50) NOT NULL,
-    code         VARCHAR(10) NOT NULL,
-    PRIMARY KEY (id_languages),
-    UNIQUE (name)
 );
 
 INSERT INTO roles (name, description)
