@@ -46,8 +46,8 @@ func register(c *fiber.Ctx) error {
 	newf.LastName = strings.ToUpper(lastName)
 
 	request := `
-		INSERT INTO newf (email, password, first_name, last_name)
-		VALUES ($1, $2, $3, $4);
+		INSERT INTO newf (email, password, first_name, last_name, language)
+		VALUES ($1, $2, $3, $4, COALESCE ((SELECT id_languages FROM languages WHERE name = $5 OR code = $5 LIMIT 1), 1));
 	`
 
 	stmt, err := db.Prepare(request)
@@ -65,7 +65,15 @@ func register(c *fiber.Ctx) error {
 		}
 	}(stmt)
 
-	_, err = stmt.Exec(newf.Email, newf.Password, newf.FirstName, newf.LastName)
+	if newf.Language == "" {
+		newf.Language = "fr"
+	} else {
+		newf.Language = strings.ToLower(newf.Language)
+	}
+
+	fmt.Println(newf)
+
+	_, err = stmt.Exec(newf.Email, newf.Password, newf.FirstName, newf.LastName, newf.Language)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") {
 			log.Println("║ 💥 User already exists: ", err)
@@ -515,19 +523,20 @@ func getNewf(c *fiber.Ctx) error {
 	log.Println("╔======== 📧 Get Newf 📧 ========╗")
 
 	request := `
-		SELECT id_newf,
-		       email,
-		       first_name,
-		       last_name,
-		       COALESCE(profile_picture, '') as profile_picture,
-		       COALESCE(phone_number, '')    as phone_number,
-		       COALESCE(graduation_year, 0)  as graduation_year,
-		       COALESCE(campus, '')          as campus,
-		       (SELECT COUNT(*)
-		        FROM newf)                   as total_newf,
-		    	password_updated_date
-		FROM newf
-		WHERE email = $1;
+			SELECT id_newf,
+       			email,
+       			first_name,
+       			last_name,
+       			COALESCE(profile_picture, '')                              as profile_picture,
+       			COALESCE(phone_number, '')                                 as phone_number,
+       			COALESCE(graduation_year, 0)                               as graduation_year,
+       			COALESCE(campus, '')                                       as campus,
+       			(SELECT COUNT(*)
+        				FROM newf)                                                as total_newf,
+       			password_updated_date,
+       			(SELECT code FROM languages WHERE language = id_languages) as language
+			FROM newf
+			WHERE email = $1;
 	`
 
 	stmt, err := db.Prepare(request)
@@ -546,7 +555,7 @@ func getNewf(c *fiber.Ctx) error {
 	}(stmt)
 
 	var newf Newf
-	err = stmt.QueryRow(email).Scan(&newf.ID, &newf.Email, &newf.FirstName, &newf.LastName, &newf.ProfilePicture, &newf.PhoneNumber, &newf.GraduationYear, &newf.Campus, &newf.TotalUsers, &newf.PasswordUpdatedDate)
+	err = stmt.QueryRow(email).Scan(&newf.ID, &newf.Email, &newf.FirstName, &newf.LastName, &newf.ProfilePicture, &newf.PhoneNumber, &newf.GraduationYear, &newf.Campus, &newf.TotalUsers, &newf.PasswordUpdatedDate, &newf.Language)
 	if err != nil {
 		log.Println("║ 💥 Failed to get newf: ", err)
 		log.Println("║ 📧 Email: ", email)
@@ -590,6 +599,9 @@ func getNewf(c *fiber.Ctx) error {
 	if newf.PasswordUpdatedDate != "" {
 		response["password_updated_date"] = newf.PasswordUpdatedDate
 	}
+	if newf.Language != "" {
+		response["language"] = newf.Language
+	}
 
 	return c.Status(fiber.StatusOK).JSON(response)
 }
@@ -630,48 +642,83 @@ func updateNewf(c *fiber.Ctx) error {
 	if newf.ProfilePicture != "" {
 		updateFields["profile_picture"] = newf.ProfilePicture
 	}
+	if newf.Language != "" {
+		request := `
+			UPDATE newf 
+			SET language = (SELECT id_languages FROM languages WHERE name = $1 OR code = $1 LIMIT 1)
+			WHERE email = $2;
+		`
 
-	if len(updateFields) == 0 {
+		stmt, err := db.Prepare(request)
+		if err != nil {
+			log.Println("║ 💥 Failed to prepare statement: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+
+		defer func(stmt *sql.Stmt) {
+			err := stmt.Close()
+			if err != nil {
+				log.Println("║ 💥 Failed to close statement: ", err)
+				log.Println("╚=========================================╝")
+				return
+			}
+		}(stmt)
+
+		_, err = stmt.Exec(newf.Language, email)
+		if err != nil {
+			log.Println("║ 💥 Failed to update language: ", err)
+			log.Println("║ 📧 Email: ", email)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+
+	}
+
+	if len(updateFields) == 0 && newf.Language == "" {
 		log.Println("║ ⚠️ No fields provided for update")
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No data provided to update"})
 	}
+	if len(updateFields) > 0 {
+		var queryParts []string
+		var values []interface{}
+		i := 1
 
-	var queryParts []string
-	var values []interface{}
-	i := 1
-
-	for column, value := range updateFields {
-		queryParts = append(queryParts, fmt.Sprintf("%s = $%d", column, i))
-		values = append(values, value)
-		i++
-	}
-
-	values = append(values, email)
-
-	query := fmt.Sprintf("UPDATE newf SET %s WHERE email = $%d;", strings.Join(queryParts, ", "), i)
-
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		log.Println("║ 💥 Failed to prepare statement: ", err)
-		log.Println("╚=========================================╝")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
-	}
-	defer func(stmt *sql.Stmt) {
-		err := stmt.Close()
-		if err != nil {
-			log.Println("║ 💥 Failed to close statement: ", err)
-			log.Println("╚=========================================╝")
-			return
+		for column, value := range updateFields {
+			queryParts = append(queryParts, fmt.Sprintf("%s = $%d", column, i))
+			values = append(values, value)
+			i++
 		}
-	}(stmt)
 
-	_, err = stmt.Exec(values...)
-	if err != nil {
-		log.Println("║ 💥 Failed to update newf: ", err)
-		log.Println("║ 📧 Email: ", email)
-		log.Println("╚=========================================╝")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		values = append(values, email)
+
+		query := fmt.Sprintf("UPDATE newf SET %s WHERE email = $%d;", strings.Join(queryParts, ", "), i)
+
+		fmt.Println(query, values)
+
+		stmt, err := db.Prepare(query)
+		if err != nil {
+			log.Println("║ 💥 Failed to prepare statement: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
+		defer func(stmt *sql.Stmt) {
+			err := stmt.Close()
+			if err != nil {
+				log.Println("║ 💥 Failed to close statement: ", err)
+				log.Println("╚=========================================╝")
+				return
+			}
+		}(stmt)
+
+		_, err = stmt.Exec(values...)
+		if err != nil {
+			log.Println("║ 💥 Failed to update newf: ", err)
+			log.Println("║ 📧 Email: ", email)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+		}
 	}
 
 	log.Println("║ ✅ Newf updated successfully")
@@ -924,7 +971,14 @@ func getNotification(c *fiber.Ctx) error {
 				log.Println("╚=========================================╝")
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 			}
-			defer rows.Close()
+			defer func(rows *sql.Rows) {
+				err := rows.Close()
+				if err != nil {
+					log.Println("║ 💥 Failed to close rows: ", err)
+					log.Println("╚=========================================╝")
+					return
+				}
+			}(rows)
 
 			subscribedServices := []string{}
 			for rows.Next() {

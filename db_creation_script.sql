@@ -14,6 +14,8 @@ CREATE TABLE newf
     notification_token           VARCHAR(50),
     graduation_year              SMALLINT,
     campus                       VARCHAR(50) CHECK (campus IN ('NANTES', 'BREST', 'RENNES') ),
+    language                     SMALLINT     NOT NULL DEFAULT 1,
+    FOREIGN KEY (language) REFERENCES languages (id_languages) ON DELETE CASCADE,
     PRIMARY KEY (email)
 );
 
@@ -309,9 +311,29 @@ CREATE TABLE files
     FOREIGN KEY (email) REFERENCES newf (email) ON DELETE CASCADE
 );
 
+CREATE TABLE languages
+(
+    id_languages SERIAL,
+    name         VARCHAR(50) NOT NULL,
+    code         VARCHAR(10) NOT NULL,
+    PRIMARY KEY (id_languages),
+    UNIQUE (name)
+);
+
 INSERT INTO roles (name, description)
 VALUES ('ADMIN', 'Global administrator with all privileges'),
        ('NEWF', 'Transat user'),
        ('VALIDATED', 'Transat user with validated email'),
        ('BANNED', 'Transat user banned from the platform'),
        ('VERIFYING', 'Transat user with email not yet verified');
+
+INSERT INTO languages(name, code)
+VALUES ('French', 'fr'),
+       ('English', 'en'),
+       ('Spanish', 'es'),
+       ('German', 'de'),
+       ('Italian', 'it'),
+       ('Portuguese', 'pt'),
+       ('Russian', 'ru'),
+       ('Chinese', 'zh'),
+       ('Korean', 'ko');

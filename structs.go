@@ -21,6 +21,7 @@ type Newf struct {
 	GraduationYear    int    `json:"graduation_year"`
 	Campus            string `json:"campus"`
 	TotalUsers        int    `json:"total_newf"`
+	Language          string `json:"language"`
 }
 
 type verificationCodeData struct {
