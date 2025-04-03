@@ -26,6 +26,10 @@ var menuCheckMutex sync.Mutex
 func init() {
 	err := godotenv.Load()
 
+	if err != nil {
+		log.Fatalf("💥 Error loading .env file: %v", err)
+	}
+
 	// Connect to the database
 	db, err = sql.Open("postgres",
 		fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
