@@ -6,26 +6,30 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/gofiber/fiber/v2"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // ensureDataFolder checks if the /data folder exists, creates it if not
 func ensureDataFolder() error {
-	path := "/data"
+	path := os.Getenv("DATA_FOLDER")
+	if path == "" {
+		path = "/data"
+	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		fmt.Println("/data folder does not exist. Creating...")
+		fmt.Println(path, "folder does not exist. Creating...")
 		if err := os.MkdirAll(path, 0755); err != nil {
-			fmt.Println("Failed to create /data folder:", err)
+			fmt.Println("Failed to create", path, "folder:", err)
 			return err
 		}
-		fmt.Println("/data folder created successfully.")
+		fmt.Println(path, "folder created successfully.")
 	} else {
-		fmt.Println("/data folder exists.")
+		fmt.Println(path, "folder exists.")
 	}
 	return nil
 }
@@ -106,7 +110,11 @@ func uploadImage(c *fiber.Ctx) error {
 	}
 
 	// Set destination path
-	dst := fmt.Sprintf("/data/%s", filename)
+	path := os.Getenv("DATA_FOLDER")
+	if path == "" {
+		path = "/data"
+	}
+	dst := fmt.Sprintf("%s/%s", path, filename)
 	fmt.Println("Destination path:", dst)
 
 	// Save file to /data directory
@@ -159,7 +167,7 @@ func uploadImage(c *fiber.Ctx) error {
 	// Return success response with image URL and database ID
 	return c.JSON(fiber.Map{
 		"success": true,
-		"url":     "/data/" + filename,
+		"url":     fmt.Sprintf("/api/data/%s", filename),
 		"file_id": fileID,
 	})
 }
@@ -167,7 +175,11 @@ func uploadImage(c *fiber.Ctx) error {
 // serveImage serves images from the /data directory
 func serveImage(c *fiber.Ctx) error {
 	filename := c.Params("filename")
-	filepath := fmt.Sprintf("/data/%s", filename)
+	path := os.Getenv("DATA_FOLDER")
+	if path == "" {
+		path = "/data"
+	}
+	filepath := fmt.Sprintf("%s/%s", path, filename)
 
 	// Check if file exists
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {
@@ -275,11 +287,15 @@ func deleteFile(c *fiber.Ctx) error {
 
 func listAllFiles(c *fiber.Ctx) error {
 	// Look the /data folder and list all files. Return the list of files with their paths and metadata
-	files, err := os.ReadDir("/data")
+	path := os.Getenv("DATA_FOLDER")
+	if path == "" {
+		path = "/data"
+	}
+	files, err := os.ReadDir(path)
 	if err != nil {
-		fmt.Println("Failed to read /data directory:", err)
+		fmt.Println("Failed to read", path, "directory:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to read /data directory",
+			"error": fmt.Sprintf("Failed to read %s directory", path),
 		})
 	}
 
@@ -287,7 +303,7 @@ func listAllFiles(c *fiber.Ctx) error {
 	for _, file := range files {
 		fileList = append(fileList, fiber.Map{
 			"name": file.Name(),
-			"url":  "/api/data/" + file.Name(),
+			"url":  fmt.Sprintf("/api/data/%s", file.Name()),
 		})
 	}
 
