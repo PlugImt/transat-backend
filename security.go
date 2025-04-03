@@ -59,7 +59,6 @@ func verifyAccount(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid verification code or expired"})
 	}
 
-	// TODO: Send welcome email
 	token, err := generateJWT(newf)
 	if err != nil {
 		log.Println("║ 💥 Failed to generate JWT: ", err)
@@ -67,14 +66,22 @@ func verifyAccount(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
+	// get language from newf table
+	language, err := GetLanguage(newf.Email)
+	if err != nil {
+		log.Println("║ 💥 Failed to get language: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
 	errEmail := sendEmail(Email{
 		Recipient: newf.Email,
-		Subject:   "🐙 Bienvenue sur Transat",
 		Template:  "email_templates/email_template_welcome.html",
 		Sender: EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
 		},
+		Language: language,
 	}, struct {
 		FirstName string
 	}{

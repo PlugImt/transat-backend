@@ -3,17 +3,19 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/joho/godotenv"
-	"github.com/robfig/cron/v3"
 	"log"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/joho/godotenv"
+	"github.com/robfig/cron/v3"
+
 	_ "github.com/lib/pq"
+	_ "github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 var db *sql.DB
@@ -164,6 +166,11 @@ func main() {
 	api.Delete("/files/:filename", jwtMiddleware, deleteFile)
 
 	api.Get("/all-files", jwtMiddleware, listAllFiles)
+
+	// Initialiser i18n
+	if err := initI18n(); err != nil {
+		log.Fatalf("Failed to initialize i18n: %v", err)
+	}
 
 	log.Fatal(app.Listen(":3000"))
 }

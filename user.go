@@ -12,6 +12,29 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+func GetLanguage(email string) (string, error) {
+	request := `
+		SELECT languages.code from newf LEFT JOIN languages ON newf.language = languages.id_languages WHERE email = $1;
+	`
+
+	stmt, err := db.Prepare(request)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare statement: ", err)
+		log.Println("╚=========================================╝")
+		return "", err
+	}
+	defer stmt.Close()
+
+	var language string
+	err = stmt.QueryRow(email).Scan(&language)
+	if err != nil {
+		log.Println("║ 💥 Failed to get language: ", err)
+		log.Println("╚=========================================╝")
+		return "", err
+	}
+	return language, nil
+}
+
 func register(c *fiber.Ctx) error {
 	var newf Newf
 
@@ -73,8 +96,6 @@ func register(c *fiber.Ctx) error {
 		newf.Language = strings.ToLower(newf.Language)
 	}
 
-	fmt.Println(newf)
-
 	_, err = stmt.Exec(newf.Email, newf.Password, newf.FirstName, newf.LastName, newf.Language)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") {
@@ -124,12 +145,12 @@ func register(c *fiber.Ctx) error {
 
 	errEmail := sendEmail(Email{
 		Recipient: newf.Email,
-		Subject:   fmt.Sprintf("🔐 Ton code de vérification : %s", verifCode.VerificationCode),
 		Template:  "email_templates/email_template_verif_code.html",
 		Sender: EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
 		},
+		Language: newf.Language,
 	}, verifCode)
 	if errEmail != nil {
 		log.Println("║ 💥 Failed to send verification email: ", errEmail)
@@ -206,14 +227,21 @@ func login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
+	language, err := GetLanguage(newf.Email)
+	if err != nil {
+		log.Println("║ 💥 Failed to get language: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
+	}
+
 	errEmail := sendEmail(Email{
 		Recipient: newf.Email,
-		Subject:   "🔐 Nouvelle connexion à votre compte",
 		Template:  "email_templates/email_template_new_signin.html",
 		Sender: EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
 		},
+		Language: language,
 	}, struct {
 		FirstName string
 		Date      string
@@ -286,14 +314,25 @@ func verificationCode(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
+	// get language from newf table
+	language, err := GetLanguage(newf.Email)
+	if err != nil {
+		log.Println("║ 💥 Failed to get language: ", err)
+		log.Println("╚=========================================╝")
+	}
+
+	if language == "" {
+		language = "fr"
+	}
+
 	errEmail := sendEmail(Email{
 		Recipient: newf.Email,
-		Subject:   fmt.Sprintf("🔐 Ton code de vérification : %s", verifCode.VerificationCode),
 		Template:  "email_templates/email_template_verif_code.html",
 		Sender: EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
 		},
+		Language: language,
 	}, verifCode)
 	if errEmail != nil {
 		log.Println("║ 💥 Failed to send verification email: ", errEmail)
@@ -696,8 +735,6 @@ func updateNewf(c *fiber.Ctx) error {
 		values = append(values, email)
 
 		query := fmt.Sprintf("UPDATE newf SET %s WHERE email = $%d;", strings.Join(queryParts, ", "), i)
-
-		fmt.Println(query, values)
 
 		stmt, err := db.Prepare(query)
 		if err != nil {
