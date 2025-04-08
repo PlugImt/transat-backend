@@ -171,6 +171,13 @@ func main() {
 
 	api.Get("/all-files", jwtMiddleware, listAllFiles)
 
+	// RealCampus specific routes
+	// Route for getting today's posts by the user.
+	api.Get("/realcampus/today", jwtMiddleware, getUserTodayPosts)
+
+	// Route for getting posts from friends.
+	api.Get("/realcampus/friend-posts", jwtMiddleware, getFriendPosts)
+
 	// Initialiser i18n
 	if err := initI18n(); err != nil {
 		log.Fatalf("Failed to initialize i18n: %v", err)
