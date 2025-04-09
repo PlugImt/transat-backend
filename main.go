@@ -16,6 +16,8 @@ import (
 
 	_ "github.com/lib/pq"
 	_ "github.com/nicksnyder/go-i18n/v2/i18n"
+
+	"Transat_2.0_Backend/routes"
 )
 
 var db *sql.DB
@@ -171,12 +173,8 @@ func main() {
 
 	api.Get("/all-files", jwtMiddleware, listAllFiles)
 
-	// RealCampus specific routes
-	// Route for getting today's posts by the user.
-	api.Get("/realcampus/today", jwtMiddleware, getUserTodayPosts)
-
-	// Route for getting posts from friends.
-	api.Get("/realcampus/friend-posts", jwtMiddleware, getFriendPosts)
+	// Setup RealCampus routes.
+	routes.SetupRealCampusRoutes(api, db)
 
 	// Initialiser i18n
 	if err := initI18n(); err != nil {
