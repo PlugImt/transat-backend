@@ -2,34 +2,39 @@ package posts
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"strings"
 	"time"
 
 	"Transat_2.0_Backend/models"
+	"Transat_2.0_Backend/utils"
 )
 
 // GetUserTodayPosts retrieves all posts created by the user today.
 func GetUserTodayPosts(db *sql.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Check if "email" exists in the context.
+		utils.LogHeader("GetUserTodayPosts")
+
 		emailIfc := c.Locals("email")
 		if emailIfc == nil {
+			utils.LogMessage(utils.LevelError, "Missing email in context.")
+			utils.LogFooter()
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Unauthorized: email not found in context",
 			})
 		}
 
-		// Safely cast email to string.
 		email, ok := emailIfc.(string)
 		if !ok || email == "" {
+			utils.LogMessage(utils.LevelError, "Invalid email format in context.")
+			utils.LogFooter()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Invalid email in context",
 			})
 		}
 
-		// Get today's start and end time in UTC.
+		utils.LogLineKeyValue(utils.LevelInfo, "User", email)
+
 		now := time.Now().UTC()
 		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 		endOfDay := startOfDay.Add(24 * time.Hour)
@@ -57,9 +62,11 @@ func GetUserTodayPosts(db *sql.DB) fiber.Handler {
 			email, startOfDay, endOfDay)
 
 		if err != nil {
-			fmt.Println("Database error:", err)
+			utils.LogMessage(utils.LevelError, "Failed to query today's posts.")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err.Error())
+			utils.LogFooter()
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to retrieve today's posts",
+				"error": "Failed to retrieve today's posts.",
 			})
 		}
 		defer rows.Close()
@@ -81,7 +88,8 @@ func GetUserTodayPosts(db *sql.DB) fiber.Handler {
 				&path2,
 				&name2,
 			); err != nil {
-				fmt.Println("Error scanning row:", err)
+				utils.LogMessage(utils.LevelWarn, "Error scanning row, skipping.")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err.Error())
 				continue
 			}
 
@@ -102,6 +110,9 @@ func GetUserTodayPosts(db *sql.DB) fiber.Handler {
 				},
 			})
 		}
+
+		utils.LogLineKeyValue(utils.LevelInfo, "Posts Found, amount", len(posts))
+		utils.LogFooter()
 
 		return c.JSON(fiber.Map{
 			"success": true,
