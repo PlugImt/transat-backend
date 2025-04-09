@@ -38,19 +38,44 @@ func CreatePost(db *sql.DB) fiber.Handler {
 			request.Privacy = "PRIVATE"
 		}
 
-		// Check files ownerships.
-		var count int
+		// Check file ownership.
+		var ownershipCount int
 		err := db.QueryRow(`
 			SELECT COUNT(*) 
 			FROM files 
 			WHERE id_files IN ($1, $2) AND email = $3`,
-			request.FileID1, request.FileID2, email).Scan(&count)
+			request.FileID1, request.FileID2, email).Scan(&ownershipCount)
 
-		if err != nil || count != 2 {
-			utils.LogMessage(utils.LevelError, "Files ownerships verification failed or files not owned by user.")
+		if err != nil || ownershipCount != 2 {
+			utils.LogMessage(utils.LevelError, "Files ownership verification failed or not all files are owned by user.")
 			utils.LogFooter()
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": "You can only create posts with your own files",
+			})
+		}
+
+		// Check if any file is already used in a post.
+		var usageCount int
+		err = db.QueryRow(`
+			SELECT COUNT(*) 
+			FROM realcampus_posts 
+			WHERE id_file_1 IN ($1, $2) OR id_file_2 IN ($1, $2)`,
+			request.FileID1, request.FileID2).Scan(&usageCount)
+
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to check file usage in posts.")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err.Error())
+			utils.LogFooter()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Unable to verify file usage.",
+			})
+		}
+
+		if usageCount > 0 {
+			utils.LogMessage(utils.LevelError, "One or both files are already used in another post.")
+			utils.LogFooter()
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "One or both files are already used in another post.",
 			})
 		}
 
@@ -71,7 +96,7 @@ func CreatePost(db *sql.DB) fiber.Handler {
 			})
 		}
 
-		utils.LogLineKeyValue(utils.LevelInfo, "Post Created, id", postID)
+		utils.LogLineKeyValue(utils.LevelInfo, "Post Created", postID)
 		utils.LogFooter()
 
 		return c.Status(fiber.StatusCreated).JSON(fiber.Map{
