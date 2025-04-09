@@ -1,10 +1,10 @@
 package main
 
 import (
-	"log"
 	"os"
 	"strings"
 
+	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -12,11 +12,12 @@ import (
 func verifyAccount(c *fiber.Ctx) error {
 	var newf Newf
 
-	log.Println("╔======== 📧 Verify Account 📧 ========╗")
+	utils.LogHeader("📧 Verify Account")
 
 	if err := c.BodyParser(&newf); err != nil {
-		log.Println("║ 💥 Failed to parse request body: ", err)
-		log.Println("╚=======================================╝")
+		utils.LogMessage(utils.LevelError, "Failed to parse request body")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
 	}
 
@@ -31,46 +32,52 @@ func verifyAccount(c *fiber.Ctx) error {
 
 	stmt, err := db.Prepare(request)
 	if err != nil {
-		log.Println("║ 💥 Failed to prepare statement: ", err)
-		log.Println("╚=======================================╝")
+		utils.LogMessage(utils.LevelError, "Failed to prepare statement")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 	defer stmt.Close()
 
 	res, err := stmt.Exec(newf.Email, newf.VerificationCode)
 	if err != nil {
-		log.Println("║ 💥 Failed to verify account: ", err)
-		log.Println("║ 📧 Email: ", newf.Email)
-		log.Println("╚=======================================╝")
+		utils.LogMessage(utils.LevelError, "Failed to verify account")
+		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
 	rows, err := res.RowsAffected()
 	if err != nil {
-		log.Println("║ 💥 Failed to get rows affected: ", err)
-		log.Println("║ 📧 Email: ", newf.Email)
-		log.Println("╚=======================================╝")
+		utils.LogMessage(utils.LevelError, "Failed to get rows affected")
+		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
 	if rows == 0 {
-		log.Println("║ 💥 Invalid verification code or expired: ", newf.Email)
-		log.Println("╚=======================================╝")
+		utils.LogMessage(utils.LevelError, "Invalid verification code or expired")
+		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+		utils.LogFooter()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid verification code or expired"})
 	}
 
 	token, err := generateJWT(newf)
 	if err != nil {
-		log.Println("║ 💥 Failed to generate JWT: ", err)
-		log.Println("╚=========================================╝")
+		utils.LogMessage(utils.LevelError, "Failed to generate JWT")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
 	// get language from newf table
 	language, err := GetLanguage(newf.Email)
 	if err != nil {
-		log.Println("║ 💥 Failed to get language: ", err)
-		log.Println("╚=========================================╝")
+		utils.LogMessage(utils.LevelError, "Failed to get language")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
@@ -88,13 +95,13 @@ func verifyAccount(c *fiber.Ctx) error {
 		FirstName: strings.ToUpper(strings.Split(newf.Email, ".")[0])[0:1] + strings.Split(newf.Email, ".")[0][1:],
 	})
 	if errEmail != nil {
-		log.Println("║ 💥 Failed to send welcome email: ", errEmail)
-		log.Println("╚=========================================╝")
+		utils.LogMessage(utils.LevelError, "Failed to send welcome email")
+		utils.LogLineKeyValue(utils.LevelError, "Error", errEmail)
 	}
 
-	log.Println("║ ✅ Account verified successfully")
-	log.Println("║ 📧 Email: ", newf.Email)
-	log.Println("╚=======================================╝")
+	utils.LogMessage(utils.LevelInfo, "Account verified successfully")
+	utils.LogLineKeyValue(utils.LevelInfo, "Email", newf.Email)
+	utils.LogFooter()
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"token": token})
 }
@@ -102,11 +109,11 @@ func verifyAccount(c *fiber.Ctx) error {
 func jwtMiddleware(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
 
-	log.Println("╔======== 📧 JWT Middleware 📧 ========╗")
+	utils.LogHeader("📧 JWT Middleware")
 
 	if authHeader == "" {
-		log.Println("║ 💥 Missing token")
-		log.Println("╚=======================================╝")
+		utils.LogMessage(utils.LevelError, "Missing token")
+		utils.LogFooter()
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Missing token"})
 	}
 
@@ -117,23 +124,24 @@ func jwtMiddleware(c *fiber.Ctx) error {
 
 	token, err := validateJWT(tokenString)
 	if err != nil {
-		log.Println("║ 💥 Invalid token: ", err)
-		log.Println("╚=======================================╝")
+		utils.LogMessage(utils.LevelError, "Invalid token")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token"})
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		log.Println("║ 💥 Invalid claims")
-		log.Println("╚=======================================╝")
+		utils.LogMessage(utils.LevelError, "Invalid claims")
+		utils.LogFooter()
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid claims"})
 	}
 
 	c.Locals("email", claims["email"])
 
-	log.Println("║ ✅ Token is valid")
-	log.Println("║ 📧 Email: ", claims["email"])
-	log.Println("╚=======================================╝")
+	utils.LogMessage(utils.LevelInfo, "Token is valid")
+	utils.LogLineKeyValue(utils.LevelInfo, "Email", claims["email"])
+	utils.LogFooter()
 
 	return c.Next()
 }
