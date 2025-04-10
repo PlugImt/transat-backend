@@ -122,6 +122,8 @@ CREATE TABLE restaurant
     id_restaurant SERIAL,
     articles      VARCHAR(5000) NOT NULL,
     updated_date  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    language      SMALLINT    NOT NULL DEFAULT 1,
+    FOREIGN KEY (language) REFERENCES languages (id_languages) ON DELETE CASCADE,
     PRIMARY KEY (id_restaurant)
 );
 
