@@ -9,6 +9,7 @@ import (
 
 	"Transat_2.0_Backend/realcampus/friendships"
 	"Transat_2.0_Backend/realcampus/posts"
+	"Transat_2.0_Backend/realcampus/users"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -22,20 +23,36 @@ func SetupRealCampusRoutes(router fiber.Router, db *sql.DB) {
 	realcampus.Get("/posts/today", jwtMiddleware, posts.GetUserTodayPosts(db))
 	realcampus.Post("/posts", jwtMiddleware, posts.CreatePost(db))
 
-	// Friendship-related routes
-	realcampus.Get("/friendships", jwtMiddleware, friendships.GetUserFriendships(db))
+	// Friendship-related routes.
+	// Group all friendship routes under /api/friendships.
+	friendshipsGroup := realcampus.Group("/friendships")
+	friendshipsGroup.Get("/", jwtMiddleware, friendships.GetUserFriendships(db))
+
+	router.Get("/users/search", jwtMiddleware, users.SearchUsers(db))
 
 	/*
-			realcampus.Get("/posts/friends", handlers.GetFriendPosts(db))
-			realcampus.Get("/posts/friends/today", handlers.GetFriendTodayPosts(db))
 
-		// Post reactions
-			realcampus.Get("/posts/:postID/reactions", handlers.GetPostReactions(db))
-			realcampus.Post("/posts/:postID/reactions", handlers.AddReaction(db))
+			// Route for searching users
 
-			realcampus.Post("/friendships", handlers.AddFriend(db))
-			realcampus.Put("/friendships/:friendshipID/respond", handlers.RespondToFriendRequest(db))
-			realcampus.Delete("/friendships/:friendshipID", handlers.RemoveFriend(db))
+			// Routes for friendship actions
+			friendships_group.Post("/send", SendFriendRequest(db))
+			friendships_group.Post("/accept", AcceptFriendRequest(db))
+			friendships_group.Post("/reject", RejectFriendRequest(db))
+			friendships_group.Post("/cancel", CancelFriendRequest(db))
+			friendships_group.Post("/remove", RemoveFriend(db))
+		}
+
+
+				realcampus.Get("/posts/friends", handlers.GetFriendPosts(db))
+				realcampus.Get("/posts/friends/today", handlers.GetFriendTodayPosts(db))
+
+			// Post reactions
+				realcampus.Get("/posts/:postID/reactions", handlers.GetPostReactions(db))
+				realcampus.Post("/posts/:postID/reactions", handlers.AddReaction(db))
+
+				realcampus.Post("/friendships_group", handlers.AddFriend(db))
+				realcampus.Put("/friendships_group/:friendshipID/respond", handlers.RespondToFriendRequest(db))
+				realcampus.Delete("/friendships_group/:friendshipID", handlers.RemoveFriend(db))
 
 	*/
 }
