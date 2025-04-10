@@ -76,6 +76,7 @@ type Restaurant struct {
 	ID          int    `json:"id_restaurant"`
 	Articles    string `json:"articles"`
 	UpdatedDate string `json:"updated_date"`
+	Language    int    `json:"language"`
 }
 
 // MenuItem represents a single menu item
@@ -101,4 +102,8 @@ type MenuData struct {
 type FullMenuData struct {
 	MenuData
 	UpdatedDate string `json:"updatedDate"`
+}
+
+type RestaurantRequest struct {
+	Language string `json:"language"`
 }
