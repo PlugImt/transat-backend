@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"Transat_2.0_Backend/realcampus/friendships"
 	"Transat_2.0_Backend/realcampus/posts"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
@@ -21,6 +22,9 @@ func SetupRealCampusRoutes(router fiber.Router, db *sql.DB) {
 	realcampus.Get("/posts/today", jwtMiddleware, posts.GetUserTodayPosts(db))
 	realcampus.Post("/posts", jwtMiddleware, posts.CreatePost(db))
 
+	// Friendship-related routes
+	realcampus.Get("/friendships", jwtMiddleware, friendships.GetUserFriendships(db))
+
 	/*
 			realcampus.Get("/posts/friends", handlers.GetFriendPosts(db))
 			realcampus.Get("/posts/friends/today", handlers.GetFriendTodayPosts(db))
@@ -29,8 +33,6 @@ func SetupRealCampusRoutes(router fiber.Router, db *sql.DB) {
 			realcampus.Get("/posts/:postID/reactions", handlers.GetPostReactions(db))
 			realcampus.Post("/posts/:postID/reactions", handlers.AddReaction(db))
 
-		// Friendship-related routes
-			realcampus.Get("/friendships", handlers.GetUserFriendships(db))
 			realcampus.Post("/friendships", handlers.AddFriend(db))
 			realcampus.Put("/friendships/:friendshipID/respond", handlers.RespondToFriendRequest(db))
 			realcampus.Delete("/friendships/:friendshipID", handlers.RemoveFriend(db))

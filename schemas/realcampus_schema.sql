@@ -4,7 +4,7 @@ CREATE TABLE realcampus_friendships
     id_friendship   SERIAL,
     user_id         VARCHAR(100) NOT NULL,                   -- Reference to user email in newf table
     friend_id       VARCHAR(100) NOT NULL,                   -- Reference to friend's email in newf table
-    status          VARCHAR(20)  NOT NULL DEFAULT 'PENDING', -- PENDING, ACCEPTED, REJECTED, BLOCKED
+    status          VARCHAR(20)  NOT NULL DEFAULT 'PENDING', -- PENDING, ACCEPTED, REJECTED
     request_date    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     acceptance_date TIMESTAMP,
     PRIMARY KEY (id_friendship),
