@@ -261,113 +261,82 @@ func getRestaurant(c *fiber.Ctx) error {
 	// Cache French menu
 	cachedMenus[1] = menuData
 
-	// Check if French menu exists in database
-	var frenchRestaurant Restaurant
-	err = stmt.QueryRow(1).Scan(&frenchRestaurant.ID, &frenchRestaurant.Articles, &frenchRestaurant.UpdatedDate, &frenchRestaurant.Language)
+	// Update French menu in database
+	menuJSON, err := json.Marshal(menuData)
 	if err != nil {
-		// If no French menu in database, insert it and send notification
-		menuJSON, err := json.Marshal(menuData)
-		if err != nil {
-			log.Println("║ 💥 Failed to marshal menu data: ", err)
-			log.Println("╚=========================================╝")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to prepare menu data for database",
-			})
-		}
+		log.Println("║ 💥 Failed to marshal menu data: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to prepare menu data for database",
+		})
+	}
 
-		updateQuery := `
-			INSERT INTO restaurant (articles, language) 
-			VALUES ($1, $2)
-		`
+	updateQuery := `
+		INSERT INTO restaurant (articles, language) 
+		VALUES ($1, $2)
+	`
 
-		updateStmt, err := db.Prepare(updateQuery)
-		if err != nil {
-			log.Println("║ 💥 Failed to prepare update statement: ", err)
-			log.Println("╚=========================================╝")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to prepare database update",
-			})
-		}
-		defer updateStmt.Close()
+	updateStmt, err := db.Prepare(updateQuery)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare update statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to prepare database update",
+		})
+	}
+	defer updateStmt.Close()
 
-		_, err = updateStmt.Exec(string(menuJSON), 1)
-		if err != nil {
-			log.Println("║ 💥 Failed to update restaurant menu in database: ", err)
-		} else {
-			log.Println("║ ✅ Restaurant menu updated successfully")
-			log.Println("║ 🔔 Sending notification to subscribers")
-			notificationService := NewNotificationService(db)
-			err = notificationService.SendDailyMenuNotification()
-			if err != nil {
-				log.Println("║ ⚠️ Failed to send notification: ", err)
-			}
-		}
+	_, err = updateStmt.Exec(string(menuJSON), 1)
+	if err != nil {
+		log.Println("║ 💥 Failed to update restaurant menu in database: ", err)
+	}
+
+	// Send notification for new menu
+	log.Println("║ ✅ Restaurant menu updated successfully")
+	log.Println("║ 🔔 Sending notification to subscribers")
+	notificationService := NewNotificationService(db)
+	err = notificationService.SendDailyMenuNotification()
+	if err != nil {
+		log.Println("║ ⚠️ Failed to send notification: ", err)
 	}
 
 	// If requested language is not French, translate the menu
 	if langID != 1 {
-		// Check if translated menu already exists in database
-		var translatedRestaurant Restaurant
-		err = stmt.QueryRow(langID).Scan(&translatedRestaurant.ID, &translatedRestaurant.Articles, &translatedRestaurant.UpdatedDate, &translatedRestaurant.Language)
+		translationService, err := NewTranslationService()
 		if err != nil {
-			// If no translated menu in database, create and insert it
-			translationService, err := NewTranslationService()
-			if err != nil {
-				log.Println("║ 💥 Failed to create translation service: ", err)
-				log.Println("╚=========================================╝")
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error": "Failed to initialize translation service",
-				})
-			}
-
-			translatedMenu, err := translationService.TranslateMenu(menuData, req.Language)
-			if err != nil {
-				log.Println("║ 💥 Failed to translate menu: ", err)
-				log.Println("╚=========================================╝")
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error": "Failed to translate menu",
-				})
-			}
-
-			// Update database with translated menu
-			translatedMenuJSON, err := json.Marshal(translatedMenu)
-			if err != nil {
-				log.Println("║ 💥 Failed to marshal translated menu data: ", err)
-				log.Println("╚=========================================╝")
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error": "Failed to prepare translated menu data for database",
-				})
-			}
-
-			updateQuery := `
-			INSERT INTO restaurant (articles, language)
-				VALUES ($1, $2)
-			`
-			updateStmt, err := db.Prepare(updateQuery)
-			if err != nil {
-				log.Println("║ 💥 Failed to prepare update statement: ", err)
-				log.Println("╚=========================================╝")
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error": "Failed to prepare database update",
-				})
-			}
-			defer updateStmt.Close()
-
-			_, err = updateStmt.Exec(string(translatedMenuJSON), langID)
-			if err != nil {
-				log.Println("║ 💥 Failed to update translated menu in database: ", err)
-			}
-
-			cachedMenus[langID] = translatedMenu
-			menuData = translatedMenu
-		} else {
-			// If translated menu exists, use it
-			var dbMenuData MenuData
-			if err := json.Unmarshal([]byte(translatedRestaurant.Articles), &dbMenuData); err == nil {
-				cachedMenus[langID] = &dbMenuData
-				menuData = &dbMenuData
-			}
+			log.Println("║ 💥 Failed to create translation service: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to initialize translation service",
+			})
 		}
+
+		translatedMenu, err := translationService.TranslateMenu(menuData, req.Language)
+		if err != nil {
+			log.Println("║ 💥 Failed to translate menu: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to translate menu",
+			})
+		}
+
+		// Update database with translated menu
+		translatedMenuJSON, err := json.Marshal(translatedMenu)
+		if err != nil {
+			log.Println("║ 💥 Failed to marshal translated menu data: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to prepare translated menu data for database",
+			})
+		}
+
+		_, err = updateStmt.Exec(string(translatedMenuJSON), langID)
+		if err != nil {
+			log.Println("║ 💥 Failed to update translated menu in database: ", err)
+		}
+
+		cachedMenus[langID] = translatedMenu
+		menuData = translatedMenu
 	}
 
 	log.Println("╚=========================================╝")
