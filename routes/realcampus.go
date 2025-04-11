@@ -28,13 +28,13 @@ func SetupRealCampusRoutes(router fiber.Router, db *sql.DB) {
 	friendshipsGroup := realcampus.Group("/friendships")
 	friendshipsGroup.Get("/", jwtMiddleware, friendships.GetUserFriendships(db))
 	friendshipsGroup.Post("/send", jwtMiddleware, friendships.SendFriendRequest(db))
+	friendshipsGroup.Post("/reject", jwtMiddleware, friendships.RejectFriendRequest(db))
 
 	router.Get("/users/search", jwtMiddleware, users.SearchUsers(db))
 
 	/*
 			// Routes for friendship actions
 			friendships_group.Post("/accept", AcceptFriendRequest(db))
-			friendships_group.Post("/reject", RejectFriendRequest(db))
 			friendships_group.Post("/cancel", CancelFriendRequest(db))
 			friendships_group.Post("/remove", RemoveFriend(db))
 		}
