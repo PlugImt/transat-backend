@@ -319,11 +319,17 @@ func getRestaurant(c *fiber.Ctx) error {
 	}
 
 	updateQuery := `
-		INSERT INTO restaurant (articles, language) 
-		VALUES ($1, $2) 
-		ON CONFLICT (language) 
-		DO UPDATE SET articles = $1, updated_date = CURRENT_TIMESTAMP
-		RETURNING id_restaurant, articles, updated_date, language
+		WITH check_duplicate AS (
+  			SELECT id_restaurant
+  			FROM restaurant
+  			WHERE articles = $1
+    		AND language = $2
+    		AND DATE(updated_date) = DATE(CURRENT_TIMESTAMP)
+		)
+		INSERT INTO restaurant (articles, language)
+		SELECT $1, $2
+		WHERE NOT EXISTS (SELECT 1 FROM check_duplicate)
+		RETURNING id_restaurant, articles, updated_date, language;
 	`
 
 	updateStmt, err := db.Prepare(updateQuery)
@@ -348,10 +354,12 @@ func getRestaurant(c *fiber.Ctx) error {
 	}
 
 	log.Println("║ ✅ Restaurant menu updated successfully")
-	log.Println("║ 🔔 Sending notification to subscribers")
 
-	notificationService := NewNotificationService(db)
-	err = notificationService.SendDailyMenuNotification()
+	if req.Language == "fr" {
+		log.Println("║ 🔔 Sending notification to subscribers")
+		notificationService := NewNotificationService(db)
+		err = notificationService.SendDailyMenuNotification()
+	}
 
 	// Set flag to indicate menu has been updated for today
 	menuCheckMutex.Lock()
@@ -447,9 +455,11 @@ func checkAndUpdateMenu(notificationService *NotificationService) (bool, error) 
 		}
 
 		log.Println("Sending notifications about updated menu")
-		err = notificationService.SendDailyMenuNotification()
-		if err != nil {
-			return true, fmt.Errorf("menu updated but failed to send notification: %w", err)
+		if len(cachedMenus) == 0 {
+			err = notificationService.SendDailyMenuNotification()
+			if err != nil {
+				return true, fmt.Errorf("menu updated but failed to send notification: %w", err)
+			}
 		}
 
 		return true, nil
