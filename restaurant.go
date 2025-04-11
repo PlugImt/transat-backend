@@ -167,19 +167,6 @@ func updateRestaurantMenu(db *sql.DB, menuData *MenuData) (*Restaurant, error) {
 	return &restaurant, nil
 }
 
-// isMenuFromToday checks if a menu's updated date is from today
-func isMenuFromToday(updatedDate string) bool {
-	menuTime, err := time.Parse("2006-01-02 15:04:05", updatedDate)
-	if err != nil {
-		return false
-	}
-
-	now := time.Now()
-	return menuTime.Year() == now.Year() &&
-		menuTime.Month() == now.Month() &&
-		menuTime.Day() == now.Day()
-}
-
 func getRestaurant(c *fiber.Ctx) error {
 	log.Println("╔======== 🍽️ Get Restaurant 🍽️ ========╗")
 
@@ -203,24 +190,30 @@ func getRestaurant(c *fiber.Ctx) error {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
-	// Check if we have a cached menu for today in the requested language
-	if cachedMenus[langID] != nil {
+	now := time.Now()
+	isSameDay := now.Year() == lastFetchTime.Year() &&
+		now.Month() == lastFetchTime.Month() &&
+		now.Day() == lastFetchTime.Day()
+
+	// Check if we have a cached menu for the requested language
+	if isSameDay && cachedMenus[langID] != nil {
 		log.Println("║ ✅ Returning cached menu data for language", req.Language)
 		log.Println("╚=========================================╝")
 		var menuToReturn FullMenuData
 		menuToReturn.MenuData = *cachedMenus[langID]
-		menuToReturn.UpdatedDate = time.Now().Format("2006-01-02 15:04:05")
+		menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
 		return c.JSON(menuToReturn)
 	}
 
-	// If no cached menu, fetch from database
+	shouldFetchFromAPI := !isSameDay
+
 	request := `
-		SELECT restaurant.id_restaurant, restaurant.articles, restaurant.updated_date, restaurant.language 
-		FROM restaurant 
-		WHERE restaurant.language = $1 
-		ORDER BY updated_date DESC 
-		LIMIT 1;
-	`
+        SELECT restaurant.id_restaurant, restaurant.articles, restaurant.updated_date, restaurant.language 
+        from restaurant
+        WHERE restaurant.language = $1
+        ORDER BY updated_date DESC
+        LIMIT 1;
+    `
 
 	stmt, err := db.Prepare(request)
 	if err != nil {
@@ -230,75 +223,66 @@ func getRestaurant(c *fiber.Ctx) error {
 			"error": "Something went wrong",
 		})
 	}
-	defer stmt.Close()
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+		}
+	}(stmt)
 
 	var restaurant Restaurant
 	err = stmt.QueryRow(langID).Scan(&restaurant.ID, &restaurant.Articles, &restaurant.UpdatedDate, &restaurant.Language)
-	if err == nil {
-		var dbMenuData MenuData
-		if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err == nil {
-			cachedMenus[langID] = &dbMenuData
-			log.Println("║ ✅ Returning menu data from database for language", req.Language)
+	if err != nil {
+		log.Println("║ 💥 Failed to get restaurant: ", err)
+		if err != sql.ErrNoRows {
 			log.Println("╚=========================================╝")
-			var menuToReturn FullMenuData
-			menuToReturn.MenuData = dbMenuData
-			menuToReturn.UpdatedDate = restaurant.UpdatedDate
-			return c.JSON(menuToReturn)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Something went wrong",
+			})
+		}
+
+		shouldFetchFromAPI = true
+	}
+
+	if !shouldFetchFromAPI && restaurant.ID != 0 {
+		var dbMenuData MenuData
+		if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err != nil {
+			log.Println("║ 💥 Failed to parse database menu: ", err)
+			// Need to fetch from API since DB data is invalid
+			shouldFetchFromAPI = true
+		} else {
+			cachedMenus[langID] = &dbMenuData
+			log.Println("║ ✅ Returning menu data from database for language", langID)
+			log.Println("╚=========================================╝")
+			return c.JSON(&dbMenuData)
 		}
 	}
 
-	// If no menu in database, fetch from API
 	log.Println("║ 🔄 Fetching menu from API")
 	menuData, err := fetchMenuFromAPI()
 	if err != nil {
 		log.Println("║ 💥 Failed to fetch menu from API: ", err)
+		if restaurant.ID != 0 {
+			var dbMenuData MenuData
+			if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err != nil {
+				log.Println("║ 💥 Failed to parse database menu: ", err)
+				log.Println("╚=========================================╝")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Failed to fetch menu and existing data is invalid",
+				})
+			}
+			log.Println("║ ⚠️ Returning existing menu data from database")
+			log.Println("╚=========================================╝")
+			return c.JSON(&dbMenuData)
+		}
 		log.Println("╚=========================================╝")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to fetch menu",
 		})
 	}
 
-	// Cache French menu
-	cachedMenus[1] = menuData
-
-	// Update French menu in database
-	menuJSON, err := json.Marshal(menuData)
-	if err != nil {
-		log.Println("║ 💥 Failed to marshal menu data: ", err)
-		log.Println("╚=========================================╝")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to prepare menu data for database",
-		})
-	}
-
-	updateQuery := `
-		INSERT INTO restaurant (articles, language) 
-		VALUES ($1, $2)
-	`
-
-	updateStmt, err := db.Prepare(updateQuery)
-	if err != nil {
-		log.Println("║ 💥 Failed to prepare update statement: ", err)
-		log.Println("╚=========================================╝")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to prepare database update",
-		})
-	}
-	defer updateStmt.Close()
-
-	_, err = updateStmt.Exec(string(menuJSON), 1)
-	if err != nil {
-		log.Println("║ 💥 Failed to update restaurant menu in database: ", err)
-	}
-
-	// Send notification for new menu
-	log.Println("║ ✅ Restaurant menu updated successfully")
-	log.Println("║ 🔔 Sending notification to subscribers")
-	notificationService := NewNotificationService(db)
-	err = notificationService.SendDailyMenuNotification()
-	if err != nil {
-		log.Println("║ ⚠️ Failed to send notification: ", err)
-	}
+	lastFetchTime = now
+	cachedMenus[1] = menuData // Cache French version by default
 
 	// If requested language is not French, translate the menu
 	if langID != 1 {
@@ -320,30 +304,67 @@ func getRestaurant(c *fiber.Ctx) error {
 			})
 		}
 
-		// Update database with translated menu
-		translatedMenuJSON, err := json.Marshal(translatedMenu)
-		if err != nil {
-			log.Println("║ 💥 Failed to marshal translated menu data: ", err)
-			log.Println("╚=========================================╝")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to prepare translated menu data for database",
-			})
-		}
-
-		_, err = updateStmt.Exec(string(translatedMenuJSON), langID)
-		if err != nil {
-			log.Println("║ 💥 Failed to update translated menu in database: ", err)
-		}
-
 		cachedMenus[langID] = translatedMenu
 		menuData = translatedMenu
 	}
+
+	// Update database with translated menu
+	menuJSON, err := json.Marshal(menuData)
+	if err != nil {
+		log.Println("║ 💥 Failed to marshal menu data: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to prepare menu data for database",
+		})
+	}
+
+	updateQuery := `
+		INSERT INTO restaurant (articles, language) 
+		VALUES ($1, $2) 
+		ON CONFLICT (language) 
+		DO UPDATE SET articles = $1, updated_date = CURRENT_TIMESTAMP
+		RETURNING id_restaurant, articles, updated_date, language
+	`
+
+	updateStmt, err := db.Prepare(updateQuery)
+	if err != nil {
+		log.Println("║ 💥 Failed to prepare update statement: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to prepare database update",
+		})
+	}
+	defer updateStmt.Close()
+
+	err = updateStmt.QueryRow(string(menuJSON), langID).Scan(&restaurant.ID, &restaurant.Articles, &restaurant.UpdatedDate, &restaurant.Language)
+	if err != nil {
+		log.Println("║ 💥 Failed to update restaurant menu in database: ", err)
+		log.Println("║ ⚠️ Returning fetched menu data despite DB update failure")
+		log.Println("╚=========================================╝")
+		var menuToReturn FullMenuData
+		menuToReturn.MenuData = *menuData
+		menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
+		return c.JSON(menuToReturn)
+	}
+
+	log.Println("║ ✅ Restaurant menu updated successfully")
+	log.Println("║ 🔔 Sending notification to subscribers")
+
+	notificationService := NewNotificationService(db)
+	err = notificationService.SendDailyMenuNotification()
+
+	// Set flag to indicate menu has been updated for today
+	menuCheckMutex.Lock()
+	if now.Hour() > 12 {
+		menuCheckedToday = true
+	}
+	menuCheckMutex.Unlock()
 
 	log.Println("╚=========================================╝")
 
 	var menuToReturn FullMenuData
 	menuToReturn.MenuData = *menuData
-	menuToReturn.UpdatedDate = time.Now().Format("2006-01-02 15:04:05")
+	menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
 	return c.JSON(menuToReturn)
 }
 
@@ -471,12 +492,4 @@ func compareStringSlices(slice1, slice2 []string) bool {
 	}
 
 	return true
-}
-
-// Reset cache at midnight
-func resetCache() {
-	cacheMutex.Lock()
-	defer cacheMutex.Unlock()
-	cachedMenus = make(map[int]*MenuData)
-	lastFetchTime = time.Time{}
 }

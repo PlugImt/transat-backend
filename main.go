@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -57,87 +56,48 @@ func main() {
 	notificationService := NewNotificationService(db)
 	c := cron.New()
 
-	// Reset cache at midnight
+	// Reset menuCheckedToday flag at midnight
 	_, err := c.AddFunc("0 0 * * *", func() {
-		resetCache()
-		log.Println("Cache reset at midnight")
+		menuCheckMutex.Lock()
+		menuCheckedToday = false
+		menuCheckMutex.Unlock()
+		log.Println("Reset menu check flag for new day")
 	})
 
 	if err != nil {
-		log.Fatalf("Error scheduling midnight cache reset: %v", err)
+		log.Fatalf("Error scheduling midnight reset: %v", err)
 	}
 
 	// Check for menu updates every 10 minutes
 	_, err = c.AddFunc("*/10 * * * *", func() {
+		fmt.Println("Checking for menu updates...")
+		menuCheckMutex.Lock()
+		if menuCheckedToday {
+			menuCheckMutex.Unlock()
+			log.Println("Menu already updated today, skipping check")
+			return
+		}
+		menuCheckMutex.Unlock()
+
 		log.Println("Checking for menu updates...")
-		
-		// Get the latest menu from database
-		request := `
-			SELECT restaurant.articles, restaurant.updated_date 
-			FROM restaurant 
-			WHERE restaurant.language = 1 
-			ORDER BY updated_date DESC 
-			LIMIT 1;
-		`
-
-		stmt, err := db.Prepare(request)
+		updated, err := checkAndUpdateMenu(notificationService)
 		if err != nil {
-			log.Printf("Error preparing statement: %v", err)
-			return
-		}
-		defer stmt.Close()
-
-		var articles string
-		var updatedDate string
-		err = stmt.QueryRow().Scan(&articles, &updatedDate)
-		if err != nil && err != sql.ErrNoRows {
-			log.Printf("Error getting latest menu: %v", err)
+			log.Printf("Error checking menu: %v", err)
 			return
 		}
 
-		// If no menu in database, fetch from API
-		if err == sql.ErrNoRows {
-			menuData, err := fetchMenuFromAPI()
-			if err != nil {
-				log.Printf("Error fetching menu from API: %v", err)
-				return
+		if updated {
+			menuCheckMutex.Lock()
+			if time.Now().Hour() > 12 {
+				menuCheckedToday = true
 			}
-
-			// Update database with new menu
-			menuJSON, err := json.Marshal(menuData)
-			if err != nil {
-				log.Printf("Error marshaling menu data: %v", err)
-				return
-			}
-
-			updateQuery := `
-				INSERT INTO restaurant (articles, language) 
-				VALUES ($1, $2)
-			`
-
-			updateStmt, err := db.Prepare(updateQuery)
-			if err != nil {
-				log.Printf("Error preparing update statement: %v", err)
-				return
-			}
-			defer updateStmt.Close()
-
-			_, err = updateStmt.Exec(string(menuJSON), 1)
-			if err != nil {
-				log.Printf("Error updating menu in database: %v", err)
-				return
-			}
-
-			log.Println("Menu updated successfully")
-			err = notificationService.SendDailyMenuNotification()
-			if err != nil {
-				log.Printf("Error sending notification: %v", err)
-			}
+			menuCheckMutex.Unlock()
+			log.Println("Menu updated and notifications sent, won't check again today")
 		}
 	})
 
 	if err != nil {
-		log.Fatalf("Error scheduling menu check: %v", err)
+		log.Fatalf("Error scheduling daily menu notification: %v", err)
 	}
 
 	c.Start()
