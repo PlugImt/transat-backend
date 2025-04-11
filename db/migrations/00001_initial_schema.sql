@@ -1,3 +1,7 @@
+-- +goose Up
+-- SQL in this section is executed when the migration is applied.
+
+-- Schema from db_creation_script.sql
 CREATE TABLE languages
 (
     id_languages SERIAL,
@@ -322,6 +326,7 @@ CREATE TABLE files
     FOREIGN KEY (email) REFERENCES newf (email) ON DELETE CASCADE
 );
 
+-- Seed
 INSERT INTO roles (name, description)
 VALUES ('ADMIN', 'Global administrator with all privileges'),
        ('NEWF', 'Transat user'),
@@ -339,3 +344,6 @@ VALUES ('French', 'fr'),
        ('Russian', 'ru'),
        ('Chinese', 'zh'),
        ('Korean', 'ko');
+
+-- +goose Down
+-- C'est la migration initiale, on va dire qu'on va jamais rollback cette migration
