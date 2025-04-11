@@ -16,12 +16,14 @@ import (
 
 // SetupRealCampusRoutes configures all the routes for RealCampus feature
 func SetupRealCampusRoutes(router fiber.Router, db *sql.DB) {
-	// Create a group for RealCampus routes
+	// Create a group for RealCampus routes.
 	realcampus := router.Group("/realcampus")
 
-	// Post-related routes
-	realcampus.Get("/posts/today", jwtMiddleware, posts.GetUserTodayPosts(db))
-	realcampus.Post("/posts", jwtMiddleware, posts.CreatePost(db))
+	// Post-related routes.
+	// Group all posts routes under /api/posts.
+	postsGroup := realcampus.Group("/posts")
+	postsGroup.Get("/today", jwtMiddleware, posts.GetUserTodayPosts(db))
+	postsGroup.Post("/", jwtMiddleware, posts.CreatePost(db))
 
 	// Friendship-related routes.
 	// Group all friendship routes under /api/friendships.
@@ -29,27 +31,23 @@ func SetupRealCampusRoutes(router fiber.Router, db *sql.DB) {
 	friendshipsGroup.Get("/", jwtMiddleware, friendships.GetUserFriendships(db))
 	friendshipsGroup.Post("/send", jwtMiddleware, friendships.SendFriendRequest(db))
 	friendshipsGroup.Post("/reject", jwtMiddleware, friendships.RejectFriendRequest(db))
+	friendshipsGroup.Post("/accept", jwtMiddleware, friendships.AcceptFriendRequest(db))
+	//friendshipsGroup.Post("/cancel", jwtMiddleware, friendships.CancelFriendRequest(db))
+	//friendshipsGroup.Post("/remove", jwtMiddleware, friendships.RemoveFriend(db))
 
 	router.Get("/users/search", jwtMiddleware, users.SearchUsers(db))
 
 	/*
-			// Routes for friendship actions
-			friendships_group.Post("/accept", AcceptFriendRequest(db))
-			friendships_group.Post("/cancel", CancelFriendRequest(db))
-			friendships_group.Post("/remove", RemoveFriend(db))
-		}
+			realcampus.Get("/posts/friends", handlers.GetFriendPosts(db))
+			realcampus.Get("/posts/friends/today", handlers.GetFriendTodayPosts(db))
 
+		// Post reactions
+			realcampus.Get("/posts/:postID/reactions", handlers.GetPostReactions(db))
+			realcampus.Post("/posts/:postID/reactions", handlers.AddReaction(db))
 
-				realcampus.Get("/posts/friends", handlers.GetFriendPosts(db))
-				realcampus.Get("/posts/friends/today", handlers.GetFriendTodayPosts(db))
-
-			// Post reactions
-				realcampus.Get("/posts/:postID/reactions", handlers.GetPostReactions(db))
-				realcampus.Post("/posts/:postID/reactions", handlers.AddReaction(db))
-
-				realcampus.Post("/friendships_group", handlers.AddFriend(db))
-				realcampus.Put("/friendships_group/:friendshipID/respond", handlers.RespondToFriendRequest(db))
-				realcampus.Delete("/friendships_group/:friendshipID", handlers.RemoveFriend(db))
+			realcampus.Post("/friendships_group", handlers.AddFriend(db))
+			realcampus.Put("/friendships_group/:friendshipID/respond", handlers.RespondToFriendRequest(db))
+			realcampus.Delete("/friendships_group/:friendshipID", handlers.RemoveFriend(db))
 
 	*/
 }
