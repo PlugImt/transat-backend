@@ -12,20 +12,21 @@ import (
 	"sync"
 	"time"
 
+	"Transat_2.0_Backend/models"
 	"github.com/gofiber/fiber/v2"
 )
 
 var (
 	lastFetchTime time.Time
-	cachedMenus   map[int]*MenuData // Map of language ID to menu data
+	cachedMenus   map[int]*models.MenuData // Map of language ID to menu data
 	cacheMutex    sync.Mutex
 )
 
 func init() {
-	cachedMenus = make(map[int]*MenuData)
+	cachedMenus = make(map[int]*models.MenuData)
 }
 
-func fetchMenuFromAPI() (*MenuData, error) {
+func fetchMenuFromAPI() (*models.MenuData, error) {
 	const targetURL = "https://toast-js.ew.r.appspot.com/coteresto?key=1ohdRUdCYo6e71aLuBh7ZfF2lc_uZqp9D78icU4DPufA"
 	regex := regexp.MustCompile(`var loadingData = (\[\[.*?\]\])`)
 
@@ -57,7 +58,7 @@ func fetchMenuFromAPI() (*MenuData, error) {
 
 	loadingData := string(matches[1])
 
-	var nestedItems [][]MenuItem
+	var nestedItems [][]models.MenuItem
 	if err := json.Unmarshal([]byte(loadingData), &nestedItems); err != nil {
 		return nil, fmt.Errorf("unable to parse JSON: %w", err)
 	}
@@ -68,7 +69,7 @@ func fetchMenuFromAPI() (*MenuData, error) {
 
 	menuItems := nestedItems[0]
 
-	menuData := MenuData{
+	menuData := models.MenuData{
 		GrilladesMidi: []string{},
 		Migrateurs:    []string{},
 		Cibo:          []string{},
@@ -146,7 +147,7 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-func updateRestaurantMenu(db *sql.DB, menuData *MenuData) (*Restaurant, error) {
+func updateRestaurantMenu(db *sql.DB, menuData *models.MenuData) (*models.Restaurant, error) {
 	menuJSON, err := json.Marshal(menuData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal menu data: %w", err)
@@ -158,7 +159,7 @@ func updateRestaurantMenu(db *sql.DB, menuData *MenuData) (*Restaurant, error) {
 
 	query := `INSERT INTO restaurant (articles) VALUES ($1) RETURNING id_restaurant, articles, updated_date`
 
-	var restaurant Restaurant
+	var restaurant models.Restaurant
 	err = db.QueryRow(query, string(menuJSON)).Scan(&restaurant.ID, &restaurant.Articles, &restaurant.UpdatedDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update restaurant menu: %w", err)
@@ -171,7 +172,7 @@ func getRestaurant(c *fiber.Ctx) error {
 	log.Println("╔======== 🍽️ Get Restaurant 🍽️ ========╗")
 
 	// Parse request body for language
-	var req RestaurantRequest
+	var req models.RestaurantRequest
 	if err := c.BodyParser(&req); err != nil {
 		// If no body provided, default to French
 		req.Language = "fr"
@@ -199,7 +200,7 @@ func getRestaurant(c *fiber.Ctx) error {
 	if isSameDay && cachedMenus[langID] != nil {
 		log.Println("║ ✅ Returning cached menu data for language", req.Language)
 		log.Println("╚=========================================╝")
-		var menuToReturn FullMenuData
+		var menuToReturn models.FullMenuData
 		menuToReturn.MenuData = *cachedMenus[langID]
 		menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
 		return c.JSON(menuToReturn)
@@ -230,7 +231,7 @@ func getRestaurant(c *fiber.Ctx) error {
 		}
 	}(stmt)
 
-	var restaurant Restaurant
+	var restaurant models.Restaurant
 	err = stmt.QueryRow(langID).Scan(&restaurant.ID, &restaurant.Articles, &restaurant.UpdatedDate, &restaurant.Language)
 	if err != nil {
 		log.Println("║ 💥 Failed to get restaurant: ", err)
@@ -245,7 +246,7 @@ func getRestaurant(c *fiber.Ctx) error {
 	}
 
 	if !shouldFetchFromAPI && restaurant.ID != 0 {
-		var dbMenuData MenuData
+		var dbMenuData models.MenuData
 		if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err != nil {
 			log.Println("║ 💥 Failed to parse database menu: ", err)
 			// Need to fetch from API since DB data is invalid
@@ -263,7 +264,7 @@ func getRestaurant(c *fiber.Ctx) error {
 	if err != nil {
 		log.Println("║ 💥 Failed to fetch menu from API: ", err)
 		if restaurant.ID != 0 {
-			var dbMenuData MenuData
+			var dbMenuData models.MenuData
 			if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err != nil {
 				log.Println("║ 💥 Failed to parse database menu: ", err)
 				log.Println("╚=========================================╝")
@@ -347,7 +348,7 @@ func getRestaurant(c *fiber.Ctx) error {
 		log.Println("║ 💥 Failed to update restaurant menu in database: ", err)
 		log.Println("║ ⚠️ Returning fetched menu data despite DB update failure")
 		log.Println("╚=========================================╝")
-		var menuToReturn FullMenuData
+		var menuToReturn models.FullMenuData
 		menuToReturn.MenuData = *menuData
 		menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
 		return c.JSON(menuToReturn)
@@ -370,7 +371,7 @@ func getRestaurant(c *fiber.Ctx) error {
 
 	log.Println("╚=========================================╝")
 
-	var menuToReturn FullMenuData
+	var menuToReturn models.FullMenuData
 	menuToReturn.MenuData = *menuData
 	menuToReturn.UpdatedDate = lastFetchTime.Format("2006-01-02 15:04:05")
 	return c.JSON(menuToReturn)
@@ -428,7 +429,7 @@ func checkAndUpdateMenu(notificationService *NotificationService) (bool, error) 
 		}
 	}(stmt)
 
-	var restaurant Restaurant
+	var restaurant models.Restaurant
 	err = stmt.QueryRow().Scan(&restaurant.ID, &restaurant.Articles, &restaurant.UpdatedDate)
 	if err != nil && err != sql.ErrNoRows {
 		return false, fmt.Errorf("failed to get restaurant: %w", err)
@@ -437,7 +438,7 @@ func checkAndUpdateMenu(notificationService *NotificationService) (bool, error) 
 	// Check if we need to update the menu
 	needsUpdate := true
 	if err != sql.ErrNoRows && restaurant.ID != 0 {
-		var dbMenuData MenuData
+		var dbMenuData models.MenuData
 		if err := json.Unmarshal([]byte(restaurant.Articles), &dbMenuData); err == nil {
 			if compareMenus(&dbMenuData, menuData) {
 				log.Println("Menu hasn't changed, no update needed")
@@ -468,7 +469,7 @@ func checkAndUpdateMenu(notificationService *NotificationService) (bool, error) 
 	return false, nil
 }
 
-func compareMenus(menu1, menu2 *MenuData) bool {
+func compareMenus(menu1, menu2 *models.MenuData) bool {
 	if !compareStringSlices(menu1.GrilladesMidi, menu2.GrilladesMidi) ||
 		!compareStringSlices(menu1.Migrateurs, menu2.Migrateurs) ||
 		!compareStringSlices(menu1.Cibo, menu2.Cibo) ||

@@ -4,13 +4,14 @@ import (
 	"os"
 	"strings"
 
+	"Transat_2.0_Backend/models"
 	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 func verifyAccount(c *fiber.Ctx) error {
-	var newf Newf
+	var newf models.Newf
 
 	utils.LogHeader("📧 Verify Account")
 
@@ -81,10 +82,10 @@ func verifyAccount(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
-	errEmail := sendEmail(Email{
+	errEmail := sendEmail(models.Email{
 		Recipient: newf.Email,
 		Template:  "email_templates/email_template_welcome.html",
-		Sender: EmailSender{
+		Sender: models.EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
 		},

@@ -3,10 +3,12 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
 	"math/rand"
 	"regexp"
 	"time"
+
+	"Transat_2.0_Backend/models"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func checkEmail(email string) (bool, error) {
@@ -18,7 +20,7 @@ func generate2FACode(digits int) string {
 	return fmt.Sprintf("%0"+fmt.Sprint(digits)+"d", rand.Intn(1000000))
 }
 
-func generateJWT(newf Newf) (string, error) {
+func generateJWT(newf models.Newf) (string, error) {
 	expirationTime := time.Now().Add(365 * 24 * time.Hour)
 
 	var role string
@@ -70,7 +72,7 @@ func validateJWT(tokenString string) (*jwt.Token, error) {
 	return token, nil
 }
 
-func isValidated(newf Newf) bool {
+func isValidated(newf models.Newf) bool {
 	request := `
 		SELECT name
 		FROM newf_roles join public.roles r on r.id_roles = newf_roles.id_roles
@@ -87,14 +89,14 @@ func isValidated(newf Newf) bool {
 	return role != "VERIFYING"
 }
 
-func getVerificationCode(newf Newf) (verificationCodeData, error) {
+func getVerificationCode(newf models.Newf) (models.VerificationCodeData, error) {
 	request := `
 		SELECT verification_code, verification_code_expiration
 		FROM newf
 		WHERE email = $1;
 	`
 
-	var data verificationCodeData
+	var data models.VerificationCodeData
 
 	stmt, err := db.Prepare(request)
 	if err != nil {

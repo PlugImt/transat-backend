@@ -3,13 +3,15 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/gofiber/fiber/v2"
 	"log"
+
+	"Transat_2.0_Backend/models"
+	"github.com/gofiber/fiber/v2"
 )
 
 func createTraqTypes(c *fiber.Ctx) error {
 	log.Println("╔======== 🍺 Create Traq Type 🍺 ========╗")
-	var traqType TraqType
+	var traqType models.TraqType
 	if err := c.BodyParser(&traqType); err != nil {
 		log.Println("║ 💥 Failed to parse request body: ", err)
 		log.Println("╚=========================================╝")
@@ -84,9 +86,9 @@ func getAllTraqTypes(c *fiber.Ctx) error {
 		}
 	}(rows)
 
-	var traqTypes []TraqType
+	var traqTypes []models.TraqType
 	for rows.Next() {
-		var traqType TraqType
+		var traqType models.TraqType
 		if err := rows.Scan(&traqType.Name); err != nil {
 			log.Println("║ 💥 Failed to scan row: ", err)
 			log.Println("╚=========================================╝")
@@ -105,7 +107,7 @@ func getAllTraqTypes(c *fiber.Ctx) error {
 
 func createTraqArticle(c *fiber.Ctx) error {
 	log.Println("╔======== 🍺 Create Article 🍺 ========╗")
-	var article TraqArticle
+	var article models.TraqArticle
 	if err := c.BodyParser(&article); err != nil {
 		log.Println("║ 💥 Failed to parse request body: ", err)
 		log.Println("╚=========================================╝")
@@ -189,9 +191,9 @@ func getAllTraqArticles(c *fiber.Ctx) error {
 		}
 	}(rows)
 
-	var articles []TraqArticle
+	var articles []models.TraqArticle
 	for rows.Next() {
-		var article TraqArticle
+		var article models.TraqArticle
 		if err := rows.Scan(&article.ID, &article.Name, &article.Description, &article.Picture, &article.Price, &article.PriceHalf, &article.Alcohol, &article.CreationDate, &article.Limited, &article.OutOfStock, &article.Disabled, &article.TraqType); err != nil {
 			log.Println("║ 💥 Failed to scan row: ", err)
 			log.Println("╚=========================================╝")

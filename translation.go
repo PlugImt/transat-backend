@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"Transat_2.0_Backend/models"
 	"cloud.google.com/go/translate"
 	"golang.org/x/text/language"
 	"google.golang.org/api/option"
@@ -16,7 +17,7 @@ type TranslationService struct {
 
 func NewTranslationService() (*TranslationService, error) {
 	ctx := context.Background()
-	
+
 	// Get API key from environment variable
 	apiKey := os.Getenv("GOOGLE_TRANSLATE_API_KEY")
 	if apiKey == "" {
@@ -54,8 +55,8 @@ func (ts *TranslationService) TranslateText(text string, targetLangCode string) 
 	return translations[0].Text, nil
 }
 
-func (ts *TranslationService) TranslateMenu(menu *MenuData, targetLangCode string) (*MenuData, error) {
-	translatedMenu := &MenuData{
+func (ts *TranslationService) TranslateMenu(menu *models.MenuData, targetLangCode string) (*models.MenuData, error) {
+	translatedMenu := &models.MenuData{
 		GrilladesMidi: make([]string, len(menu.GrilladesMidi)),
 		Migrateurs:    make([]string, len(menu.Migrateurs)),
 		Cibo:          make([]string, len(menu.Cibo)),

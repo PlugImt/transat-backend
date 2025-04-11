@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 
+	"Transat_2.0_Backend/models"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	gomail "gopkg.in/mail.v2"
 )
@@ -29,7 +30,7 @@ type EmailData struct {
 	T    func(string, ...interface{}) template.HTML
 }
 
-func sendEmail(mailDetails Email, emailData interface{}) error {
+func sendEmail(mailDetails models.Email, emailData interface{}) error {
 	// Read the HTML template file
 	htmlTemplate, err := os.ReadFile(mailDetails.Template)
 	if err != nil {
