@@ -145,8 +145,9 @@ func register(c *fiber.Ctx) error {
 	}
 
 	errEmail := sendEmail(models.Email{
-		Recipient: newf.Email,
-		Template:  "email_templates/email_template_verif_code.html",
+		Recipient:  newf.Email,
+		Template:   "email_templates/email_template_verif_code.html",
+		SubjectKey: "email_verification.subject",
 		Sender: models.EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
@@ -236,8 +237,9 @@ func login(c *fiber.Ctx) error {
 	}
 
 	errEmail := sendEmail(models.Email{
-		Recipient: newf.Email,
-		Template:  "email_templates/email_template_new_signin.html",
+		Recipient:  newf.Email,
+		Template:   "email_templates/email_template_new_signin.html",
+		SubjectKey: "email_new_signin.subject",
 		Sender: models.EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
@@ -327,8 +329,9 @@ func verificationCode(c *fiber.Ctx) error {
 	}
 
 	errEmail := sendEmail(models.Email{
-		Recipient: newf.Email,
-		Template:  "email_templates/email_template_verif_code.html",
+		Recipient:  newf.Email,
+		Template:   "email_templates/email_template_verif_code.html",
+		SubjectKey: "email_verification.subject",
 		Sender: models.EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),

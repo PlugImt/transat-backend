@@ -3,10 +3,11 @@ package models
 import "html/template"
 
 type Email struct {
-	Recipient string      `json:"recipient" bson:"recipient"`
-	Template  string      `json:"template" bson:"template"`
-	Sender    EmailSender `json:"sender" bson:"sender"`
-	Language  string      `json:"language" bson:"language"`
+	Recipient  string      `json:"recipient" bson:"recipient"`
+	Template   string      `json:"template" bson:"template"`
+	SubjectKey string      `json:"subjectKey" bson:"subjectKey"`
+	Sender     EmailSender `json:"sender" bson:"sender"`
+	Language   string      `json:"language" bson:"language"`
 }
 
 type EmailSender struct {

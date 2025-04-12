@@ -83,8 +83,9 @@ func verifyAccount(c *fiber.Ctx) error {
 	}
 
 	errEmail := sendEmail(models.Email{
-		Recipient: newf.Email,
-		Template:  "email_templates/email_template_welcome.html",
+		Recipient:  newf.Email,
+		Template:   "email_templates/email_template_welcome.html",
+		SubjectKey: "email_welcome.subject",
 		Sender: models.EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
