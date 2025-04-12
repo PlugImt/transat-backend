@@ -10,7 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 
@@ -18,6 +18,7 @@ import (
 	_ "github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/pressly/goose/v3"
 
+	"Transat_2.0_Backend/middlewares"
 	"Transat_2.0_Backend/routes"
 )
 
@@ -120,18 +121,9 @@ func main() {
 		AllowMethods: "*",
 	}))
 
-	loginRegisterLimiter := limiter.New(limiter.Config{
-		Max:        3,
-		Expiration: 200 * time.Second,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
-		},
-		LimitReached: func(c *fiber.Ctx) error {
-			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error": "Too many requests",
-			})
-		},
-	})
+	app.Use(logger.New(logger.Config{
+		Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
+	}))
 
 	app.Get("/status", func(c *fiber.Ctx) error {
 		return c.SendString("API is up and running")
@@ -141,21 +133,17 @@ func main() {
 
 	// User routes
 	newf := api.Group("/newf")
-	newf.Post("/", loginRegisterLimiter, register)
-	newf.Delete("/", jwtMiddleware, deleteNewf)
-	newf.Get("/me", jwtMiddleware, getNewf)
-	newf.Patch("/me", jwtMiddleware, updateNewf)
-	newf.Post("/notification", jwtMiddleware, addNotification)
-	newf.Get("/notification", jwtMiddleware, getNotification)
-	//newf.Get("/", getAllNewfs)
-	//newf.Get(":id", getNewf)
-	//newf.Put(":id", updateNewf)
-	//newf.Delete(":id", deleteNewf)
-	newf.Post("/send-notification", sendNotification)
+	newf.Post("/", middlewares.LoginRegisterLimiter, register)
+	newf.Delete("/", middlewares.JWTMiddleware, deleteNewf)
+	newf.Get("/me", middlewares.JWTMiddleware, getNewf)
+	newf.Patch("/me", middlewares.JWTMiddleware, updateNewf)
+	newf.Post("/notification", middlewares.JWTMiddleware, addNotification)
+	newf.Get("/notification", middlewares.JWTMiddleware, getNotification)
+	newf.Post("/send-notification", middlewares.JWTMiddleware, sendNotification)
 
 	// Auth routes
-	auth := api.Group("/auth")
-	auth.Post("/login", loginRegisterLimiter, login)
+	auth := api.Group("/auth", middlewares.LoginRegisterLimiter)
+	auth.Post("/login", login)
 	auth.Post("/verify-account", verifyAccount)
 	auth.Post("/verification-code", verificationCode)
 	auth.Patch("/change-password", changePassword)
@@ -176,13 +164,13 @@ func main() {
 	restaurant := api.Group("/restaurant")
 	restaurant.Get("/", getRestaurant)
 
-	api.Post("/upload", jwtMiddleware, uploadImage)
+	api.Post("/upload", middlewares.JWTMiddleware, uploadImage)
 	api.Get("/data/:filename", serveImage)
 
-	api.Get("/files", jwtMiddleware, listUserFiles)
-	api.Delete("/files/:filename", jwtMiddleware, deleteFile)
+	api.Get("/files", middlewares.JWTMiddleware, listUserFiles)
+	api.Delete("/files/:filename", middlewares.JWTMiddleware, deleteFile)
 
-	api.Get("/all-files", jwtMiddleware, listAllFiles)
+	api.Get("/all-files", middlewares.JWTMiddleware, listAllFiles)
 
 	// Setup RealCampus routes.
 	routes.SetupRealCampusRoutes(api, db)
