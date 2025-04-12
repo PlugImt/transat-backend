@@ -132,17 +132,17 @@ func main() {
 	api := app.Group("/api")
 
 	// User routes
-	newf := api.Group("/newf")
-	newf.Post("/", middlewares.LoginRegisterLimiter, register)
-	newf.Delete("/", middlewares.JWTMiddleware, deleteNewf)
-	newf.Get("/me", middlewares.JWTMiddleware, getNewf)
-	newf.Patch("/me", middlewares.JWTMiddleware, updateNewf)
-	newf.Post("/notification", middlewares.JWTMiddleware, addNotification)
-	newf.Get("/notification", middlewares.JWTMiddleware, getNotification)
-	newf.Post("/send-notification", middlewares.JWTMiddleware, sendNotification)
+	newf := api.Group("/newf", middlewares.JWTMiddleware)
+	newf.Delete("/", deleteNewf)
+	newf.Get("/me", getNewf)
+	newf.Patch("/me", updateNewf)
+	newf.Post("/notification", addNotification)
+	newf.Get("/notification", getNotification)
+	newf.Post("/send-notification", sendNotification)
 
 	// Auth routes
 	auth := api.Group("/auth", middlewares.LoginRegisterLimiter)
+	auth.Post("/register", register)
 	auth.Post("/login", login)
 	auth.Post("/verify-account", verifyAccount)
 	auth.Post("/verification-code", verificationCode)
