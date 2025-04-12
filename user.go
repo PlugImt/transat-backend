@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"Transat_2.0_Backend/models"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -36,7 +37,7 @@ func GetLanguage(email string) (string, error) {
 }
 
 func register(c *fiber.Ctx) error {
-	var newf Newf
+	var newf models.Newf
 
 	log.Println("╔======== 👶 Newf Registration 👶 ========╗")
 
@@ -143,10 +144,11 @@ func register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
-	errEmail := sendEmail(Email{
-		Recipient: newf.Email,
-		Template:  "email_templates/email_template_verif_code.html",
-		Sender: EmailSender{
+	errEmail := sendEmail(models.Email{
+		Recipient:  newf.Email,
+		Template:   "email_templates/email_template_verif_code.html",
+		SubjectKey: "email_verification.subject",
+		Sender: models.EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
 		},
@@ -166,8 +168,8 @@ func register(c *fiber.Ctx) error {
 }
 
 func login(c *fiber.Ctx) error {
-	var newf Newf
-	var candidate Newf
+	var newf models.Newf
+	var candidate models.Newf
 
 	log.Println("╔============== 🔐 Login 🔐 ============╗")
 
@@ -234,10 +236,11 @@ func login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong"})
 	}
 
-	errEmail := sendEmail(Email{
-		Recipient: newf.Email,
-		Template:  "email_templates/email_template_new_signin.html",
-		Sender: EmailSender{
+	errEmail := sendEmail(models.Email{
+		Recipient:  newf.Email,
+		Template:   "email_templates/email_template_new_signin.html",
+		SubjectKey: "email_new_signin.subject",
+		Sender: models.EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
 		},
@@ -264,7 +267,7 @@ func login(c *fiber.Ctx) error {
 }
 
 func verificationCode(c *fiber.Ctx) error {
-	var newf Newf
+	var newf models.Newf
 
 	log.Println("╔======== 📧 Verification Code 📧 ========╗")
 
@@ -325,10 +328,11 @@ func verificationCode(c *fiber.Ctx) error {
 		language = "fr"
 	}
 
-	errEmail := sendEmail(Email{
-		Recipient: newf.Email,
-		Template:  "email_templates/email_template_verif_code.html",
-		Sender: EmailSender{
+	errEmail := sendEmail(models.Email{
+		Recipient:  newf.Email,
+		Template:   "email_templates/email_template_verif_code.html",
+		SubjectKey: "email_verification.subject",
+		Sender: models.EmailSender{
 			Name:  "Transat Team",
 			Email: os.Getenv("EMAIL_SENDER"),
 		},
@@ -349,7 +353,7 @@ func verificationCode(c *fiber.Ctx) error {
 }
 
 func changePassword(c *fiber.Ctx) error {
-	var newf Newf
+	var newf models.Newf
 
 	log.Println("╔======== 🔐 Change Password 🔐 ========╗")
 
@@ -595,7 +599,7 @@ func getNewf(c *fiber.Ctx) error {
 		}
 	}(stmt)
 
-	var newf Newf
+	var newf models.Newf
 	err = stmt.QueryRow(email).Scan(&newf.ID, &newf.Email, &newf.FirstName, &newf.LastName, &newf.ProfilePicture, &newf.PhoneNumber, &newf.GraduationYear, &newf.Campus, &newf.TotalUsers, &newf.PasswordUpdatedDate, &newf.Language)
 	if err != nil {
 		log.Println("║ 💥 Failed to get newf: ", err)
@@ -648,7 +652,7 @@ func getNewf(c *fiber.Ctx) error {
 }
 
 func updateNewf(c *fiber.Ctx) error {
-	var newf Newf
+	var newf models.Newf
 
 	log.Println("╔======== 📧 Update Newf 📧 ========╗")
 

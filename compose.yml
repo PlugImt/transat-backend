@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:17-alpine # Utilisation de PostgreSQL 17 Alpine
+    container_name: transat_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}       # Variable du fichier .env
+      POSTGRES_USER: ${DB_USER}     # Variable du fichier .env
+      POSTGRES_PASSWORD: ${DB_PASS} # Variable du fichier .env
+    ports:
+      - "5432:5432" # Mappe le port 5432 du conteneur au port 5432 de l'hôte
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persiste les données de la base de données
+
+volumes:
+  postgres_data:
+    driver: local 

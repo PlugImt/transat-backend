@@ -20,7 +20,6 @@ func initI18n() error {
 	bundle = i18n.NewBundle(language.French)
 	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 
-	// Charger tous les fichiers de traduction
 	entries, err := LocaleFS.ReadDir("locale")
 	if err != nil {
 		return err

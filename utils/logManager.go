@@ -1,8 +1,7 @@
 package utils
 
 import (
-	"fmt"
-	"time"
+	"log"
 )
 
 type LogLevel string
@@ -15,18 +14,17 @@ const (
 )
 
 func LogHeader(title string) {
-	fmt.Printf("\n╔======== %s ========╗\n", title)
-	fmt.Printf("║ 🕒 %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	log.Printf("╔======== %s ========╗\n", title)
 }
 
 func LogMessage(level LogLevel, msg string) {
-	fmt.Printf("║ %s: %s\n", level, msg)
+	log.Printf("║ %s: %s\n", level, msg)
 }
 
 func LogLineKeyValue(level LogLevel, key string, value any) {
-	fmt.Printf("║ %s: %s: %v\n", level, key, value)
+	log.Printf("║ %s: %s: %v\n", level, key, value)
 }
 
 func LogFooter() {
-	fmt.Println("╚=======================================╝")
+	log.Println("╚=======================================╝")
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 
+	"Transat_2.0_Backend/models"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	gomail "gopkg.in/mail.v2"
 )
@@ -29,7 +30,7 @@ type EmailData struct {
 	T    func(string, ...interface{}) template.HTML
 }
 
-func sendEmail(mailDetails Email, emailData interface{}) error {
+func sendEmail(mailDetails models.Email, emailData interface{}) error {
 	// Read the HTML template file
 	htmlTemplate, err := os.ReadFile(mailDetails.Template)
 	if err != nil {
@@ -60,21 +61,8 @@ func sendEmail(mailDetails Email, emailData interface{}) error {
 		return template.HTML(message)
 	}
 
-	// Déterminer la clé de traduction de l'objet en fonction du template
-	var subjectKey string
-	switch mailDetails.Template {
-	case "email_templates/email_template_verif_code.html":
-		subjectKey = "email_verification.subject"
-	case "email_templates/email_template_new_signin.html":
-		subjectKey = "email_new_signin.subject"
-	case "email_templates/email_template_welcome.html":
-		subjectKey = "email_welcome.subject"
-	default:
-		subjectKey = "email_verification.subject" // Fallback par défaut
-	}
-
 	// Traduire l'objet de l'email avec les données de template
-	subject := translate(subjectKey, emailData)
+	subject := translate(mailDetails.SubjectKey, emailData)
 
 	// Créer les données pour le template
 	templateData := struct {

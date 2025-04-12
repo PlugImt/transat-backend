@@ -1,3 +1,6 @@
+-- +goose Up
+-- SQL in this section is executed when the migration is applied.
+
 -- Add friendship table to manage connections between users
 CREATE TABLE realcampus_friendships
 (
@@ -58,3 +61,13 @@ CREATE TABLE realcampus_post_reactions
 
 -- Add index for reaction lookups
 CREATE INDEX idx_realcampus_post_reactions_post ON realcampus_post_reactions (id_post);
+
+-- +goose Down
+-- SQL in this section is executed when the migration is rolled back.
+-- Note: Dropping all tables in the correct order can be complex.
+-- Add DROP TABLE statements here if you need to roll back the initial schema.
+-- Example:
+DROP TABLE IF EXISTS realcampus_post_reactions;
+DROP TABLE IF EXISTS realcampus_posts;
+DROP TYPE IF EXISTS realcampus_privacy_level;
+DROP TABLE IF EXISTS realcampus_friendships;

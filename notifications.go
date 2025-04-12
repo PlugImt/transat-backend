@@ -4,14 +4,20 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"github.com/gofiber/fiber/v2"
-	"github.com/lib/pq"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
+
+	"Transat_2.0_Backend/models"
+	"github.com/gofiber/fiber/v2"
+	"github.com/lib/pq"
 )
+
+type NotificationService struct {
+	db *sql.DB
+}
 
 func NewNotificationService(db *sql.DB) *NotificationService {
 	return &NotificationService{
@@ -19,7 +25,7 @@ func NewNotificationService(db *sql.DB) *NotificationService {
 	}
 }
 
-func (s *NotificationService) SendNotification(target NotificationTarget, payload NotificationPayload) error {
+func (s *NotificationService) SendNotification(target models.NotificationTarget, payload models.NotificationPayload) error {
 	if payload.Data == nil {
 		payload.Data = map[string]interface{}{
 			"sentTime": time.Now().Format(time.RFC3339),
@@ -75,9 +81,9 @@ func (s *NotificationService) SendNotification(target NotificationTarget, payloa
 	return nil
 }
 
-func (s *NotificationService) GetNotificationTargets(emails []string, groups []string) ([]NotificationTarget, error) {
+func (s *NotificationService) GetNotificationTargets(emails []string, groups []string) ([]models.NotificationTarget, error) {
 	log.Println("╔======== 📧 Get Notification Targets 📧 ========╗")
-	var targets []NotificationTarget
+	var targets []models.NotificationTarget
 
 	if len(emails) > 0 {
 		query := `
@@ -101,7 +107,7 @@ func (s *NotificationService) GetNotificationTargets(emails []string, groups []s
 		}(rows)
 
 		for rows.Next() {
-			var target NotificationTarget
+			var target models.NotificationTarget
 			if err := rows.Scan(&target.Email, &target.NotificationToken); err != nil {
 				log.Println("║ 💥 Failed to scan row: ", err)
 				log.Println("╚=========================================╝")
@@ -144,7 +150,7 @@ func (s *NotificationService) GetNotificationTargets(emails []string, groups []s
 		}(rows)
 
 		for rows.Next() {
-			var target NotificationTarget
+			var target models.NotificationTarget
 			if err := rows.Scan(&target.Email, &target.NotificationToken); err != nil {
 				log.Println("║ 💥 Failed to scan row: ", err)
 				log.Println("╚=========================================╝")
@@ -174,7 +180,7 @@ func (s *NotificationService) GetNotificationTargets(emails []string, groups []s
 
 func sendNotification(c *fiber.Ctx) error {
 	log.Println("╔======== 📤 Send Notification 📤 ========╗")
-	var payload NotificationPayload
+	var payload models.NotificationPayload
 	if err := c.BodyParser(&payload); err != nil {
 		log.Println("║ 💥 Failed to parse request body: ", err)
 		log.Println("╚=========================================╝")
@@ -268,7 +274,7 @@ func (s *NotificationService) SendDailyMenuNotification() error {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	randomMessage := messages[r.Intn(len(messages))]
 
-	payload := NotificationPayload{
+	payload := models.NotificationPayload{
 		Title:   "Menu du jour disponible",
 		Message: randomMessage,
 		Data: map[string]interface{}{
