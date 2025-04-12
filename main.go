@@ -133,7 +133,7 @@ func main() {
 
 	// User routes
 	newf := api.Group("/newf", middlewares.JWTMiddleware)
-	newf.Delete("/", deleteNewf)
+	newf.Delete("/me", deleteNewf)
 	newf.Get("/me", getNewf)
 	newf.Patch("/me", updateNewf)
 	newf.Post("/notification", addNotification)
