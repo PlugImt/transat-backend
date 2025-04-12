@@ -360,6 +360,10 @@ func getRestaurant(c *fiber.Ctx) error {
 		log.Println("║ 🔔 Sending notification to subscribers")
 		notificationService := NewNotificationService(db)
 		err = notificationService.SendDailyMenuNotification()
+		if err != nil {
+			log.Println("║ 💥 Failed to send notification: ", err)
+			log.Println("╚=========================================╝")
+		}
 	}
 
 	// Set flag to indicate menu has been updated for today
