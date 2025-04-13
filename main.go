@@ -8,6 +8,14 @@ import (
 	"sync"
 	"time"
 
+	// handlers "Transat_2.0_Backend/handlers" // Import handlers if needed directly (usually not)
+	restaurantHandler "Transat_2.0_Backend/handlers/restaurant" // Import restaurant handler explicitly
+	"Transat_2.0_Backend/i18n"
+
+	"Transat_2.0_Backend/routes"
+	"Transat_2.0_Backend/services"
+	"Transat_2.0_Backend/utils"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -15,23 +23,26 @@ import (
 	"github.com/robfig/cron/v3"
 
 	_ "github.com/lib/pq"
-	_ "github.com/nicksnyder/go-i18n/v2/i18n"
+	_ "github.com/nicksnyder/go-i18n/v2/i18n" // Keep for i18n initialization if still needed here
 	"github.com/pressly/goose/v3"
-
-	"Transat_2.0_Backend/middlewares"
-	"Transat_2.0_Backend/routes"
 )
 
 var db *sql.DB
-var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+var jwtSecret []byte
+
+// Menu check state - Consider moving this into RestaurantHandler or a dedicated service
 var menuCheckedToday bool
 var menuCheckMutex sync.Mutex
 
 func init() {
 	err := godotenv.Load()
-
 	if err != nil {
-		log.Println("Warning: 💥 Error loading .env file: ", err)
+		log.Println("Info: ℹ️ Error loading .env file: ", err)
+	}
+
+	jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+	if len(jwtSecret) == 0 {
+		log.Fatal("💥 JWT_SECRET environment variable is not set")
 	}
 
 	// Connect to the database
@@ -44,12 +55,17 @@ func init() {
 			os.Getenv("DB_NAME"),
 		),
 	)
-
-	// If there is an error connecting to the database, exit the program
 	if err != nil {
 		log.Fatalf("💥 Error connecting to the database : %v", err)
 	} else {
-		log.Println("Connected to the database")
+		log.Println("Successfully connected to the database")
+	}
+
+	// Ping the database to verify connection
+	if err = db.Ping(); err != nil {
+		log.Fatalf("💥 Error pinging the database : %v", err)
+	} else {
+		log.Println("Database connection verified")
 	}
 
 	// Run migrations
@@ -61,60 +77,90 @@ func init() {
 		log.Fatalf("💥 Failed to run migrations: %v", err)
 	}
 	log.Println("Database migrations completed successfully")
+
+	if err := i18n.Init(); err != nil {
+		log.Fatalf("Failed to initialize i18n: %v", err)
+	}
+
+	// Ensure data folder exists
+	if err := utils.EnsureDataFolder(); err != nil { // Assuming EnsureDataFolder is moved to utils
+		log.Fatalf("Failed to ensure data folder: %v", err)
+	}
 }
 
 func main() {
 	app := fiber.New()
-	notificationService := NewNotificationService(db)
+
+	// Initialize Services
+	notificationService := services.NewNotificationService(db)  // Pass db
+	translationService, err := services.NewTranslationService() // Assuming moved to utils
+	if err != nil {
+		log.Fatalf("💥 Failed to create Translation Service: %v", err)
+	}
+	// Initialize Email Service (assuming it's in utils now)
+	emailService := utils.NewEmailService(
+		os.Getenv("EMAIL_HOST"),
+		os.Getenv("EMAIL_PORT"),
+		os.Getenv("EMAIL_SENDER"),
+		os.Getenv("EMAIL_PASSWORD"),
+		os.Getenv("EMAIL_SENDER_NAME"),
+	)
+
+	// Initialize Handlers that need explicit instantiation (e.g., for Cron)
+	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
+
+	// Cron Jobs - Requires access to handlers/services
 	c := cron.New()
 
 	// Reset menuCheckedToday flag at midnight
-	_, err := c.AddFunc("0 0 * * *", func() {
+	_, err = c.AddFunc("0 0 * * *", func() {
 		menuCheckMutex.Lock()
 		menuCheckedToday = false
 		menuCheckMutex.Unlock()
 		log.Println("Reset menu check flag for new day")
 	})
-
 	if err != nil {
 		log.Fatalf("Error scheduling midnight reset: %v", err)
 	}
 
 	// Check for menu updates every 10 minutes
 	_, err = c.AddFunc("*/10 * * * *", func() {
-		fmt.Println("Checking for menu updates...")
 		menuCheckMutex.Lock()
-		if menuCheckedToday {
-			menuCheckMutex.Unlock()
-			log.Println("Menu already updated today, skipping check")
-			return
-		}
+		shouldCheck := !menuCheckedToday
 		menuCheckMutex.Unlock()
 
-		log.Println("Checking for menu updates...")
-		updated, err := checkAndUpdateMenu(notificationService)
+		if !shouldCheck {
+			return
+		}
+
+		updated, err := restHandler.CheckAndUpdateMenuCron()
+
 		if err != nil {
-			log.Printf("Error checking menu: %v", err)
+			log.Printf("Error checking menu via cron: %v", err)
 			return
 		}
 
 		if updated {
+			log.Println("Menu updated via cron.")
 			menuCheckMutex.Lock()
-			if time.Now().Hour() > 12 {
+			if time.Now().Hour() > 10 {
 				menuCheckedToday = true
+				log.Println("Marking menu as checked for today (update occurred after 10 AM).")
+			} else {
+				log.Println("Menu updated before 10 AM, will allow further checks today.")
 			}
 			menuCheckMutex.Unlock()
-			log.Println("Menu updated and notifications sent, won't check again today")
+		} else {
 		}
 	})
-
 	if err != nil {
-		log.Fatalf("Error scheduling daily menu notification: %v", err)
+		log.Fatalf("Error scheduling menu check: %v", err)
 	}
 
 	c.Start()
 	defer c.Stop()
 
+	// Middlewares
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowHeaders: "*",
@@ -122,63 +168,44 @@ func main() {
 	}))
 
 	app.Use(logger.New(logger.Config{
-		Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
+		TimeFormat: "2006-01-02 15:04:05",
 	}))
 
+	// Status Route
 	app.Get("/status", func(c *fiber.Ctx) error {
 		return c.SendString("API is up and running")
 	})
 
+	// API Group
 	api := app.Group("/api")
 
-	// User routes
-	newf := api.Group("/newf", middlewares.JWTMiddleware)
-	newf.Delete("/me", deleteNewf)
-	newf.Get("/me", getNewf)
-	newf.Patch("/me", updateNewf)
-	newf.Post("/notification", addNotification)
-	newf.Get("/notification", getNotification)
-	newf.Post("/send-notification", sendNotification)
+	// Setup Routes using the new structure
+	// Pass necessary dependencies (db, jwtSecret, services) to setup functions
+	routes.SetupAuthRoutes(api, db, jwtSecret, notificationService, emailService)
+	routes.SetupUserRoutes(api, db, notificationService) // Pass notificationService if needed by user handlers
+	routes.SetupTraqRoutes(api, db)
+	routes.SetupFileRoutes(api, db)
+	routes.SetupRestaurantRoutes(api, restHandler)
+	routes.SetupRealCampusRoutes(api, db) // Existing RealCampus routes
 
-	// Auth routes
-	auth := api.Group("/auth", middlewares.LoginRegisterLimiter)
-	auth.Post("/register", register)
-	auth.Post("/login", login)
-	auth.Post("/verify-account", verifyAccount)
-	auth.Post("/verification-code", verificationCode)
-	auth.Patch("/change-password", changePassword)
-
-	// Traq routes
-	traq := api.Group("/traq")
-	traq.Post("/", createTraqArticle)
-	traq.Get("/", getAllTraqArticles)
-	//traq.Get(":id", getTraqArticle)
-	//traq.Put(":id", updateTraqArticle)
-	//traq.Delete(":id", deleteTraqArticle)
-
-	traqTypes := traq.Group("/types")
-	traqTypes.Post("/", createTraqTypes)
-	traqTypes.Get("/", getAllTraqTypes)
-
-	// restaurant routes
-	restaurant := api.Group("/restaurant")
-	restaurant.Get("/", getRestaurant)
-
-	api.Post("/upload", middlewares.JWTMiddleware, uploadImage)
-	api.Get("/data/:filename", serveImage)
-
-	api.Get("/files", middlewares.JWTMiddleware, listUserFiles)
-	api.Delete("/files/:filename", middlewares.JWTMiddleware, deleteFile)
-
-	api.Get("/all-files", middlewares.JWTMiddleware, listAllFiles)
-
-	// Setup RealCampus routes.
-	routes.SetupRealCampusRoutes(api, db)
-
-	// Initialiser i18n
-	if err := initI18n(); err != nil {
-		log.Fatalf("Failed to initialize i18n: %v", err)
+	// Start Server
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000" // Default port
 	}
-
-	log.Fatal(app.Listen(":3000"))
+	log.Printf("Server starting on port %s", port)
+	log.Fatal(app.Listen(":" + port))
 }
+
+// Remove old handler functions previously defined in main.go (if any)
+// Remove old route definitions previously defined in main.go
+
+// --- Removed Old Handlers/Routes ---
+// (Example: remove functions like createTraqArticle, getAllTraqArticles, etc. if they were here)
+// (Example: remove lines like api.Post("/traq", createTraqArticle), etc.)
+
+// Ensure i18n initialization function is available (moved to utils)
+// func initI18n() error { ... } // Removed - Moved to utils
+
+// Ensure data folder function is available (moved to utils)
+// func ensureDataFolder() error { ... } // Removed - Moved to utils

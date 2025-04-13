@@ -20,7 +20,30 @@ type Newf struct {
 	Language          string `json:"language"`
 }
 
+// VerificationCodeData holds verification code details.
 type VerificationCodeData struct {
 	VerificationCode           string `json:"verification_code"`
-	VerificationCodeExpiration string `json:"verification_code_expiration"`
+	VerificationCodeExpiration string `json:"verification_code_expiration"` // Formatted time (e.g., "15h04")
+}
+
+// --- Request Structs ---
+
+// VerificationRequest is used for verifying an account.
+type VerificationRequest struct {
+	Email            string `json:"email"`
+	VerificationCode string `json:"verification_code"`
+}
+
+// EmailRequest is used when only an email is needed, e.g., resending a code.
+type EmailRequest struct {
+	Email string `json:"email"`
+}
+
+// ChangePasswordRequest is used for changing a user's password.
+type ChangePasswordRequest struct {
+	Email                   string `json:"email"`
+	OldPassword             string `json:"old_password,omitempty"` // Optional: Used when logged in
+	NewPassword             string `json:"new_password"`
+	NewPasswordConfirmation string `json:"new_password_confirmation"`
+	VerificationCode        string `json:"verification_code,omitempty"` // Optional: Used for password reset
 }

@@ -1,8 +1,9 @@
 package posts
 
 import (
-	"Transat_2.0_Backend/utils"
 	"database/sql"
+
+	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
