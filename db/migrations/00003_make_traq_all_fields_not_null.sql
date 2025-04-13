@@ -1,0 +1,30 @@
+-- +goose Up
+-- +goose StatementBegin
+ALTER TABLE traq
+ALTER COLUMN alcohol SET NOT NULL,
+ALTER COLUMN price_half SET NOT NULL,
+ALTER COLUMN id_traq_types SET NOT NULL,
+ALTER COLUMN disabled SET NOT NULL,
+ALTER COLUMN disabled SET DEFAULT FALSE,
+ALTER COLUMN limited SET NOT NULL,
+ALTER COLUMN limited SET DEFAULT FALSE,
+ALTER COLUMN description SET NOT NULL,
+ALTER COLUMN out_of_stock SET NOT NULL,
+ALTER COLUMN out_of_stock SET DEFAULT FALSE;
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+ALTER TABLE traq
+ALTER COLUMN alcohol DROP NOT NULL,
+ALTER COLUMN price_half DROP NOT NULL,
+ALTER COLUMN id_traq_types DROP NOT NULL,
+ALTER COLUMN disabled DROP NOT NULL,
+ALTER COLUMN disabled SET DEFAULT NULL,
+ALTER COLUMN limited DROP NOT NULL,
+ALTER COLUMN limited SET DEFAULT NULL,
+ALTER COLUMN description DROP NOT NULL,
+ALTER COLUMN out_of_stock DROP NOT NULL,
+ALTER COLUMN out_of_stock SET DEFAULT NULL;
+-- +goose StatementEnd
