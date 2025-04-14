@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"fmt"
 	"log"
+	"os"
 )
 
 type LogLevel string
@@ -13,16 +15,23 @@ const (
 	LevelDebug LogLevel = "🔍 DEBUG"
 )
 
+func _log(level LogLevel, msg string) {
+	if level == LevelDebug && os.Getenv("ENV") == "production" {
+		return
+	}
+	log.Printf("║ %s: %s\n", level, msg)
+}
+
 func LogHeader(title string) {
 	log.Printf("╔======== %s ========╗\n", title)
 }
 
 func LogMessage(level LogLevel, msg string) {
-	log.Printf("║ %s: %s\n", level, msg)
+	_log(level, msg)
 }
 
 func LogLineKeyValue(level LogLevel, key string, value any) {
-	log.Printf("║ %s: %s: %v\n", level, key, value)
+	_log(level, fmt.Sprintf("%s: %v", key, value))
 }
 
 func LogFooter() {

@@ -402,6 +402,7 @@ func (h *UserHandler) GetNotificationSubscriptions(c *fiber.Ctx) error {
 		}
 
 		utils.LogMessage(utils.LevelInfo, "Successfully fetched all subscriptions")
+		utils.LogLineKeyValue(utils.LevelInfo, "Services", servicesList)
 		utils.LogFooter()
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{"services": servicesList})
 

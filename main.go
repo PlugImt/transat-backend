@@ -83,7 +83,7 @@ func init() {
 	}
 
 	// Ensure data folder exists
-	if err := utils.EnsureDataFolder(); err != nil { // Assuming EnsureDataFolder is moved to utils
+	if err := utils.EnsureDataFolder(); err != nil {
 		log.Fatalf("Failed to ensure data folder: %v", err)
 	}
 }
@@ -92,8 +92,8 @@ func main() {
 	app := fiber.New()
 
 	// Initialize Services
-	notificationService := services.NewNotificationService(db)  // Pass db
-	translationService, err := services.NewTranslationService() // Assuming moved to utils
+	notificationService := services.NewNotificationService(db)
+	translationService, err := services.NewTranslationService()
 	if err != nil {
 		log.Fatalf("💥 Failed to create Translation Service: %v", err)
 	}
@@ -187,7 +187,6 @@ func main() {
 	routes.SetupFileRoutes(api, db)
 	routes.SetupRestaurantRoutes(api, restHandler)
 	routes.SetupRealCampusRoutes(api, db) // Existing RealCampus routes
-
 	// Start Server
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -196,16 +195,3 @@ func main() {
 	log.Printf("Server starting on port %s", port)
 	log.Fatal(app.Listen(":" + port))
 }
-
-// Remove old handler functions previously defined in main.go (if any)
-// Remove old route definitions previously defined in main.go
-
-// --- Removed Old Handlers/Routes ---
-// (Example: remove functions like createTraqArticle, getAllTraqArticles, etc. if they were here)
-// (Example: remove lines like api.Post("/traq", createTraqArticle), etc.)
-
-// Ensure i18n initialization function is available (moved to utils)
-// func initI18n() error { ... } // Removed - Moved to utils
-
-// Ensure data folder function is available (moved to utils)
-// func ensureDataFolder() error { ... } // Removed - Moved to utils

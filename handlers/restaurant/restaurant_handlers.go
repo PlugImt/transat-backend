@@ -196,7 +196,7 @@ func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 				// For now, notify if base menu was fetched & saved.
 				if h.NotifService != nil {
 					utils.LogMessage(utils.LevelInfo, "Triggering daily menu notification send")
-					notifErr := h.NotifService.SendDailyMenuNotification(menuToSave) // Send the base menu
+					notifErr := h.NotifService.SendDailyMenuNotification() // Send the base menu
 					if notifErr != nil {
 						log.Printf("Error sending daily menu notification asynchronously: %v", notifErr)
 					}
@@ -377,16 +377,17 @@ func (h *RestaurantHandler) saveMenuToDB(menuData *models.MenuData, langID int, 
 // getLatestMenuFromDB retrieves the most recent menu entry for a given language from the database.
 func (h *RestaurantHandler) getLatestMenuFromDB(langID int) (*models.FullMenuData, error) {
 	query := `
-		SELECT articles, updated_date
+		SELECT id_restaurant, articles, updated_date
 		FROM restaurant
 		WHERE language = $1
 		ORDER BY updated_date DESC
 		LIMIT 1;
 	`
+	var idRestaurant int
 	var articlesJSON string
 	var updatedDate time.Time
 
-	err := h.DB.QueryRow(query, langID).Scan(&articlesJSON, &updatedDate)
+	err := h.DB.QueryRow(query, langID).Scan(&idRestaurant, &articlesJSON, &updatedDate)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil // No menu found in DB for this language
@@ -400,6 +401,8 @@ func (h *RestaurantHandler) getLatestMenuFromDB(langID int) (*models.FullMenuDat
 		// Data in DB is corrupt, return nil or error?
 		return nil, fmt.Errorf("failed to parse menu data from DB: %w", err)
 	}
+
+	utils.LogLineKeyValue(utils.LevelDebug, "Latest DB Menu ID", idRestaurant)
 
 	return &models.FullMenuData{
 		MenuData:    menuData,
@@ -425,7 +428,8 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 
 	// 2. Get latest base menu from DB for comparison
 	latestDbMenu, err := h.getLatestMenuFromDB(1) // Get French menu (langID 1)
-	needsUpdate := true                           // Assume update needed unless proven otherwise
+	utils.LogLineKeyValue(utils.LevelDebug, "Latest DB Menu", latestDbMenu)
+	needsUpdate := true // Assume update needed unless proven otherwise
 	if err != nil {
 		utils.LogMessage(utils.LevelWarn, "Cron: Failed to get latest base menu from DB for comparison")
 		utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
@@ -473,7 +477,7 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 		// 5. Trigger notifications (only if base menu was updated)
 		if h.NotifService != nil {
 			utils.LogMessage(utils.LevelInfo, "Cron: Triggering daily menu notification send")
-			notifErr := h.NotifService.SendDailyMenuNotification(baseMenuData)
+			notifErr := h.NotifService.SendDailyMenuNotification()
 			if notifErr != nil {
 				utils.LogMessage(utils.LevelError, "Cron: Failed to send daily menu notification")
 				utils.LogLineKeyValue(utils.LevelError, "Error", notifErr)

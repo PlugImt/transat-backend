@@ -7,13 +7,16 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
-	"strings"
+	"os"
+	"time"
 
 	"Transat_2.0_Backend/models" // Assuming models are correctly placed
 	"Transat_2.0_Backend/utils"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/lib/pq"
 )
 
 // NotificationService handles sending notifications.
@@ -28,6 +31,103 @@ func NewNotificationService(db *sql.DB) *NotificationService {
 		db:          db,
 		expoPushURL: "https://api.expo.dev/v2/push/send",
 	}
+}
+
+func (ns *NotificationService) GetNotificationTargets(userEmails []string, groups []string) ([]models.NotificationTarget, error) {
+	log.Println("╔======== 📧 Get Notification Targets 📧 ========╗")
+	var targets []models.NotificationTarget
+
+	if len(userEmails) > 0 {
+		query := `
+            SELECT email, notification_token 
+            FROM newf 
+            WHERE email = ANY($1) 
+            AND notification_token IS NOT NULL
+        `
+		rows, err := ns.db.Query(query, pq.Array(userEmails))
+		if err != nil {
+			log.Println("║ 💥 Failed to query emails: ", err)
+			log.Println("╚=========================================╝")
+			return nil, err
+		}
+		defer func(rows *sql.Rows) {
+			err := rows.Close()
+			if err != nil {
+				log.Println("║ 💥 Failed to close rows: ", err)
+				log.Println("╚=========================================╝")
+			}
+		}(rows)
+
+		for rows.Next() {
+			var target models.NotificationTarget
+			if err := rows.Scan(&target.Email, &target.NotificationToken); err != nil {
+				log.Println("║ 💥 Failed to scan row: ", err)
+				log.Println("╚=========================================╝")
+				return nil, err
+			}
+			targets = append(targets, target)
+		}
+	}
+
+	if len(groups) > 0 {
+		query := `
+            SELECT DISTINCT n.email, nf.notification_token 
+            FROM notifications n
+            JOIN newf nf ON n.email = nf.email
+            JOIN services s ON n.id_services = s.id_services
+            WHERE s.name = ANY($1)
+            AND nf.notification_token IS NOT NULL
+        `
+
+		stmt, err := ns.db.Prepare(query)
+		if err != nil {
+			log.Println("║ 💥 Failed to prepare statement: ", err)
+			log.Println("╚=========================================╝")
+			return nil, err
+		}
+
+		rows, err := stmt.Query(pq.Array(groups))
+		if err != nil {
+			log.Println("║ 💥 Failed to query groups: ", err)
+			log.Println("╚=========================================╝")
+			return nil, err
+		}
+
+		defer func(rows *sql.Rows) {
+			err := rows.Close()
+			if err != nil {
+				log.Println("║ 💥 Failed to close rows: ", err)
+				log.Println("╚=========================================╝")
+			}
+		}(rows)
+
+		for rows.Next() {
+			var target models.NotificationTarget
+			if err := rows.Scan(&target.Email, &target.NotificationToken); err != nil {
+				log.Println("║ 💥 Failed to scan row: ", err)
+				log.Println("╚=========================================╝")
+				return nil, err
+			}
+			targets = append(targets, target)
+		}
+
+		if err := rows.Err(); err != nil {
+			log.Println("║ 💥 Failed to iterate rows: ", err)
+			log.Println("╚=========================================╝")
+			return nil, err
+		}
+
+		if err := stmt.Close(); err != nil {
+			log.Println("║ 💥 Failed to close statement: ", err)
+			log.Println("╚=========================================╝")
+			return nil, err
+		}
+
+	}
+
+	log.Println("║ ✅ Notification targets retrieved successfully")
+	log.Println("╚=========================================╝")
+	return targets, nil
 }
 
 // GetSubscribedUsers retrieves users subscribed to a specific service.
@@ -66,16 +166,44 @@ func (ns *NotificationService) GetSubscribedUsers(serviceName string) ([]models.
 
 // SendPushNotification sends a push notification via Expo.
 func (ns *NotificationService) SendPushNotification(payload models.NotificationPayload) error {
-	// Expo expects the 'to' field to contain the list of push tokens
-	// We map UserEmails (which contains tokens in our current structure) to the 'to' field.
+	// resolve the tokens from the db from the userEmails
+	request := `SELECT notification_token FROM newf WHERE email = ANY($1)`
+	rows, err := ns.db.Query(request, pq.Array(payload.UserEmails))
+	if err != nil {
+		log.Printf("Error querying tokens from db: %v", err)
+		return fmt.Errorf("failed to query tokens from db: %w", err)
+	}
+
+	var tokens []string
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err != nil {
+			log.Printf("Error scanning token: %v", err)
+			continue
+		}
+		tokens = append(tokens, token)
+	}
+
 	expoPayload := map[string]interface{}{
-		"to":        payload.UserEmails, // Use the tokens here
-		"title":     payload.Title,
-		"body":      payload.Message,
-		"sound":     payload.Sound,
-		"channelId": payload.ChannelID,
-		"badge":     payload.Badge,
-		"data":      payload.Data,
+		"to":    tokens,
+		"title": payload.Title,
+	}
+
+	// Only include optional fields if they have values
+	if payload.Message != "" {
+		expoPayload["body"] = payload.Message
+	}
+	if payload.Sound != "" {
+		expoPayload["sound"] = payload.Sound
+	}
+	if payload.ChannelID != "" {
+		expoPayload["channelId"] = payload.ChannelID
+	}
+	if payload.Badge != 0 {
+		expoPayload["badge"] = payload.Badge
+	}
+	if payload.Data != nil {
+		expoPayload["data"] = payload.Data
 	}
 
 	payloadBytes, err := json.Marshal(expoPayload)
@@ -92,8 +220,6 @@ func (ns *NotificationService) SendPushNotification(payload models.NotificationP
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	// Add Authorization if needed (Expo might require tokens for certain operations)
-	// req.Header.Set("Authorization", "Bearer YOUR_EXPO_ACCESS_TOKEN")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -124,131 +250,143 @@ func (ns *NotificationService) SendPushNotification(payload models.NotificationP
 // This function remains a placeholder as its original implementation was complex
 // and likely tied to specific handler logic (permissions, data fetching etc.)
 func (ns *NotificationService) SendNotification(c *fiber.Ctx) error {
-	log.Println("╔======== 🚀 Send Notification Handler (Placeholder) 🚀 ========╗")
-	// TODO: Implement the logic from the original `sendNotification` handler.
-	// This involves:
-	// 1. Parsing the request body (title, message, targets like emails/groups).
-	// 2. Checking permissions (e.g., is the user allowed to send notifications?).
-	// 3. Resolving targets (emails/groups) to actual push tokens.
-	// 4. Constructing the `models.NotificationPayload`.
-	// 5. Calling `ns.SendPushNotification(payload)`.
-
-	var reqPayload models.NotificationPayload // Example structure
-	if err := c.BodyParser(&reqPayload); err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to parse notification request")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request payload"})
+	log.Println("╔======== 📤 Send Notification 📤 ========╗")
+	var payload models.NotificationPayload
+	if err := c.BodyParser(&payload); err != nil {
+		log.Println("║ 💥 Failed to parse request body: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
 	}
 
-	// --- Placeholder for target resolution and permission checks ---
-	// Example: Get tokens for specified emails or groups
-	targetTokens := []string{} // Replace with actual token fetching logic
-	if len(reqPayload.UserEmails) > 0 {
-		// Fetch tokens for these emails...
-	}
-	if len(reqPayload.Groups) > 0 {
-		// Fetch tokens for users in these groups...
-	}
-	// --- End Placeholder ---
-
-	if len(targetTokens) == 0 {
-		utils.LogMessage(utils.LevelWarn, "No target tokens found for notification")
-		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No recipients found for the notification"})
+	if payload.Title == "" {
+		log.Println("║ 💥 Title is required")
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Title is required",
+		})
 	}
 
-	pushPayload := models.NotificationPayload{
-		UserEmails: targetTokens, // Use the fetched tokens here
-		Title:      reqPayload.Title,
-		Message:    reqPayload.Message,
-		Sound:      "default", // Or from request
-		ChannelID:  "default", // Or from request
-		Badge:      reqPayload.Badge,
-		Data:       reqPayload.Data,
+	if len(payload.UserEmails) == 0 && len(payload.Groups) == 0 {
+		log.Println("║ 💥 At least one user email or group must be specified")
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "At least one user email or group must be specified",
+		})
 	}
 
-	err := ns.SendPushNotification(pushPayload)
+	targets, err := ns.GetNotificationTargets(payload.UserEmails, payload.Groups)
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to send push notification")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to send notification"})
+		log.Println("║ 💥 Failed to get notification targets: ", err)
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get notification targets",
+		})
 	}
 
-	utils.LogMessage(utils.LevelInfo, "Notification sent successfully")
-	utils.LogFooter()
-	return c.SendStatus(fiber.StatusOK)
+	if len(targets) == 0 {
+		log.Println("║ 💥 No valid notification targets found")
+		log.Println("╚=========================================╝")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "No valid notification targets found",
+		})
+	}
+
+	var failedTargets []string
+	for _, target := range targets {
+		if err := ns.SendPushNotification(payload); err != nil {
+			failedTargets = append(failedTargets, target.Email)
+		}
+	}
+
+	log.Println("║ ✅ Notification sent successfully")
+	log.Println("║ 📧 Total Targets: ", len(targets))
+	log.Println("║ 📧 Failed Targets: ", failedTargets)
+	log.Println("╚=========================================╝")
+	return c.JSON(fiber.Map{
+		"success":       true,
+		"totalTargets":  len(targets),
+		"failedTargets": failedTargets,
+	})
 }
 
 // SendDailyMenuNotification sends the daily menu notification to subscribed users.
-func (ns *NotificationService) SendDailyMenuNotification(menuData *models.MenuData) error {
-	utils.LogHeader("🍽️ Sending Daily Menu Notification")
+// It reads messages from notifications.json, picks one randomly, and sends it.
+func (ns *NotificationService) SendDailyMenuNotification() error {
+	log.Println("╔======== 🍽️ Send Daily Menu Notification 🍽️ ========╗")
 
-	subscribers, err := ns.GetSubscribedUsers("Restaurant")
+	subscribers, err := ns.GetSubscribedUsers("Restaurant") // Keep using existing function
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to get restaurant subscribers")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
+		log.Println("║ 💥 Failed to get notification targets: ", err)
+		log.Println("╚=========================================╝")
 		return err
 	}
 
 	if len(subscribers) == 0 {
-		utils.LogMessage(utils.LevelInfo, "No users subscribed to restaurant notifications")
-		utils.LogFooter()
+		log.Println("║ ℹ️ No users subscribed to RESTAURANT notifications")
+		log.Println("╚=========================================╝")
 		return nil
 	}
 
-	utils.LogLineKeyValue(utils.LevelInfo, "Subscribers found", len(subscribers))
+	log.Printf("║ ℹ️ Found %d users subscribed to RESTAURANT notifications", len(subscribers))
 
-	// Construct the notification message from menuData
-	var menuSummary strings.Builder
-	menuSummary.WriteString("Au menu aujourd'hui:\n")
-	if len(menuData.GrilladesMidi) > 0 {
-		menuSummary.WriteString(fmt.Sprintf("- Grill/Trad: %s\n", strings.Join(menuData.GrilladesMidi, ", ")))
+	// Read messages from external JSON file
+	file, err := os.ReadFile("notifications.json")
+	if err != nil {
+		log.Println("║ 💥 Failed to read notifications.json: ", err)
+		log.Println("╚=========================================╝")
+		// Consider default message or different error handling?
+		return fmt.Errorf("failed to read notifications.json: %w", err)
 	}
-	if len(menuData.Migrateurs) > 0 {
-		menuSummary.WriteString(fmt.Sprintf("- Migrateurs: %s\n", strings.Join(menuData.Migrateurs, ", ")))
-	}
-	if len(menuData.Cibo) > 0 {
-		menuSummary.WriteString(fmt.Sprintf("- Végé: %s\n", strings.Join(menuData.Cibo, ", ")))
-	}
-	// Add more sections as needed
 
-	// Collect tokens
-	tokens := []string{}
+	var emails []string
 	for _, sub := range subscribers {
-		if sub.NotificationToken != "" {
-			tokens = append(tokens, sub.NotificationToken)
-		}
+		emails = append(emails, sub.Email)
 	}
 
-	if len(tokens) == 0 {
-		utils.LogMessage(utils.LevelInfo, "No valid push tokens found for subscribers")
-		utils.LogFooter()
-		return nil
+	// Parse messages
+	var messages []string
+	if err := json.Unmarshal(file, &messages); err != nil {
+		log.Println("║ 💥 Failed to parse menu messages from notifications.json: ", err)
+		log.Println("╚=========================================╝")
+		return fmt.Errorf("failed to parse notifications.json: %w", err)
 	}
 
-	// Prepare Expo payload
+	if len(messages) == 0 {
+		log.Println("║ ⚠️ No messages found in notifications.json")
+		log.Println("╚=========================================╝")
+		return fmt.Errorf("no messages available in notifications.json")
+	}
+
+	// Randomize selection
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomMessage := messages[r.Intn(len(messages))]
+
+	// Prepare base payload
 	payload := models.NotificationPayload{
-		UserEmails: tokens, // Expo uses 'to' field for tokens
-		Title:      "Menu du Restaurant",
-		Message:    menuSummary.String(),
+		UserEmails: emails,
+		Title:      "Menu du jour disponible",
+		Message:    randomMessage,
 		Sound:      "default",
 		ChannelID:  "default", // Ensure this channel exists on the client app
-		// Add other fields like Badge, Data if needed
+		Data: map[string]interface{}{
+			"screen": "Restaurant",
+		},
 	}
 
-	// Send via Expo
+	utils.LogLineKeyValue(utils.LevelInfo, "Sending daily menu notification to", len(subscribers))
+
 	err = ns.SendPushNotification(payload)
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to send push notifications")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		// Log individual failures but continue sending to others
+		utils.LogLineKeyValue(utils.LevelError, "Failed to send menu notification", err)
 		utils.LogFooter()
 		return err
 	}
 
-	utils.LogMessage(utils.LevelInfo, "Daily menu notifications sent successfully")
+	utils.LogLineKeyValue(utils.LevelInfo, "Daily menu notifications processed", len(subscribers))
 	utils.LogFooter()
+
 	return nil
 }
