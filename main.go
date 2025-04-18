@@ -14,7 +14,6 @@ import (
 
 	"Transat_2.0_Backend/routes"
 	"Transat_2.0_Backend/services"
-	"Transat_2.0_Backend/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -80,11 +79,6 @@ func init() {
 
 	if err := i18n.Init(); err != nil {
 		log.Fatalf("Failed to initialize i18n: %v", err)
-	}
-
-	// Ensure data folder exists
-	if err := utils.EnsureDataFolder(); err != nil {
-		log.Fatalf("Failed to ensure data folder: %v", err)
 	}
 }
 
