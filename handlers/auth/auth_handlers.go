@@ -19,11 +19,11 @@ type AuthHandler struct {
 	DB           *sql.DB
 	JwtSecret    []byte
 	NotifService *services.NotificationService
-	EmailService *utils.EmailService
+	EmailService *services.EmailService
 }
 
 // NewAuthHandler creates a new AuthHandler.
-func NewAuthHandler(db *sql.DB, jwtSecret []byte, notifService *services.NotificationService, emailService *utils.EmailService) *AuthHandler {
+func NewAuthHandler(db *sql.DB, jwtSecret []byte, notifService *services.NotificationService, emailService *services.EmailService) *AuthHandler {
 	if emailService == nil {
 		log.Println("Warning: EmailService is nil in NewAuthHandler")
 	}

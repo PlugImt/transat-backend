@@ -97,8 +97,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("💥 Failed to create Translation Service: %v", err)
 	}
-	// Initialize Email Service (assuming it's in utils now)
-	emailService := utils.NewEmailService(
+	// Initialize Email Service
+	emailService := services.NewEmailService(
 		os.Getenv("EMAIL_HOST"),
 		os.Getenv("EMAIL_PORT"),
 		os.Getenv("EMAIL_SENDER"),
