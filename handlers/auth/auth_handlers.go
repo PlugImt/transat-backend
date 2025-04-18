@@ -194,33 +194,42 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	// Send verification email *after* successful commit
-	verifCodeData, codeErr := utils.GetVerificationCodeData(h.DB, newf.Email) // Use helper
-	if codeErr != nil {
-		utils.LogMessage(utils.LevelError, "Failed to get formatted verification code after registration")
-		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
-		utils.LogLineKeyValue(utils.LevelError, "Error", codeErr)
-		// Don't fail the whole request, but log it. Email will lack expiration.
-		verifCodeData.VerificationCode = code            // Ensure code is sent
-		verifCodeData.VerificationCodeExpiration = "???" // Indicate missing expiration
-	}
-
-	if h.EmailService == nil {
-		utils.LogMessage(utils.LevelError, "EmailService is not initialized, cannot send verification email.")
-	} else {
-		emailErr := h.EmailService.SendEmail(models.Email{
-			Recipient:  newf.Email,
-			Template:   "email_templates/email_template_verif_code.html",
-			SubjectKey: "email_verification.subject",
-			Language:   newf.Language, // Use the language provided/defaulted
-			// Sender details are handled by EmailService now
-		}, verifCodeData) // Pass struct containing Code and Expiration
-
-		if emailErr != nil {
-			utils.LogMessage(utils.LevelError, "Failed to send verification email")
+	if h.EmailService != nil {
+		verifCodeData, err := utils.GetVerificationCodeData(h.DB, newf.Email) // Use helper
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to get formatted verification code after registration")
 			utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
-			utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
-			// Don't return error to client, registration succeeded, but email failed.
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			// Don't fail the whole request, but log it. Email will lack expiration.
+			verifCodeData.VerificationCode = code            // Ensure code is sent
+			verifCodeData.VerificationCodeExpiration = "???" // Indicate missing expiration
 		}
+
+		// Capture necessary variables for the goroutine
+		recipient := newf.Email
+		template := "email_templates/email_template_verif_code.html"
+		subjectKey := "email_verification.subject"
+		lang := newf.Language
+		data := verifCodeData
+
+		// Run email sending in a separate goroutine
+		go func(recipient, template, subjectKey, lang string, data models.VerificationCodeData) {
+			emailErr := h.EmailService.SendEmail(models.Email{
+				Recipient:  recipient,
+				Template:   template,
+				SubjectKey: subjectKey,
+				Language:   lang,
+			}, data) // Pass struct containing Code and Expiration
+
+			if emailErr != nil {
+				utils.LogMessage(utils.LevelError, "Failed to send verification email (asynchronously)")
+				utils.LogLineKeyValue(utils.LevelError, "Email", recipient)
+				utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
+			}
+		}(recipient, template, subjectKey, lang, data)
+
+	} else {
+		utils.LogMessage(utils.LevelWarn, "EmailService is not initialized, cannot send verification email.")
 	}
 
 	utils.LogMessage(utils.LevelInfo, "Newf registered successfully")
@@ -313,6 +322,12 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 	// Send notification email about new sign-in
 	if h.EmailService != nil {
+		// Capture data for the goroutine
+		recipient := storedNewf.Email
+		lang := languageCode
+		template := "email_templates/email_template_new_signin.html"
+		subjectKey := "email_new_signin.subject"
+
 		firstName := ""
 		emailParts := strings.Split(storedNewf.Email, "@")
 		nameParts := strings.Split(emailParts[0], ".")
@@ -320,13 +335,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 			fName := nameParts[0]
 			firstName = strings.ToUpper(string(fName[0])) + strings.ToLower(fName[1:])
 		}
-
-		emailErr := h.EmailService.SendEmail(models.Email{
-			Recipient:  storedNewf.Email,
-			Template:   "email_templates/email_template_new_signin.html",
-			SubjectKey: "email_new_signin.subject",
-			Language:   languageCode,
-		}, struct { // Data for the template
+		emailData := struct {
 			FirstName string
 			Date      string
 			Time      string
@@ -334,13 +343,24 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 			FirstName: firstName,
 			Date:      time.Now().Format("02/01/2006"), // Adjust format as needed
 			Time:      time.Now().Format("15:04:05"),   // Adjust format as needed
-		})
-		if emailErr != nil {
-			// Log error but don't fail the login
-			utils.LogMessage(utils.LevelError, "Failed to send new sign-in notification email")
-			utils.LogLineKeyValue(utils.LevelError, "Email", storedNewf.Email)
-			utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
 		}
+
+		// Run email sending in a separate goroutine
+		go func(recipient, template, subjectKey, lang string, data interface{}) {
+			emailErr := h.EmailService.SendEmail(models.Email{
+				Recipient:  recipient,
+				Template:   template,
+				SubjectKey: subjectKey,
+				Language:   lang,
+			}, data)
+			if emailErr != nil {
+				// Log error but don't fail the login
+				utils.LogMessage(utils.LevelError, "Failed to send new sign-in notification email asynchronously")
+				utils.LogLineKeyValue(utils.LevelError, "Email", recipient)
+				utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
+			}
+		}(recipient, template, subjectKey, lang, emailData)
+
 	} else {
 		utils.LogMessage(utils.LevelWarn, "EmailService is not initialized, skipping new sign-in email.")
 	}
@@ -482,11 +502,16 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 
 	// Send welcome email
 	if h.EmailService != nil {
+		// Capture data for the goroutine
+		recipient := req.Email
 		languageCode, langErr := utils.GetLanguageCode(h.DB, req.Email) // Use helper
 		if langErr != nil {
 			utils.LogMessage(utils.LevelWarn, "Failed to get language for welcome email, using default 'fr'")
 			languageCode = "fr" // Default
 		}
+		template := "email_templates/email_template_welcome.html"
+		subjectKey := "email_welcome.subject"
+		lang := languageCode
 
 		firstName := ""
 		emailParts := strings.Split(req.Email, "@")
@@ -495,22 +520,27 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 			fName := nameParts[0]
 			firstName = strings.ToUpper(string(fName[0])) + strings.ToLower(fName[1:])
 		}
-
-		emailErr := h.EmailService.SendEmail(models.Email{
-			Recipient:  req.Email,
-			Template:   "email_templates/email_template_welcome.html",
-			SubjectKey: "email_welcome.subject",
-			Language:   languageCode,
-		}, struct { // Data for welcome email
+		emailData := struct { // Data for welcome email
 			FirstName string
 		}{
 			FirstName: firstName,
-		})
-		if emailErr != nil {
-			utils.LogMessage(utils.LevelError, "Failed to send welcome email")
-			utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
-			// Log but don't fail
 		}
+
+		// Run email sending in a separate goroutine
+		go func(recipient, template, subjectKey, lang string, data interface{}) {
+			emailErr := h.EmailService.SendEmail(models.Email{
+				Recipient:  recipient,
+				Template:   template,
+				SubjectKey: subjectKey,
+				Language:   lang,
+			}, data)
+			if emailErr != nil {
+				utils.LogMessage(utils.LevelError, "Failed to send welcome email asynchronously")
+				utils.LogLineKeyValue(utils.LevelError, "Email", recipient)
+				utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
+				// Log but don't fail
+			}
+		}(recipient, template, subjectKey, lang, emailData)
 	} else {
 		utils.LogMessage(utils.LevelWarn, "EmailService is not initialized, skipping welcome email.")
 	}
@@ -622,20 +652,29 @@ func (h *AuthHandler) RequestVerificationCode(c *fiber.Ctx) error {
 
 	// Send email
 	if h.EmailService != nil {
-		emailErr := h.EmailService.SendEmail(models.Email{
-			Recipient:  req.Email,
-			Template:   "email_templates/email_template_verif_code.html",
-			SubjectKey: "email_verification.subject", // Or a different key for password reset if applicable
-			Language:   languageCode,
-		}, verifCodeData)
+		// Capture data for the goroutine
+		recipient := req.Email
+		template := "email_templates/email_template_verif_code.html"
+		subjectKey := "email_verification.subject" // Or a different key for password reset if applicable
+		lang := languageCode
+		data := verifCodeData
 
-		if emailErr != nil {
-			utils.LogMessage(utils.LevelError, "Failed to send verification code email")
-			utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
-			utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
-			// Don't expose email failure to client if code was updated successfully in DB
-			// return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to send verification email"})
-		}
+		// Run email sending in a separate goroutine
+		go func(recipient, template, subjectKey, lang string, data models.VerificationCodeData) {
+			emailErr := h.EmailService.SendEmail(models.Email{
+				Recipient:  recipient,
+				Template:   template,
+				SubjectKey: subjectKey,
+				Language:   lang,
+			}, data)
+
+			if emailErr != nil {
+				utils.LogMessage(utils.LevelError, "Failed to send verification code email asynchronously")
+				utils.LogLineKeyValue(utils.LevelError, "Email", recipient)
+				utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
+				// Don't expose email failure to client if code was updated successfully in DB
+			}
+		}(recipient, template, subjectKey, lang, data)
 	} else {
 		utils.LogMessage(utils.LevelWarn, "EmailService is not initialized, cannot send verification code email.")
 		// Return an error? Or just log? Depends on requirements.
@@ -804,11 +843,16 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 
 	// Optionally send a confirmation email
 	if h.EmailService != nil {
+		// Capture data for the goroutine
+		recipient := req.Email
 		languageCode, langErr := utils.GetLanguageCode(h.DB, req.Email)
 		if langErr != nil {
 			utils.LogMessage(utils.LevelWarn, "Failed to get language for password change confirmation email, using default 'fr'")
 			languageCode = "fr" // Default
 		}
+		template := "email_templates/email_template_password_changed.html" // Create this template
+		subjectKey := "email_password_changed.subject"                     // Define this translation key
+		lang := languageCode
 
 		firstName := ""
 		emailParts := strings.Split(req.Email, "@")
@@ -817,13 +861,7 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 			fName := nameParts[0]
 			firstName = strings.ToUpper(string(fName[0])) + strings.ToLower(fName[1:])
 		}
-
-		emailErr := h.EmailService.SendEmail(models.Email{
-			Recipient:  req.Email,
-			Template:   "email_templates/email_template_password_changed.html", // Create this template
-			SubjectKey: "email_password_changed.subject",                       // Define this translation key
-			Language:   languageCode,
-		}, struct { // Data for the template
+		emailData := struct { // Data for the template
 			FirstName string
 			Date      string
 			Time      string
@@ -831,11 +869,22 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 			FirstName: firstName,
 			Date:      time.Now().Format("02/01/2006"),
 			Time:      time.Now().Format("15:04:05"),
-		})
-		if emailErr != nil {
-			utils.LogMessage(utils.LevelError, "Failed to send password change confirmation email")
-			utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
 		}
+
+		// Run email sending in a separate goroutine
+		go func(recipient, template, subjectKey, lang string, data interface{}) {
+			emailErr := h.EmailService.SendEmail(models.Email{
+				Recipient:  recipient,
+				Template:   template,
+				SubjectKey: subjectKey,
+				Language:   lang,
+			}, data)
+			if emailErr != nil {
+				utils.LogMessage(utils.LevelError, "Failed to send password change confirmation email asynchronously")
+				utils.LogLineKeyValue(utils.LevelError, "Email", recipient)
+				utils.LogLineKeyValue(utils.LevelError, "Error", emailErr)
+			}
+		}(recipient, template, subjectKey, lang, emailData)
 	} else {
 		utils.LogMessage(utils.LevelWarn, "EmailService not initialized, skipping password change confirmation email.")
 	}
