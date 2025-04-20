@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"log"
 	"time"
 
 	"Transat_2.0_Backend/utils"
@@ -30,6 +31,8 @@ type EndpointStatistic struct {
 	SuccessRatePercent float64    `json:"success_rate_percent"`
 	FirstRequest       time.Time  `json:"first_request"`
 	LastRequest        time.Time  `json:"last_request"`
+	SuccessCount       int        `json:"success_count"`
+	ErrorCount         int        `json:"error_count"`
 }
 
 // GlobalStatistic represents aggregated statistics across all endpoints
@@ -41,6 +44,8 @@ type GlobalStatistic struct {
 	GlobalSuccessRatePercent float64 `json:"global_success_rate_percent"`
 	FirstRequest           time.Time `json:"first_request"`
 	LastRequest            time.Time `json:"last_request"`
+	SuccessCount           int       `json:"success_count"`
+	ErrorCount             int       `json:"error_count"`
 }
 
 // GetEndpointStatistics retrieves all endpoint statistics from the view
@@ -48,7 +53,7 @@ func (s *StatisticsService) GetEndpointStatistics() ([]EndpointStatistic, error)
 	rows, err := s.db.Query(`SELECT 
 		endpoint, method, request_count, avg_duration_ms, 
 		min_duration_ms, max_duration_ms, success_rate_percent,
-		first_request, last_request 
+		first_request, last_request, success_count, error_count
 		FROM endpoint_statistics`)
 	if err != nil {
 		return nil, err
@@ -61,7 +66,7 @@ func (s *StatisticsService) GetEndpointStatistics() ([]EndpointStatistic, error)
 		if err := rows.Scan(
 			&stat.Endpoint, &stat.Method, &stat.RequestCount, &stat.AvgDurationMs,
 			&stat.MinDurationMs, &stat.MaxDurationMs, &stat.SuccessRatePercent,
-			&stat.FirstRequest, &stat.LastRequest,
+			&stat.FirstRequest, &stat.LastRequest, &stat.SuccessCount, &stat.ErrorCount,
 		); err != nil {
 			return nil, err
 		}
@@ -82,11 +87,13 @@ func (s *StatisticsService) GetGlobalStatistics() (*GlobalStatistic, error) {
 	err := s.db.QueryRow(`SELECT 
 		total_request_count, global_avg_duration_ms, 
 		global_min_duration_ms, global_max_duration_ms, 
-		global_success_rate_percent, first_request, last_request 
+		global_success_rate_percent, first_request, last_request,
+		success_count, error_count
 		FROM global_statistics`).Scan(
 		&stat.TotalRequestCount, &stat.GlobalAvgDurationMs,
 		&stat.GlobalMinDurationMs, &stat.GlobalMaxDurationMs,
 		&stat.GlobalSuccessRatePercent, &stat.FirstRequest, &stat.LastRequest,
+		&stat.SuccessCount, &stat.ErrorCount,
 	)
 	if err != nil {
 		return nil, err
@@ -107,12 +114,22 @@ func (s *StatisticsService) LogRequest(
 	// Calculate duration in milliseconds
 	durationMs := int(responseSent.Sub(requestReceived).Milliseconds())
 
+	// Add more detailed logging for troubleshooting
+	log.Printf("Logging request: %s %s - Status: %d", method, endpoint, statusCode)
+
 	utils.LogHeader("📊 Statistics Service")
 	utils.LogLineKeyValue(utils.LevelInfo, "User", userEmail)
 	utils.LogLineKeyValue(utils.LevelInfo, "Endpoint", endpoint)
 	utils.LogLineKeyValue(utils.LevelInfo, "Method", method)
 	utils.LogLineKeyValue(utils.LevelInfo, "Status", statusCode)
 	utils.LogLineKeyValue(utils.LevelInfo, "Duration", durationMs)
+
+	// Verify the status code is appropriate
+	if statusCode < 100 || statusCode > 599 {
+		log.Printf("WARNING: Invalid status code %d for %s %s - correcting to 500", 
+			statusCode, method, endpoint)
+		statusCode = 500 // Default to 500 if the status code is invalid
+	}
 
 	// Set userEmail to nil for empty strings to handle the foreign key constraint properly
 	var userEmailOrNil interface{}
