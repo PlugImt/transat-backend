@@ -187,6 +187,7 @@ func main() {
 	routes.SetupRestaurantRoutes(api, restHandler)
 	routes.SetupRealCampusRoutes(api, db) // Existing RealCampus routes
 	routes.SetupStatisticsRoutes(api, db, statisticsService) // Setup statistics routes
+	routes.SetupWashingMachineRoutes(api) // Setup washing machine routes
 	
 	// Start Server
 	port := os.Getenv("PORT")
