@@ -11,7 +11,7 @@ import (
 	// handlers "Transat_2.0_Backend/handlers" // Import handlers if needed directly (usually not)
 	restaurantHandler "Transat_2.0_Backend/handlers/restaurant" // Import restaurant handler explicitly
 	"Transat_2.0_Backend/i18n"
-
+	"Transat_2.0_Backend/middlewares"
 	"Transat_2.0_Backend/routes"
 	"Transat_2.0_Backend/services"
 
@@ -99,6 +99,8 @@ func main() {
 		os.Getenv("EMAIL_PASSWORD"),
 		os.Getenv("EMAIL_SENDER_NAME"),
 	)
+	// Initialize Statistics Service
+	statisticsService := services.NewStatisticsService(db)
 
 	// Initialize Handlers that need explicit instantiation (e.g., for Cron)
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
@@ -164,6 +166,9 @@ func main() {
 	app.Use(logger.New(logger.Config{
 		TimeFormat: "2006-01-02 15:04:05",
 	}))
+
+	// Add statistics middleware to capture all requests
+	app.Use(middlewares.StatisticsMiddleware(statisticsService))
 
 	// Status Route
 	app.Get("/status", func(c *fiber.Ctx) error {
