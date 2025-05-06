@@ -9,6 +9,8 @@ import (
 	"Transat_2.0_Backend/models"
 	"Transat_2.0_Backend/services" // For NotificationService
 	"Transat_2.0_Backend/utils"    // For logger
+	"github.com/getsentry/sentry-go"
+	sentryfiber "github.com/getsentry/sentry-go/fiber"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -29,6 +31,7 @@ func NewUserHandler(db *sql.DB, notifService *services.NotificationService) *Use
 // GetNewf retrieves the profile information for the logged-in user.
 func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 	email := c.Locals("email").(string) // Assumes email is set by JWTMiddleware
+	ctx := c.UserContext()              // Obtenir le context.Context de Fiber
 
 	utils.LogHeader("📧 Get Newf Profile")
 	utils.LogLineKeyValue(utils.LevelInfo, "User", email)
@@ -55,7 +58,19 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 	var newf models.Newf             // Use the full model, but only populate relevant fields for response
 	var passwordUpdated sql.NullTime // Use sql.NullTime for potentially null dates
 
-	err := h.DB.QueryRow(query, email).Scan(
+	parentSpan := sentryfiber.GetSpanFromContext(c)
+	var querySpan *sentry.Span
+
+	if parentSpan != nil {
+		querySpan = parentSpan.StartChild("db.sql.query")
+		querySpan.SetTag("db.system", "postgresql")
+		querySpan.SetData("db.statement", query)
+		querySpan.SetData("db.operation", "SELECT")
+		querySpan.SetData("db.table", "newf, languages")
+		defer querySpan.Finish()
+	}
+
+	err := h.DB.QueryRowContext(ctx, query, email).Scan(
 		&newf.ID,
 		&newf.Email,
 		&newf.FirstName,
@@ -69,6 +84,19 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 		&newf.Language,
 		&newf.TotalUsers,
 	)
+
+	if querySpan != nil {
+		if err != nil {
+			if err == sql.ErrNoRows {
+				querySpan.Status = sentry.SpanStatusNotFound
+			} else {
+				querySpan.Status = sentry.SpanStatusInternalError
+			}
+			querySpan.SetData("error", err.Error())
+		} else {
+			querySpan.Status = sentry.SpanStatusOK
+		}
+	}
 
 	if err != nil {
 		if err == sql.ErrNoRows {
