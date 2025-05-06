@@ -18,7 +18,7 @@ func EnsureDataFolder() error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Printf("Data folder '%s' does not exist. Creating...", path)
 		// Create the directory and any necessary parents
-		if err := os.MkdirAll(path, 0755); err != nil { // 0755 allows owner rwx, group rx, others rx
+		if err := os.MkdirAll(path, 0750); err != nil { // 0750 allows owner rwx, group rx
 			log.Printf("Failed to create data folder '%s': %v", path, err)
 			return fmt.Errorf("failed to create data folder '%s': %w", path, err)
 		}
