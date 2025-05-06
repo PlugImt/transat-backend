@@ -192,24 +192,6 @@ func main() {
 	routes.SetupStatisticsRoutes(api, db, statisticsService) // Setup statistics routes
 	routes.SetupWashingMachineRoutes(api)                    // Setup washing machine routes
 
-	app.Get("/", func(c *fiber.Ctx) error {
-		// Sentry transaction is now handled by the SentryTransactionMiddleware.
-		// The hub and transaction are available via c.UserContext() and c.Locals("sentryTransaction") if needed.
-
-		// Example of creating a child span (optional):
-		// if tx, ok := c.Locals("sentryTransaction").(*sentry.Span); ok && tx != nil {
-		//    childSpan := tx.StartChild("specific.work.in.root.handler")
-		//    // ... do work ...
-		//    childSpan.Finish()
-		// }
-
-		// User commented this out in a previous change
-		// time.Sleep(300 * time.Millisecond)
-
-		// User changed this string in a previous change
-		return c.SendString("Hello, World with hub!")
-	})
-
 	// Start Server
 	port := os.Getenv("PORT")
 	if port == "" {

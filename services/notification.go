@@ -2,15 +2,15 @@ package services
 
 import (
 	"bytes"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"os"
-	"time"
 
 	"Transat_2.0_Backend/models" // Assuming models are correctly placed
 	"Transat_2.0_Backend/utils"
@@ -360,8 +360,14 @@ func (ns *NotificationService) SendDailyMenuNotification() error {
 	}
 
 	// Randomize selection
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	randomMessage := messages[r.Intn(len(messages))]
+	r, err := rand.Int(rand.Reader, big.NewInt(int64(len(messages))))
+	if err != nil {
+		log.Println("║ 💥 Failed to generate random number: ", err)
+		r = big.NewInt(0)
+	}
+	log.Println("║ ℹ️ Random message ID: ", r.Int64())
+
+	randomMessage := messages[r.Int64()]
 
 	// Prepare base payload
 	payload := models.NotificationPayload{

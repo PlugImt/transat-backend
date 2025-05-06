@@ -80,8 +80,10 @@ func (es *EmailService) SendEmail(mailDetails models.Email, emailData interface{
 		message, err := localizer.Localize(config)
 		if err != nil {
 			log.Printf("Error translating key '%s' for language '%s': %v", key, mailDetails.Language, err)
-			return template.HTML("!!!" + key + "!!!") // Return key clearly marked as untranslated
+			//gosec:disable G203 -- Faux positif
+			return template.HTML("!!!" + template.HTMLEscapeString(key) + "!!!") // Return key clearly marked as untranslated
 		}
+		//gosec:disable G203 -- Faux positif
 		return template.HTML(message)
 	}
 
