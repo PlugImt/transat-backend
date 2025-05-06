@@ -41,10 +41,12 @@ func SentryInit() {
 }
 
 func EnhanceSentryEventWithEmail(ctx *fiber.Ctx) error {
+	email := ctx.Locals("email").(string)
+
 	if hub := sentryfiber.GetHubFromContext(ctx); hub != nil {
-		email := ctx.Locals("email").(string)
 		if email != "" {
-			hub.Scope().SetTag("email", email)
+			scope := hub.Scope()
+			scope.SetTag("email", email)
 		}
 	}
 	return ctx.Next()

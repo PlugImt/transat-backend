@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	// handlers "Transat_2.0_Backend/handlers" // Import handlers if needed directly (usually not)
 	restaurantHandler "Transat_2.0_Backend/handlers/restaurant" // Import restaurant handler explicitly
 	"Transat_2.0_Backend/i18n"
 	"Transat_2.0_Backend/middlewares"
@@ -170,9 +169,6 @@ func main() {
 	app.Use(logger.New(logger.Config{
 		TimeFormat: "2006-01-02 15:04:05",
 	}))
-
-	// Add Sentry transaction middleware globally
-	app.Use(utils.SentryTransactionMiddleware())
 
 	// Add statistics middleware to capture all requests
 	app.Use(middlewares.StatisticsMiddleware(statisticsService))
