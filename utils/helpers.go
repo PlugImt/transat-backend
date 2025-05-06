@@ -1,11 +1,13 @@
 package utils
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"log" // Use log instead of custom logger for basic helpers?
-	"math/rand"
+	"math/big"
 	"regexp"
+	"strconv"
 	"time"
 
 	"Transat_2.0_Backend/models" // Need this for GetVerificationCodeData
@@ -27,17 +29,20 @@ func CheckEmail(email string) (bool, error) {
 // Generate2FACode generates a random numeric string of the specified length.
 func Generate2FACode(digits int) string {
 	if digits <= 0 {
-		digits = 6 // Default to 6 digits
+		digits = 6
 	}
-	max := int64(1)
-	for i := 0; i < digits; i++ {
-		max *= 10
+
+	// Calcul de la borne supérieure (ex : 10^6 pour 6 chiffres)
+	max := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(digits)), nil)
+
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		return "000000"
 	}
-	// Generate a random number up to max-1
-	num := rand.Int63n(max)
-	// Format it with leading zeros
-	format := fmt.Sprintf("%%0%dd", digits)
-	return fmt.Sprintf(format, num)
+
+	// Formatage avec zéros en tête
+	format := "%0" + strconv.Itoa(digits) + "s"
+	return fmt.Sprintf(format, n.Text(10))
 }
 
 // GenerateJWT creates a new JWT token for a user with their email and role.
