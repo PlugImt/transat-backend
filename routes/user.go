@@ -6,6 +6,7 @@ import (
 	"Transat_2.0_Backend/handlers/user" // Import the user handlers
 	"Transat_2.0_Backend/middlewares"
 	"Transat_2.0_Backend/services" // Import NotificationService
+	"Transat_2.0_Backend/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -17,7 +18,7 @@ func SetupUserRoutes(router fiber.Router, db *sql.DB, notifService *services.Not
 
 	// Group routes that require JWT authentication
 	// Changed group name from "/newf" to "/user" for clarity
-	userGroup := router.Group("/newf", middlewares.JWTMiddleware)
+	userGroup := router.Group("/newf", middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail)
 
 	// Profile routes
 	userGroup.Get("/me", userHandler.GetNewf)       // GET /api/user/me

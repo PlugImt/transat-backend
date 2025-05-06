@@ -7,13 +7,14 @@ import (
 	"Transat_2.0_Backend/realcampus/friendships"
 	"Transat_2.0_Backend/realcampus/posts"
 	"Transat_2.0_Backend/realcampus/users"
+	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
 // SetupRealCampusRoutes configures all the routes for RealCampus feature
 func SetupRealCampusRoutes(router fiber.Router, db *sql.DB) {
 	// Create a group for RealCampus routes.
-	realcampus := router.Group("/realcampus", middlewares.JWTMiddleware)
+	realcampus := router.Group("/realcampus", middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail)
 
 	// Post-related routes.
 	// Group all posts routes under /api/posts.

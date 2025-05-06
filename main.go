@@ -14,7 +14,7 @@ import (
 	"Transat_2.0_Backend/middlewares"
 	"Transat_2.0_Backend/routes"
 	"Transat_2.0_Backend/services"
-
+	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -34,6 +34,8 @@ var menuCheckedToday bool
 var menuCheckMutex sync.Mutex
 
 func init() {
+	utils.SentryInit()
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("Info: ℹ️ Error loading .env file: ", err)
@@ -84,6 +86,8 @@ func init() {
 
 func main() {
 	app := fiber.New()
+
+	app.Use(utils.SentryHandler)
 
 	// Initialize Services
 	notificationService := services.NewNotificationService(db)
@@ -167,6 +171,9 @@ func main() {
 		TimeFormat: "2006-01-02 15:04:05",
 	}))
 
+	// Add Sentry transaction middleware globally
+	app.Use(utils.SentryTransactionMiddleware())
+
 	// Add statistics middleware to capture all requests
 	app.Use(middlewares.StatisticsMiddleware(statisticsService))
 
@@ -185,10 +192,28 @@ func main() {
 	routes.SetupTraqRoutes(api, db)
 	routes.SetupFileRoutes(api, db)
 	routes.SetupRestaurantRoutes(api, restHandler)
-	routes.SetupRealCampusRoutes(api, db) // Existing RealCampus routes
+	routes.SetupRealCampusRoutes(api, db)                    // Existing RealCampus routes
 	routes.SetupStatisticsRoutes(api, db, statisticsService) // Setup statistics routes
-	routes.SetupWashingMachineRoutes(api) // Setup washing machine routes
-	
+	routes.SetupWashingMachineRoutes(api)                    // Setup washing machine routes
+
+	app.Get("/", func(c *fiber.Ctx) error {
+		// Sentry transaction is now handled by the SentryTransactionMiddleware.
+		// The hub and transaction are available via c.UserContext() and c.Locals("sentryTransaction") if needed.
+
+		// Example of creating a child span (optional):
+		// if tx, ok := c.Locals("sentryTransaction").(*sentry.Span); ok && tx != nil {
+		//    childSpan := tx.StartChild("specific.work.in.root.handler")
+		//    // ... do work ...
+		//    childSpan.Finish()
+		// }
+
+		// User commented this out in a previous change
+		// time.Sleep(300 * time.Millisecond)
+
+		// User changed this string in a previous change
+		return c.SendString("Hello, World with hub!")
+	})
+
 	// Start Server
 	port := os.Getenv("PORT")
 	if port == "" {
