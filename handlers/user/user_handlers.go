@@ -370,7 +370,11 @@ func (h *UserHandler) AddOrRemoveNotificationSubscription(c *fiber.Ctx) error {
 			// Check if service exists
 			var serviceExists bool
 			checkService := `SELECT EXISTS(SELECT 1 FROM services WHERE name = $1)`
-			h.DB.QueryRow(checkService, req.Service).Scan(&serviceExists)
+			err := h.DB.QueryRow(checkService, req.Service).Scan(&serviceExists)
+			if err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to check if service exists")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			}
 			if !serviceExists {
 				utils.LogFooter()
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Service '%s' not found", req.Service)})

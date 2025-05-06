@@ -145,8 +145,14 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
 		// Clean up partially written file
-		dstFile.Close()            // Close it first
-		os.Remove(destinationPath) // Attempt removal
+		if closeErr := dstFile.Close(); closeErr != nil {
+			utils.LogMessage(utils.LevelError, "Failed to close destination file during cleanup")
+			utils.LogLineKeyValue(utils.LevelError, "Error", closeErr)
+		} // Close it first
+		if removeErr := os.Remove(destinationPath); removeErr != nil {
+			utils.LogMessage(utils.LevelError, "Failed to remove partially written file during cleanup")
+			utils.LogLineKeyValue(utils.LevelError, "Error", removeErr)
+		} // Attempt removal
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to save file contents",
 		})
@@ -172,7 +178,11 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
 		// Critical: If DB fails, remove the orphaned file from disk
-		os.Remove(destinationPath)
+		err := os.Remove(destinationPath)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to remove orphaned file from disk")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to record file in database",
 		})
@@ -331,10 +341,18 @@ func (h *FileHandler) DeleteFile(c *fiber.Ctx) error {
 	// Defer rollback
 	defer func() {
 		if p := recover(); p != nil {
-			tx.Rollback()
+			err := tx.Rollback()
+			if err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to rollback transaction for file deletion")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			}
 			panic(p) // re-throw panic after Rollback
 		} else if err != nil {
-			tx.Rollback() // err is non-nil; rollback
+			err := tx.Rollback()
+			if err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to rollback transaction for file deletion")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			}
 		}
 	}()
 
