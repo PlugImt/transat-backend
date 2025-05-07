@@ -29,4 +29,5 @@ data/
 
 # built binary
 Transat_2.0_Backend
+transat-backend
 .DS_Store

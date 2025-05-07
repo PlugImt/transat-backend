@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"Transat_2.0_Backend/models"
-	"Transat_2.0_Backend/services"
-	"Transat_2.0_Backend/utils" // logger
+	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/utils" // logger
 
 	"github.com/gofiber/fiber/v2"
 )

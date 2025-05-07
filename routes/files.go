@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"log"
 
-	"Transat_2.0_Backend/handlers/files" // Import the files handlers
-	"Transat_2.0_Backend/middlewares"
+	"github.com/plugimt/transat-backend/handlers/files" // Import the files handlers
+	"github.com/plugimt/transat-backend/middlewares"
 
 	"github.com/gofiber/fiber/v2"
 )

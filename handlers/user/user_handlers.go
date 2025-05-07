@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"Transat_2.0_Backend/models"
-	"Transat_2.0_Backend/services" // For NotificationService
-	"Transat_2.0_Backend/utils"    // For logger
 	"github.com/getsentry/sentry-go"
 	sentryfiber "github.com/getsentry/sentry-go/fiber"
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services" // For NotificationService
+	"github.com/plugimt/transat-backend/utils"    // For logger
 )
 
 // UserHandler handles user profile and related actions.

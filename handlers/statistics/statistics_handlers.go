@@ -3,21 +3,21 @@ package statistics
 import (
 	"database/sql"
 
-	"Transat_2.0_Backend/services"
-	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // StatisticsHandler handles statistics related operations
 type StatisticsHandler struct {
-	db               *sql.DB
+	db                *sql.DB
 	statisticsService *services.StatisticsService
 }
 
 // NewStatisticsHandler creates a new instance of StatisticsHandler
 func NewStatisticsHandler(db *sql.DB, statisticsService *services.StatisticsService) *StatisticsHandler {
 	return &StatisticsHandler{
-		db:               db,
+		db:                db,
 		statisticsService: statisticsService,
 	}
 }
@@ -69,4 +69,4 @@ func (h *StatisticsHandler) GetGlobalStatistics(c *fiber.Ctx) error {
 		"success":    true,
 		"statistics": stats,
 	})
-} 
+}

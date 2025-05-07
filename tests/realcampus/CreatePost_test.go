@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"Transat_2.0_Backend/realcampus/posts"
+	"github.com/plugimt/transat-backend/realcampus/posts"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gofiber/fiber/v2"

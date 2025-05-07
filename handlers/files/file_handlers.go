@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"Transat_2.0_Backend/utils" // For logger if needed, EnsureDataFolder moved here potentially?
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/utils" // For logger if needed, EnsureDataFolder moved here potentially?
 )
 
 // FileHandler handles file upload, serving, listing, and deletion.

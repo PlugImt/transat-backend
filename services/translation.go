@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"Transat_2.0_Backend/models"
 	"cloud.google.com/go/translate"
+	"github.com/plugimt/transat-backend/models"
 	"golang.org/x/text/language"
 	"google.golang.org/api/option"
 )

@@ -8,16 +8,16 @@ import (
 	"sync"
 	"time"
 
-	restaurantHandler "Transat_2.0_Backend/handlers/restaurant" // Import restaurant handler explicitly
-	"Transat_2.0_Backend/i18n"
-	"Transat_2.0_Backend/middlewares"
-	"Transat_2.0_Backend/routes"
-	"Transat_2.0_Backend/services"
-	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
+	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant" // Import restaurant handler explicitly
+	"github.com/plugimt/transat-backend/i18n"
+	"github.com/plugimt/transat-backend/middlewares"
+	"github.com/plugimt/transat-backend/routes"
+	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/utils"
 	"github.com/robfig/cron/v3"
 
 	_ "github.com/lib/pq"

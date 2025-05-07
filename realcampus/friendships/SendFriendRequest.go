@@ -1,10 +1,11 @@
 package friendships
 
 import (
-	"Transat_2.0_Backend/models"
-	"Transat_2.0_Backend/utils"
 	"database/sql"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // SendFriendRequest handles creating a new friend request.

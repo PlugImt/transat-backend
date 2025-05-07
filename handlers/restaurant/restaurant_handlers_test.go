@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"Transat_2.0_Backend/models"
+	"github.com/plugimt/transat-backend/models"
 )
 
 // crée un serveur HTTP de mock

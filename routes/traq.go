@@ -3,8 +3,8 @@ package routes
 import (
 	"database/sql"
 
-	"Transat_2.0_Backend/handlers/traq" // Import the traq handlers
-	"Transat_2.0_Backend/middlewares"   // Import if specific middlewares are needed
+	"github.com/plugimt/transat-backend/handlers/traq" // Import the traq handlers
+	"github.com/plugimt/transat-backend/middlewares"   // Import if specific middlewares are needed
 
 	"github.com/gofiber/fiber/v2"
 )

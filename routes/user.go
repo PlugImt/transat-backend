@@ -3,10 +3,10 @@ package routes
 import (
 	"database/sql"
 
-	"Transat_2.0_Backend/handlers/user" // Import the user handlers
-	"Transat_2.0_Backend/middlewares"
-	"Transat_2.0_Backend/services" // Import NotificationService
-	"Transat_2.0_Backend/utils"
+	"github.com/plugimt/transat-backend/handlers/user" // Import the user handlers
+	"github.com/plugimt/transat-backend/middlewares"
+	"github.com/plugimt/transat-backend/services" // Import NotificationService
+	"github.com/plugimt/transat-backend/utils"
 
 	"github.com/gofiber/fiber/v2"
 )

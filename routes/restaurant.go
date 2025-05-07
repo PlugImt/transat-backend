@@ -3,10 +3,10 @@ package routes
 import (
 	// "database/sql" // No longer needed here
 
-	restaurantHandler "Transat_2.0_Backend/handlers/restaurant" // Import the handler package
+	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant" // Import the handler package
 	// Remove unused service/utils imports if handler is passed directly
-	// "Transat_2.0_Backend/services"
-	// "Transat_2.0_Backend/utils"
+	// "github.com/plugimt/transat-backend/services"
+	// "github.com/plugimt/transat-backend/utils"
 
 	"github.com/gofiber/fiber/v2"
 )

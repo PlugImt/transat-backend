@@ -3,9 +3,9 @@ package routes
 import (
 	"database/sql"
 
-	"Transat_2.0_Backend/handlers/statistics"
-	"Transat_2.0_Backend/services"
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/handlers/statistics"
+	"github.com/plugimt/transat-backend/services"
 )
 
 // SetupStatisticsRoutes configures routes for statistics
@@ -19,4 +19,4 @@ func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *s
 	// Endpoints
 	statsGroup.Get("/endpoints", statsHandler.GetEndpointStatistics)
 	statsGroup.Get("/global", statsHandler.GetGlobalStatistics)
-} 
+}

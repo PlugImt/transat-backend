@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"Transat_2.0_Backend/utils"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // StatisticsService handles logging of request statistics
@@ -22,30 +22,30 @@ func NewStatisticsService(db *sql.DB) *StatisticsService {
 
 // EndpointStatistic represents aggregated statistics for an endpoint
 type EndpointStatistic struct {
-	Endpoint           string     `json:"endpoint"`
-	Method             string     `json:"method"`
-	RequestCount       int        `json:"request_count"`
-	AvgDurationMs      float64    `json:"avg_duration_ms"`
-	MinDurationMs      int        `json:"min_duration_ms"`
-	MaxDurationMs      int        `json:"max_duration_ms"`
-	SuccessRatePercent float64    `json:"success_rate_percent"`
-	FirstRequest       time.Time  `json:"first_request"`
-	LastRequest        time.Time  `json:"last_request"`
-	SuccessCount       int        `json:"success_count"`
-	ErrorCount         int        `json:"error_count"`
+	Endpoint           string    `json:"endpoint"`
+	Method             string    `json:"method"`
+	RequestCount       int       `json:"request_count"`
+	AvgDurationMs      float64   `json:"avg_duration_ms"`
+	MinDurationMs      int       `json:"min_duration_ms"`
+	MaxDurationMs      int       `json:"max_duration_ms"`
+	SuccessRatePercent float64   `json:"success_rate_percent"`
+	FirstRequest       time.Time `json:"first_request"`
+	LastRequest        time.Time `json:"last_request"`
+	SuccessCount       int       `json:"success_count"`
+	ErrorCount         int       `json:"error_count"`
 }
 
 // GlobalStatistic represents aggregated statistics across all endpoints
 type GlobalStatistic struct {
-	TotalRequestCount      int       `json:"total_request_count"`
-	GlobalAvgDurationMs    float64   `json:"global_avg_duration_ms"`
-	GlobalMinDurationMs    int       `json:"global_min_duration_ms"`
-	GlobalMaxDurationMs    int       `json:"global_max_duration_ms"`
-	GlobalSuccessRatePercent float64 `json:"global_success_rate_percent"`
-	FirstRequest           time.Time `json:"first_request"`
-	LastRequest            time.Time `json:"last_request"`
-	SuccessCount           int       `json:"success_count"`
-	ErrorCount             int       `json:"error_count"`
+	TotalRequestCount        int       `json:"total_request_count"`
+	GlobalAvgDurationMs      float64   `json:"global_avg_duration_ms"`
+	GlobalMinDurationMs      int       `json:"global_min_duration_ms"`
+	GlobalMaxDurationMs      int       `json:"global_max_duration_ms"`
+	GlobalSuccessRatePercent float64   `json:"global_success_rate_percent"`
+	FirstRequest             time.Time `json:"first_request"`
+	LastRequest              time.Time `json:"last_request"`
+	SuccessCount             int       `json:"success_count"`
+	ErrorCount               int       `json:"error_count"`
 }
 
 // GetEndpointStatistics retrieves all endpoint statistics from the view
@@ -126,7 +126,7 @@ func (s *StatisticsService) LogRequest(
 
 	// Verify the status code is appropriate
 	if statusCode < 100 || statusCode > 599 {
-		log.Printf("WARNING: Invalid status code %d for %s %s - correcting to 500", 
+		log.Printf("WARNING: Invalid status code %d for %s %s - correcting to 500",
 			statusCode, method, endpoint)
 		statusCode = 500 // Default to 500 if the status code is invalid
 	}
@@ -153,4 +153,4 @@ func (s *StatisticsService) LogRequest(
 		utils.LogMessage(utils.LevelInfo, "Successfully logged request statistics")
 	}
 	utils.LogFooter()
-} 
+}

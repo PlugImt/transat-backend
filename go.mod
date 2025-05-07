@@ -1,4 +1,4 @@
-module Transat_2.0_Backend
+module github.com/plugimt/transat-backend
 
 go 1.23.0
 
@@ -8,6 +8,8 @@ require (
 	cloud.google.com/go/translate v1.12.4
 	github.com/BurntSushi/toml v1.3.2
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/getsentry/sentry-go v0.32.0
+	github.com/getsentry/sentry-go/fiber v0.32.0
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/joho/godotenv v1.5.1
@@ -30,8 +32,6 @@ require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/getsentry/sentry-go v0.32.0 // indirect
-	github.com/getsentry/sentry-go/fiber v0.32.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect

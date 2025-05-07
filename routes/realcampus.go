@@ -3,12 +3,12 @@ package routes
 import (
 	"database/sql"
 
-	"Transat_2.0_Backend/middlewares"
-	"Transat_2.0_Backend/realcampus/friendships"
-	"Transat_2.0_Backend/realcampus/posts"
-	"Transat_2.0_Backend/realcampus/users"
-	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/middlewares"
+	"github.com/plugimt/transat-backend/realcampus/friendships"
+	"github.com/plugimt/transat-backend/realcampus/posts"
+	"github.com/plugimt/transat-backend/realcampus/users"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // SetupRealCampusRoutes configures all the routes for RealCampus feature

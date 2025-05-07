@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"Transat_2.0_Backend/models"
-	"Transat_2.0_Backend/utils" // Assuming logger is here
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/utils" // Assuming logger is here
 )
 
 // TraqHandler handles requests related to Traq articles and types.

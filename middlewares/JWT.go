@@ -3,9 +3,9 @@ package middlewares
 import (
 	"strings"
 
-	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 func JWTMiddleware(c *fiber.Ctx) error {

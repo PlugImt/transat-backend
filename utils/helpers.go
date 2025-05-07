@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"Transat_2.0_Backend/models" // Need this for GetVerificationCodeData
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/plugimt/transat-backend/models" // Need this for GetVerificationCodeData
 )
 
 // CheckEmail validates if the email format is correct for imt-atlantique.net.

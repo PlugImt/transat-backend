@@ -1,9 +1,10 @@
 package friendships
 
 import (
-	"Transat_2.0_Backend/utils"
 	"database/sql"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // CancelFriendRequest handles cancelling a sent friend request.

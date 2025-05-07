@@ -1,4 +1,6 @@
-# Transat_2.0_Backend
+# Transat-backend
+
+Le backend de Transat est un serveur Fiber, développé en Go, connecté à une base de données PostgreSQL.
  
 ## Schéma MCD
 Le schéma MCD est disponible dans le fichier `MCD.lo1`, conçu avec le logiciel [Looping](https://www.looping-mcd.fr/).

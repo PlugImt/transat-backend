@@ -2,12 +2,13 @@ package posts
 
 import (
 	"database/sql"
-	"github.com/gofiber/fiber/v2"
 	"strings"
 	"time"
 
-	"Transat_2.0_Backend/models"
-	"Transat_2.0_Backend/utils"
+	"github.com/gofiber/fiber/v2"
+
+	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // GetUserTodayPosts retrieves all posts created by the user today.

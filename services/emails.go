@@ -9,9 +9,9 @@ import (
 	"path/filepath" // Added for template name parsing
 	"strconv"
 
-	i18n "Transat_2.0_Backend/i18n"
-	"Transat_2.0_Backend/models" // Ensure models path is correct
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
+	i18n "github.com/plugimt/transat-backend/i18n"
+	"github.com/plugimt/transat-backend/models" // Ensure models path is correct
 	gomail "gopkg.in/mail.v2"
 )
 

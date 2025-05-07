@@ -3,8 +3,8 @@ package posts
 import (
 	"database/sql"
 
-	"Transat_2.0_Backend/utils"
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // CreatePost creates a new post with two images.

@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"os"
 
-	"Transat_2.0_Backend/models" // Assuming models are correctly placed
-	"Transat_2.0_Backend/utils"
+	"github.com/plugimt/transat-backend/models" // Assuming models are correctly placed
+	"github.com/plugimt/transat-backend/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/lib/pq"

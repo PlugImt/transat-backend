@@ -3,9 +3,9 @@ package routes
 import (
 	"database/sql"
 
-	"Transat_2.0_Backend/handlers/auth" // Import the auth handlers
-	"Transat_2.0_Backend/middlewares"
-	"Transat_2.0_Backend/services" // For NotificationService
+	"github.com/plugimt/transat-backend/handlers/auth" // Import the auth handlers
+	"github.com/plugimt/transat-backend/middlewares"
+	"github.com/plugimt/transat-backend/services" // For NotificationService
 
 	// For EmailService
 	"github.com/gofiber/fiber/v2"

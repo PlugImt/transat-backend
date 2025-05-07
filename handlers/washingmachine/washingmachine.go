@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"Transat_2.0_Backend/models"
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/models"
 )
 
 type WashingMachineHandler struct{}
@@ -84,25 +84,25 @@ func (h *WashingMachineHandler) GetWashingMachines() fiber.Handler {
 // transformMachineData categorizes and transforms the machine data into washing machines and dryers
 func transformMachineData(machineList []models.MachineData) models.FormattedMachineData {
 	var result models.FormattedMachineData
-	
+
 	// Initialize slices
 	result.WashingMachines = []models.FormattedMachine{}
 	result.Dryers = []models.FormattedMachine{}
-	
+
 	for _, machine := range machineList {
 		// Convert selecteur_machine to number
 		number, _ := strconv.Atoi(machine.SelecteurMachine)
-		
+
 		// Check if machine is available (status 1 appears to mean available)
 		isAvailable := machine.Status == 1
-		
+
 		// Create formatted machine
 		formattedMachine := models.FormattedMachine{
 			Number:    number,
 			Available: isAvailable,
 			TimeLeft:  machine.TimeBeforeOff,
 		}
-		
+
 		// Categorize by machine type
 		if strings.Contains(strings.ToUpper(machine.NomType), "LAVE LINGE") {
 			result.WashingMachines = append(result.WashingMachines, formattedMachine)
@@ -110,6 +110,6 @@ func transformMachineData(machineList []models.MachineData) models.FormattedMach
 			result.Dryers = append(result.Dryers, formattedMachine)
 		}
 	}
-	
+
 	return result
 }
