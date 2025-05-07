@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
+	"github.com/plugimt/transat-backend/handlers"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant" // Import restaurant handler explicitly
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/middlewares"
@@ -108,6 +109,13 @@ func main() {
 	// Initialize Handlers that need explicit instantiation (e.g., for Cron)
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
 
+	// Initialize Weather Service and Handler
+	weatherService, err := services.NewWeatherService()
+	if err != nil {
+		log.Fatalf("💥 Failed to create Weather Service: %v", err)
+	}
+	weatherHandler := handlers.NewWeatherHandler(weatherService)
+
 	// Cron Jobs - Requires access to handlers/services
 	c := cron.New()
 
@@ -191,6 +199,7 @@ func main() {
 	routes.SetupRealCampusRoutes(api, db)                    // Existing RealCampus routes
 	routes.SetupStatisticsRoutes(api, db, statisticsService) // Setup statistics routes
 	routes.SetupWashingMachineRoutes(api)                    // Setup washing machine routes
+	routes.SetupWeatherRoutes(api, weatherHandler)           // Setup weather routes
 
 	// Start Server
 	port := os.Getenv("PORT")
