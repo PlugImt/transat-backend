@@ -13,8 +13,19 @@ var SentryHandler fiber.Handler
 
 // To initialize Sentry's handler, you need to initialize Sentry itself beforehand
 func SentryInit() {
+	env := GetEnvName()
+	commitSHA := GetEnvCommitSHA()
+	host := GetEnvHost()
+
+	LogMessage(LevelInfo, "Initializing Sentry with env: "+env+", commitSHA: "+commitSHA+", host: "+host)
+
 	if err := sentry.Init(sentry.ClientOptions{
-		Dsn: "https://121ef29a5b1be0fb38b2dc2eb116f255@o4509277512859648.ingest.de.sentry.io/4509277597597776",
+		Dsn:         "https://121ef29a5b1be0fb38b2dc2eb116f255@o4509277512859648.ingest.de.sentry.io/4509277597597776",
+		Environment: env,
+		Tags: map[string]string{
+			"host":    host,
+			"version": commitSHA,
+		},
 		// Set TracesSampleRate to 1.0 to capture 100%
 		// of transactions for tracing.
 		// We recommend adjusting this value in production,
