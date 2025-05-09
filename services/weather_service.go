@@ -3,110 +3,21 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
+
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
+	"github.com/plugimt/transat-backend/i18n"
+	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/utils"
 )
 
-// weatherTranslations map[englishCondition]map[lang]translation
-var weatherTranslations = map[string]map[string]string{
-	"Thunderstorm": {
-		"fr": "Orage",
-		"es": "Tormenta",
-		"de": "Gewitter",
-	},
-	"Drizzle": {
-		"fr": "Bruine",
-		"es": "Llovizna",
-		"de": "Nieselregen",
-	},
-	"Rain": {
-		"fr": "Pluie",
-		"es": "Lluvia",
-		"de": "Regen",
-	},
-	"Snow": {
-		"fr": "Neige",
-		"es": "Nieve",
-		"de": "Schnee",
-	},
-	"Mist": {
-		"fr": "Brume",
-		"es": "Neblina",
-		"de": "Nebel",
-	},
-	"Smoke": {
-		"fr": "Fumée",
-		"es": "Humo",
-		"de": "Rauch",
-	},
-	"Haze": {
-		"fr": "Brume sèche",
-		"es": "Calima",
-		"de": "Dunst",
-	},
-	"Dust": {
-		"fr": "Poussière",
-		"es": "Polvo",
-		"de": "Staub",
-	},
-	"Fog": {
-		"fr": "Brouillard",
-		"es": "Niebla",
-		"de": "Nebel",
-	},
-	"Sand": {
-		"fr": "Sable",
-		"es": "Arena",
-		"de": "Sand",
-	},
-	"Ash": {
-		"fr": "Cendre",
-		"es": "Ceniza",
-		"de": "Asche",
-	},
-	"Squall": {
-		"fr": "Rafale",
-		"es": "Chubasco",
-		"de": "Böe",
-	},
-	"Tornado": {
-		"fr": "Tornade",
-		"es": "Tornado",
-		"de": "Tornado",
-	},
-	"Clear": {
-		"fr": "Dégagé",
-		"es": "Despejado",
-		"de": "Klar",
-	},
-	"Clouds": {
-		"fr": "Nuageux",
-		"es": "Nublado",
-		"de": "Bewölkt",
-	},
-}
-
-type WeatherData struct {
-	Main struct {
-		Temp      float64 `json:"temp"`
-		FeelsLike float64 `json:"feels_like"`
-		Humidity  int     `json:"humidity"`
-	} `json:"main"`
-	Weather []struct {
-		Main        string `json:"main"`
-		Description string `json:"description"`
-		Icon        string `json:"icon"`
-	} `json:"weather"`
-	Wind struct {
-		Speed float64 `json:"speed"`
-	} `json:"wind"`
-	Name string `json:"name"`
-}
-
 type CachedWeather struct {
-	Data      *WeatherData
+	Data      *models.WeatherData
 	Timestamp time.Time
 }
 
@@ -125,8 +36,6 @@ func NewWeatherService() (*WeatherService, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("OPENWEATHERMAP_API_KEY environment variable is not set")
 	}
-
-	// Coordonnées pour Nantes
 	lat := "47.218371"
 	lon := "-1.553621"
 
@@ -139,7 +48,7 @@ func NewWeatherService() (*WeatherService, error) {
 	}, nil
 }
 
-func (s *WeatherService) GetWeather(lang string) (*WeatherData, error) {
+func (s *WeatherService) GetWeather(lang string) (*models.WeatherData, error) {
 	if lang == "" {
 		lang = "fr"
 	}
@@ -164,19 +73,40 @@ func (s *WeatherService) GetWeather(lang string) (*WeatherData, error) {
 		return nil, fmt.Errorf("failed to get weather data: status code %d", resp.StatusCode)
 	}
 
-	var data WeatherData
+	var data models.WeatherData
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return nil, fmt.Errorf("failed to decode weather data: %w", err)
 	}
 
-	// Traduire le champ Weather[].Main et le stocker directement dans Main
+	// Translate the Weather[].Main field using TranslationService
+	localizer := i18n.GetLocalizer(lang)
+
+	if localizer == nil {
+		// This case should ideally be handled within GetLocalizer itself
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Error: Could not get localizer for language '%s'. Using default.", lang))
+		localizer = i18n.GetLocalizer("fr") // Fallback
+	}
+
 	if len(data.Weather) > 0 {
 		for i := range data.Weather {
 			englishMain := data.Weather[i].Main
-			if translations, ok := weatherTranslations[englishMain]; ok {
-				if translatedText, langOk := translations[lang]; langOk {
-					data.Weather[i].Main = translatedText
-				}
+			conditionKey := strings.ToLower(englishMain)
+			messageID := "weather." + conditionKey
+
+			config := &goi18n.LocalizeConfig{
+				MessageID: messageID,
+			}
+
+			message, err := localizer.Localize(config)
+			if err != nil {
+				log.Printf("Error translating key '%s' for language '%s': %v", messageID, lang, err)
+				return nil, fmt.Errorf("error translating key '%s' for language '%s': %v", messageID, lang, err)
+			}
+
+			if message != "" && message != messageID {
+				data.Weather[i].Main = message
+			} else {
+				data.Weather[i].Main = englishMain
 			}
 		}
 	}
