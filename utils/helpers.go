@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/plugimt/transat-backend/models" // Need this for GetVerificationCodeData
 )
 
@@ -45,32 +44,32 @@ func Generate2FACode(digits int) string {
 	return fmt.Sprintf(format, n.Text(10))
 }
 
-// GenerateJWT creates a new JWT token for a user with their email and role.
-func GenerateJWT(email string, role string, jwtSecret []byte) (string, error) {
-	if len(jwtSecret) == 0 {
-		log.Println("Error generating JWT: JWT secret is empty")
-		return "", fmt.Errorf("JWT secret is not configured")
-	}
-
-	expirationTime := time.Now().Add(365 * 24 * time.Hour) // Token valid for 1 year
-
-	claims := jwt.MapClaims{
-		"email": email,
-		"role":  role,
-		"exp":   expirationTime.Unix(),
-		"iat":   time.Now().Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	tokenString, err := token.SignedString(jwtSecret)
-	if err != nil {
-		log.Printf("Error signing JWT for %s: %v", email, err)
-		return "", fmt.Errorf("failed to sign token: %w", err)
-	}
-
-	return tokenString, nil
-}
+//// GenerateJWT creates a new JWT token for a user with their email and role.
+//func GenerateJWT(email string, role string, jwtSecret []byte) (string, error) {
+//	if len(jwtSecret) == 0 {
+//		log.Println("Error generating JWT: JWT secret is empty")
+//		return "", fmt.Errorf("JWT secret is not configured")
+//	}
+//
+//	expirationTime := time.Now().Add(365 * 24 * time.Hour) // Token valid for 1 year
+//
+//	claims := jwt.MapClaims{
+//		"email": email,
+//		"role":  role,
+//		"exp":   expirationTime.Unix(),
+//		"iat":   time.Now().Unix(),
+//	}
+//
+//	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+//
+//	tokenString, err := token.SignedString(jwtSecret)
+//	if err != nil {
+//		log.Printf("Error signing JWT for %s: %v", email, err)
+//		return "", fmt.Errorf("failed to sign token: %w", err)
+//	}
+//
+//	return tokenString, nil
+//}
 
 // IsValidated checks if a user role is not 'VERIFYING'.
 // This function might be less useful now as role is checked directly in handlers.

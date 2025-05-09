@@ -17,12 +17,15 @@ func SetupAuthRoutes(router fiber.Router, db *sql.DB, jwtSecret []byte, notifSer
 	// Note: jwtSecret is now passed to the handler constructor
 	authHandler := auth.NewAuthHandler(db, jwtSecret, notifService, emailService)
 
-	// Group routes with rate limiting for login/register
-	authGroup := router.Group("/auth", middlewares.LoginRegisterLimiter) // Apply limiter
+	// Group routes for auth operations and apply multiple security layers
+	authGroup := router.Group("/auth")
 
-	authGroup.Post("/register", authHandler.Register)
-	authGroup.Post("/login", authHandler.Login)
-	authGroup.Post("/verify-account", authHandler.VerifyAccount)
-	authGroup.Post("/verification-code", authHandler.RequestVerificationCode)
-	authGroup.Patch("/change-password", authHandler.ChangePassword)
+	// Apply account rate limiter to sensitive account endpoints
+	authGroup.Post("/register", middlewares.AccessRateLimiter, authHandler.Register)
+	authGroup.Post("/login", middlewares.AccessRateLimiter, authHandler.Login)
+	authGroup.Post("/verify-account", middlewares.AccessRateLimiter, authHandler.VerifyAccount)
+	
+	// Apply slightly less restrictive rate limiter to these endpoints
+	authGroup.Post("/verification-code", middlewares.AccountRateLimiter, authHandler.RequestVerificationCode)
+	authGroup.Patch("/change-password", middlewares.AccountRateLimiter, authHandler.ChangePassword)
 }

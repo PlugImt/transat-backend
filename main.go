@@ -84,7 +84,20 @@ func init() {
 }
 
 func main() {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		// Set strict routing
+		StrictRouting: true,
+		// Add security-focused settings
+		EnableTrustedProxyCheck: true,
+		// Limit the size of request body
+		BodyLimit: 15 * 1024 * 1024, // 15MB
+		// Set read timeout to avoid slow request attacks
+		ReadTimeout: 10 * time.Second,
+		// Set write timeout
+		WriteTimeout: 15 * time.Second,
+		// Set idle timeout
+		IdleTimeout: 120 * time.Second,
+	})
 
 	app.Use(utils.SentryHandler)
 
@@ -159,18 +172,44 @@ func main() {
 	c.Start()
 	defer c.Stop()
 
-	// Middlewares
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowHeaders: "*",
-		AllowMethods: "*",
-	}))
+	// ---- SECURITY MIDDLEWARES ----
 
+	// 1. Add security headers to all responses
+	app.Use(middlewares.SecurityHeadersMiddleware())
+
+	// 2. CORS configuration - restrict to allowed origins in production
+	corsConfig := cors.Config{
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
+	}
+
+	// Use proper CORS origins in production, or * in development
+	if os.Getenv("ENV") == "production" {
+		corsConfig.AllowOrigins = os.Getenv("ALLOWED_ORIGINS") // Comma-separated list from env var
+	} else {
+		corsConfig.AllowOrigins = "*" // Allow all origins in development
+	}
+
+	app.Use(cors.New(corsConfig))
+
+	// 3. Add general rate limiting
+	app.Use(middlewares.GeneralRateLimiter)
+
+	// 4. Add input validation middleware
+	app.Use(middlewares.ValidationMiddleware())
+
+	// 5. Add SQL injection protection
+	app.Use(middlewares.SQLInjectionProtectionMiddleware())
+
+	// 6. Add XSS protection
+	app.Use(middlewares.XSSProtectionMiddleware())
+
+	// 7. Logger middleware
 	app.Use(logger.New(logger.Config{
 		TimeFormat: "2006-01-02 15:04:05",
 	}))
 
-	// Add statistics middleware to capture all requests
+	// 8. Add statistics middleware to capture all requests
 	app.Use(middlewares.StatisticsMiddleware(statisticsService))
 
 	// Status Route

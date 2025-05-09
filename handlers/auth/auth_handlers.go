@@ -311,7 +311,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	}
 
 	// Generate JWT
-	token, err := utils.GenerateJWT(storedNewf.Email, role, h.JwtSecret) // Use helper
+	token, err := utils.GenerateJWT(storedNewf.Email, role, "") // Use device fingerprint or empty string if not available
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to generate JWT")
 		utils.LogLineKeyValue(utils.LevelError, "Email", storedNewf.Email)
@@ -490,7 +490,7 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 
 	// Generate JWT for immediate login
 	var token string
-	token, err = utils.GenerateJWT(req.Email, "NEWF", h.JwtSecret) // Role is now NEWF
+	token, err = utils.GenerateJWT(req.Email, "NEWF", "") // Empty fingerprint for now
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to generate JWT after verification")
 		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
@@ -891,7 +891,3 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 
 	return c.SendStatus(fiber.StatusOK)
 }
-
-// --- Helper functions specific to auth handler (if any) ---
-// E.g., maybe fetching user details frequently
-// Moved helpers like CheckEmail, GenerateJWT, GetVerificationCodeData, GetLanguageCode to utils package
