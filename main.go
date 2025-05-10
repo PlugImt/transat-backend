@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -18,6 +16,7 @@ import (
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/middlewares"
 	"github.com/plugimt/transat-backend/routes"
+	"github.com/plugimt/transat-backend/scheduler" // Import our scheduler package
 	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 	"github.com/robfig/cron/v3"
@@ -29,10 +28,6 @@ import (
 
 var db *sql.DB
 var jwtSecret []byte
-
-// Menu check state - Consider moving this into RestaurantHandler or a dedicated service
-var menuCheckedToday bool
-var menuCheckMutex sync.Mutex
 
 func init() {
 	utils.SentryInit()
@@ -130,109 +125,13 @@ func main() {
 	}
 	weatherHandler := handlers.NewWeatherHandler(weatherService)
 
+	// Initialize and start schedulers
+	appScheduler := scheduler.NewScheduler(restHandler)
+	appScheduler.StartAll()
+	defer appScheduler.StopAll()
+
 	// Cron Jobs - Requires access to handlers/services
 	c := cron.New()
-
-	resetMenuCheckedTodayMonitorSchedule := sentry.IntervalSchedule(1, sentry.MonitorScheduleUnitDay)
-
-	resetMenuCheckedTodayMonitor := &sentry.MonitorConfig{
-		Schedule:      resetMenuCheckedTodayMonitorSchedule,
-		MaxRuntime:    2,
-		CheckInMargin: 1,
-	}
-
-	// Reset menuCheckedToday flag at midnight
-	_, err = c.AddFunc("0 0 * * *", func() {
-		checkinId := sentry.CaptureCheckIn(
-			&sentry.CheckIn{
-				MonitorSlug: "reset-menu-checked-today",
-				Status:      sentry.CheckInStatusInProgress,
-			},
-			resetMenuCheckedTodayMonitor,
-		)
-		utils.LogLineKeyValue(utils.LevelInfo, "reset-menu-checked-today: in progress with id", checkinId)
-
-		menuCheckMutex.Lock()
-		menuCheckedToday = false
-		menuCheckMutex.Unlock()
-		utils.LogMessage(utils.LevelInfo, "Reset menu check flag for new day")
-
-		sentry.CaptureCheckIn(
-			&sentry.CheckIn{
-				MonitorSlug: "reset-menu-checked-today",
-				Status:      sentry.CheckInStatusOK,
-			},
-			resetMenuCheckedTodayMonitor,
-		)
-	})
-	if err != nil {
-		log.Fatalf("Error scheduling midnight reset: %v", err)
-	}
-
-	menuCheckMonitorSchedule := sentry.IntervalSchedule(10, sentry.MonitorScheduleUnitMinute)
-
-	menuCheckMonitor := &sentry.MonitorConfig{
-		Schedule:      menuCheckMonitorSchedule,
-		MaxRuntime:    2,
-		CheckInMargin: 1,
-	}
-
-	// Check for menu updates every 10 minutes
-	_, err = c.AddFunc("*/10 * * * *", func() {
-		checkinId := sentry.CaptureCheckIn(
-			&sentry.CheckIn{
-				MonitorSlug: "menu-check",
-				Status:      sentry.CheckInStatusInProgress,
-			},
-			menuCheckMonitor,
-		)
-		utils.LogLineKeyValue(utils.LevelInfo, "menu-check: in progress with id", checkinId)
-		menuCheckMutex.Lock()
-		shouldCheck := !menuCheckedToday
-		menuCheckMutex.Unlock()
-
-		if !shouldCheck {
-			return
-		}
-
-		updated, err := restHandler.CheckAndUpdateMenuCron()
-
-		if err != nil {
-			sentry.CaptureCheckIn(
-				&sentry.CheckIn{
-					MonitorSlug: "menu-check",
-					Status:      sentry.CheckInStatusError,
-				},
-				menuCheckMonitor,
-			)
-			sentry.CaptureException(err)
-			log.Printf("Error checking menu via cron: %v", err)
-			return
-		}
-
-		if updated {
-			log.Println("Menu updated via cron.")
-			menuCheckMutex.Lock()
-			if time.Now().Hour() > 10 {
-				menuCheckedToday = true
-				log.Println("Marking menu as checked for today (update occurred after 10 AM).")
-			} else {
-				log.Println("Menu updated before 10 AM, will allow further checks today.")
-			}
-			menuCheckMutex.Unlock()
-		} else {
-		}
-		sentry.CaptureCheckIn(
-			&sentry.CheckIn{
-				MonitorSlug: "menu-check",
-				Status:      sentry.CheckInStatusOK,
-			},
-			menuCheckMonitor,
-		)
-	})
-	if err != nil {
-		log.Fatalf("Error scheduling menu check: %v", err)
-	}
 
 	c.Start()
 	defer c.Stop()

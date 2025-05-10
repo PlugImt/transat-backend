@@ -316,7 +316,7 @@ func (ns *NotificationService) SendNotification(c *fiber.Ctx) error {
 func (ns *NotificationService) SendDailyMenuNotification() error {
 	log.Println("╔======== 🍽️ Send Daily Menu Notification 🍽️ ========╗")
 
-	subscribers, err := ns.GetSubscribedUsers("Restaurant") // Keep using existing function
+	subscribers, err := ns.GetSubscribedUsers("RESTAURANT") // Keep using existing function
 	if err != nil {
 		log.Println("║ 💥 Failed to get notification targets: ", err)
 		log.Println("╚=========================================╝")

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/plugimt/transat-backend/models"
 )
@@ -109,6 +110,108 @@ Expected: %v`, menuData.Cibo, expectedCibo)
 		t.Errorf("Expected empty AccompSoir, got: %v", menuData.AccompSoir)
 	}
 
+}
+
+// Test for the menu similarity calculation function
+func TestCalculateMenuSimilarity(t *testing.T) {
+	handler := NewRestaurantHandler(nil, nil, nil)
+	
+	// Test case 1: Identical menus
+	menu1 := &models.MenuData{
+		GrilladesMidi: []string{"Item 1", "Item 2"},
+		Migrateurs:    []string{"Item 3"},
+		Cibo:          []string{"Item 4"},
+		AccompMidi:    []string{"Item 5", "Item 6"},
+		GrilladesSoir: []string{"Item 7"},
+		AccompSoir:    []string{"Item 8"},
+	}
+	
+	// Make a copy of menu1
+	menu2 := &models.MenuData{
+		GrilladesMidi: []string{"Item 1", "Item 2"},
+		Migrateurs:    []string{"Item 3"},
+		Cibo:          []string{"Item 4"},
+		AccompMidi:    []string{"Item 5", "Item 6"},
+		GrilladesSoir: []string{"Item 7"},
+		AccompSoir:    []string{"Item 8"},
+	}
+	
+	similarity := handler.calculateMenuSimilarity(menu1, menu2)
+	if similarity != 1.0 {
+		t.Errorf("Expected similarity 1.0 for identical menus, got %f", similarity)
+	}
+	
+	// Test case 2: Completely different menus
+	menu3 := &models.MenuData{
+		GrilladesMidi: []string{"Different 1", "Different 2"},
+		Migrateurs:    []string{"Different 3"},
+		Cibo:          []string{"Different 4"},
+		AccompMidi:    []string{"Different 5", "Different 6"},
+		GrilladesSoir: []string{"Different 7"},
+		AccompSoir:    []string{"Different 8"},
+	}
+	
+	similarity = handler.calculateMenuSimilarity(menu1, menu3)
+	if similarity != 0.0 {
+		t.Errorf("Expected similarity 0.0 for completely different menus, got %f", similarity)
+	}
+	
+	// Test case 3: 50% similar menus
+	menu4 := &models.MenuData{
+		GrilladesMidi: []string{"Item 1", "Different 2"},
+		Migrateurs:    []string{"Item 3"},
+		Cibo:          []string{"Different 4"},
+		AccompMidi:    []string{"Item 5", "Different 6"},
+		GrilladesSoir: []string{"Different 7"},
+		AccompSoir:    []string{"Item 8"},
+	}
+	
+	similarity = handler.calculateMenuSimilarity(menu1, menu4)
+	expectedSimilarity := 4.0 / 8.0 // 4 matching items out of 8 total
+	if similarity != expectedSimilarity {
+		t.Errorf("Expected similarity %f for partially similar menus, got %f", expectedSimilarity, similarity)
+	}
+	
+	// Test case 4: Empty menus
+	emptyMenu1 := &models.MenuData{}
+	emptyMenu2 := &models.MenuData{}
+	
+	similarity = handler.calculateMenuSimilarity(emptyMenu1, emptyMenu2)
+	if similarity != 1.0 {
+		t.Errorf("Expected similarity 1.0 for empty menus, got %f", similarity)
+	}
+	
+	// Test case 5: One empty menu, one with items
+	similarity = handler.calculateMenuSimilarity(emptyMenu1, menu1)
+	if similarity != 0.0 {
+		t.Errorf("Expected similarity 0.0 for empty vs non-empty menu, got %f", similarity)
+	}
+}
+
+// Test for the cache clearing mechanism
+func TestCheckAndClearCache(t *testing.T) {
+	handler := NewRestaurantHandler(nil, nil, nil)
+	
+	// Setup test data in cache
+	handler.cachedMenus = map[int]*models.MenuData{
+		1: {GrilladesMidi: []string{"Test Item"}},
+	}
+	
+	// Set the nextCacheClearTime to a time in the past
+	handler.nextCacheClearTime = time.Now().Add(-1 * time.Hour)
+	
+	// Call the function that checks and clears cache
+	handler.checkAndClearCache()
+	
+	// Verify cache was cleared
+	if len(handler.cachedMenus) != 0 {
+		t.Errorf("Expected cache to be cleared but it contains %d items", len(handler.cachedMenus))
+	}
+	
+	// Verify next clear time was set to future
+	if !handler.nextCacheClearTime.After(time.Now()) {
+		t.Errorf("Expected next cache clear time to be in the future")
+	}
 }
 
 // --- Mocks (if needed for other tests) ---

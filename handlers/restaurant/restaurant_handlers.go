@@ -32,6 +32,11 @@ type RestaurantHandler struct {
 	cachedMenus   map[int]*models.MenuData // Map[languageID] -> MenuData
 	menuSourceURL string                   // URL to fetch the menu from
 	apiRegex      *regexp.Regexp           // Compiled regex for parsing API response
+	
+	// Additional fields for notification control and menu similarity
+	lastNotificationDate string            // Date when the last notification was sent (YYYY-MM-DD)
+	menuSimilarityThreshold float64        // Threshold for menu similarity (0.0-1.0)
+	nextCacheClearTime time.Time           // Time when the cache should be cleared next
 }
 
 // NewRestaurantHandler creates a new RestaurantHandler.
@@ -43,13 +48,23 @@ func NewRestaurantHandler(db *sql.DB, transService *services.TranslationService,
 	// Make source URL configurable
 	sourceURL := "https://toast-js.ew.r.appspot.com/coteresto?key=1ohdRUdCYo6e71aLuBh7ZfF2lc_uZqp9D78icU4DPufA"
 
+	// Set cache clear time to 23:00 today
+	now := time.Now()
+	nextCacheClearTime := time.Date(now.Year(), now.Month(), now.Day(), 23, 0, 0, 0, now.Location())
+	if now.After(nextCacheClearTime) {
+		// If it's already past 23:00, set it to 23:00 tomorrow
+		nextCacheClearTime = nextCacheClearTime.Add(24 * time.Hour)
+	}
+
 	return &RestaurantHandler{
-		DB:            db,
-		TransService:  transService,
-		NotifService:  notifService,
-		cachedMenus:   make(map[int]*models.MenuData),
-		menuSourceURL: sourceURL,
-		apiRegex:      regex,
+		DB:                   db,
+		TransService:         transService,
+		NotifService:         notifService,
+		cachedMenus:          make(map[int]*models.MenuData),
+		menuSourceURL:        sourceURL,
+		apiRegex:             regex,
+		menuSimilarityThreshold: 0.7, // 70% similarity threshold
+		nextCacheClearTime:   nextCacheClearTime,
 	}
 }
 
@@ -57,6 +72,9 @@ func NewRestaurantHandler(db *sql.DB, transService *services.TranslationService,
 // It uses caching and fetches/translates the menu if needed.
 func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 	utils.LogHeader("🍽️ Get Restaurant Menu")
+
+	// Check if cache should be cleared
+	h.checkAndClearCache()
 
 	// decode RestaurantRequest from query params
 	language := c.Query("language")
@@ -216,6 +234,28 @@ func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 		MenuData:    *finalMenuData,
 		UpdatedDate: fetchedTime.Format(time.RFC3339),
 	})
+}
+
+// checkAndClearCache checks if it's time to clear the cache and does so if needed
+func (h *RestaurantHandler) checkAndClearCache() {
+	now := time.Now()
+	
+	// Check if it's time to clear the cache
+	if now.After(h.nextCacheClearTime) {
+		// Acquire write lock for cache clearing
+		h.cacheMutex.Lock()
+		defer h.cacheMutex.Unlock()
+		
+		// Double-check after acquiring lock
+		if now.After(h.nextCacheClearTime) {
+			utils.LogMessage(utils.LevelInfo, "Clearing menu cache (scheduled at 23:00)")
+			h.cachedMenus = make(map[int]*models.MenuData)
+			
+			// Set next cache clear time to 23:00 tomorrow
+			h.nextCacheClearTime = time.Date(now.Year(), now.Month(), now.Day(), 23, 0, 0, 0, now.Location()).Add(24 * time.Hour)
+			utils.LogLineKeyValue(utils.LevelInfo, "Next cache clear scheduled for", h.nextCacheClearTime.Format(time.RFC3339))
+		}
+	}
 }
 
 // --- Internal Methods ---
@@ -435,12 +475,17 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 		utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
 		// Proceed with saving the fetched menu as we can't compare
 	} else if latestDbMenu != nil {
-		// Compare fetched menu with DB menu
-		if compareMenus(&latestDbMenu.MenuData, baseMenuData) {
-			utils.LogMessage(utils.LevelInfo, "Cron: Fetched menu is identical to latest in DB. No update needed.")
+		// Compare fetched menu with DB menu using similarity score
+		similarity := h.calculateMenuSimilarity(&latestDbMenu.MenuData, baseMenuData)
+		utils.LogLineKeyValue(utils.LevelInfo, "Menu similarity score", similarity)
+		
+		// Only consider it a new menu if similarity is below threshold (meaning it's different enough)
+		if similarity >= h.menuSimilarityThreshold {
+			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cron: Fetched menu similarity (%f) is above threshold (%f). No update needed.", 
+				similarity, h.menuSimilarityThreshold))
 			needsUpdate = false
 		} else {
-			utils.LogMessage(utils.LevelInfo, "Cron: Menu change detected.")
+			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cron: Menu change detected (similarity: %f).", similarity))
 		}
 	} else {
 		utils.LogMessage(utils.LevelInfo, "Cron: No existing base menu found in DB. Saving fetched menu.")
@@ -476,12 +521,22 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 
 		// 5. Trigger notifications (only if base menu was updated)
 		if h.NotifService != nil {
-			utils.LogMessage(utils.LevelInfo, "Cron: Triggering daily menu notification send")
-			notifErr := h.NotifService.SendDailyMenuNotification()
-			if notifErr != nil {
-				utils.LogMessage(utils.LevelError, "Cron: Failed to send daily menu notification")
-				utils.LogLineKeyValue(utils.LevelError, "Error", notifErr)
-				// Log error, but don't necessarily fail the whole check-update cycle because of notification failure
+			// Check if we already sent a notification today
+			today := time.Now().Format("2006-01-02")
+			if h.lastNotificationDate != today {
+				utils.LogMessage(utils.LevelInfo, "Cron: Triggering daily menu notification send")
+				notifErr := h.NotifService.SendDailyMenuNotification()
+				if notifErr != nil {
+					utils.LogMessage(utils.LevelError, "Cron: Failed to send daily menu notification")
+					utils.LogLineKeyValue(utils.LevelError, "Error", notifErr)
+					// Log error, but don't necessarily fail the whole check-update cycle because of notification failure
+				} else {
+					// Record that we sent a notification today
+					h.lastNotificationDate = today
+					utils.LogMessage(utils.LevelInfo, "Cron: Notification sent successfully, won't send more today")
+				}
+			} else {
+				utils.LogMessage(utils.LevelInfo, "Cron: Already sent a notification today, skipping")
 			}
 		} else {
 			utils.LogMessage(utils.LevelWarn, "Cron: NotificationService not available.")
@@ -490,6 +545,61 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 
 	utils.LogFooter()
 	return updated, nil // Return true if an update was saved
+}
+
+// calculateMenuSimilarity calculates a similarity score between two menus
+// Returns a value between 0.0 (completely different) and 1.0 (identical)
+func (h *RestaurantHandler) calculateMenuSimilarity(menu1, menu2 *models.MenuData) float64 {
+	// Count total items in each menu
+	totalItems1 := len(menu1.GrilladesMidi) + len(menu1.Migrateurs) + len(menu1.Cibo) + 
+		len(menu1.AccompMidi) + len(menu1.GrilladesSoir) + len(menu1.AccompSoir)
+	
+	totalItems2 := len(menu2.GrilladesMidi) + len(menu2.Migrateurs) + len(menu2.Cibo) + 
+		len(menu2.AccompMidi) + len(menu2.GrilladesSoir) + len(menu2.AccompSoir)
+	
+	if totalItems1 == 0 && totalItems2 == 0 {
+		return 1.0 // Both empty, consider identical
+	}
+	if totalItems1 == 0 || totalItems2 == 0 {
+		return 0.0 // One is empty, one is not - very different
+	}
+	
+	// Count matching items in each category
+	matches := 0
+	
+	// Helper to count matches in a category
+	countMatches := func(slice1, slice2 []string) int {
+		// Convert slice2 to a map for O(1) lookups
+		itemMap := make(map[string]bool)
+		for _, item := range slice2 {
+			itemMap[strings.TrimSpace(item)] = true
+		}
+		
+		// Count items from slice1 that are in slice2
+		matchCount := 0
+		for _, item := range slice1 {
+			if itemMap[strings.TrimSpace(item)] {
+				matchCount++
+			}
+		}
+		return matchCount
+	}
+	
+	// Count matches in each category
+	matches += countMatches(menu1.GrilladesMidi, menu2.GrilladesMidi)
+	matches += countMatches(menu1.Migrateurs, menu2.Migrateurs)
+	matches += countMatches(menu1.Cibo, menu2.Cibo)
+	matches += countMatches(menu1.AccompMidi, menu2.AccompMidi)
+	matches += countMatches(menu1.GrilladesSoir, menu2.GrilladesSoir)
+	matches += countMatches(menu1.AccompSoir, menu2.AccompSoir)
+	
+	// Calculate Jaccard similarity coefficient (intersection over union)
+	maxItems := totalItems1
+	if totalItems2 > maxItems {
+		maxItems = totalItems2
+	}
+	
+	return float64(matches) / float64(maxItems)
 }
 
 // --- Helper Functions ---
