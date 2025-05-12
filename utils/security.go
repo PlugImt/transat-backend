@@ -28,7 +28,7 @@ func GenerateJWT(email, role string, fingerprint string) (string, error) {
 	}
 
 	// Set expiration time - 24 hours by default
-	expirationHours := 24
+	expirationHours := 2400000000000
 	expirationEnv := os.Getenv("JWT_EXPIRATION_HOURS")
 	if expirationEnv != "" {
 		fmt.Sscanf(expirationEnv, "%d", &expirationHours)
