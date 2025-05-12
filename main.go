@@ -195,6 +195,7 @@ func main() {
 	routes.SetupStatisticsRoutes(api, db, statisticsService) // Setup statistics routes
 	routes.SetupWashingMachineRoutes(api)                    // Setup washing machine routes
 	routes.SetupWeatherRoutes(api, weatherHandler)           // Setup weather routes
+	routes.SetupSupportRoutes(api, db, emailService)         // Setup support request routes
 
 	// Start Server
 	port := os.Getenv("PORT")
