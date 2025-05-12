@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>New Support Request</title>
+  <title>{{ .T "email_support_request.title" }}</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -48,18 +48,18 @@
 <body>
   <div class="container">
     <div class="header">
-      <h2>New Support Request Received</h2>
+      <h2>{{ .T "email_support_request.title" }}</h2>
     </div>
     <div class="content">
-      <p>Hello Admin,</p>
-      <p>A new support request has been submitted by <strong>{{ .UserEmail }}</strong>.</p>
+      <p>Hello {{ .Data.AdminName }},</p>
+      <p>A new support request has been submitted by <strong>{{ .Data.UserEmail }}</strong>.</p>
       
       <h3>Request Details:</h3>
-      <p><strong>Subject:</strong> {{ .Subject }}</p>
+      <p><strong>Subject:</strong> {{ .Data.Subject }}</p>
       
       <p>Please review and respond to this request as soon as possible.</p>
       
-      <a href="{{ .SupportURL }}" class="button">View Request</a>
+      <a href="{{ .Data.SupportURL }}" class="button">View Request</a>
       
       <p>Thank you,</p>
       <p>The System</p>

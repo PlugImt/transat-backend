@@ -307,7 +307,8 @@ func (h *SupportHandler) sendSupportNotification(email string, subject string) {
 
 	// Get admin emails
 	rows, err := h.DB.Query(`
-		SELECT n.email, COALESCE(l.code, 'fr') as lang_code
+		SELECT n.email, COALESCE(l.code, 'fr') as lang_code, 
+		       COALESCE(n.first_name, '') as first_name
 		FROM newf_roles nr
 		JOIN newf n ON nr.email = n.email
 		LEFT JOIN languages l ON n.language = l.id_languages
@@ -322,20 +323,23 @@ func (h *SupportHandler) sendSupportNotification(email string, subject string) {
 
 	// Send notification email to each admin
 	for rows.Next() {
-		var adminEmail, langCode string
-		if err := rows.Scan(&adminEmail, &langCode); err != nil {
+		var adminEmail, langCode, firstName string
+		if err := rows.Scan(&adminEmail, &langCode, &firstName); err != nil {
 			utils.LogMessage(utils.LevelError, "Error scanning admin email row")
 			utils.LogLineKeyValue(utils.LevelError, "Error", err)
 			continue
 		}
 
-		// Extract first name from admin email
-		firstName := ""
-		emailParts := strings.Split(adminEmail, "@")
-		nameParts := strings.Split(emailParts[0], ".")
-		if len(nameParts) > 0 && len(nameParts[0]) > 0 {
-			fName := nameParts[0]
-			firstName = strings.ToUpper(string(fName[0])) + strings.ToLower(fName[1:])
+		// Use stored firstName if available, otherwise extract from email
+		if firstName == "" {
+			emailParts := strings.Split(adminEmail, "@")
+			nameParts := strings.Split(emailParts[0], ".")
+			if len(nameParts) > 0 && len(nameParts[0]) > 0 {
+				fName := nameParts[0]
+				firstName = strings.ToUpper(string(fName[0])) + strings.ToLower(fName[1:])
+			} else {
+				firstName = "Admin" // Fallback
+			}
 		}
 
 		// Prepare email data
@@ -358,7 +362,7 @@ func (h *SupportHandler) sendSupportNotification(email string, subject string) {
 		// Capture data for the goroutine
 		recipient := adminEmail
 		template := "email_templates/support_request.html"
-		subjectKey := "email_support_request.subject" // Define this in your translation files
+		subjectKey := "email_support_request.subject"
 		lang := langCode
 
 		// Run email sending in a separate goroutine

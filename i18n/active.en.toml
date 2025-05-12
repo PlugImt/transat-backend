@@ -35,6 +35,10 @@ ru_message = "Never know which line to join? Get the daily menu at 11am and plan
 future_title = "<span style=\"color:#ec7f32\">Transat</span>, this is just the beginning!"
 future_message = "We're improving the app based on your feedback, and some awesome new features are coming very soon!\n\nBest regards,\nThe Transat team"
 
+[email_support_request]
+subject = "🆘 New support request: {{.Subject}}"
+title = "New Support Request"
+
 [weather]
 thunderstorm = "Thunderstorm"
 drizzle = "Drizzle"

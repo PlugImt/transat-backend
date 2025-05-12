@@ -35,6 +35,10 @@ ru_message = "Tu ne sais jamais dans quelle queue te placer ? Reçois le menu du
 future_title = "<span style=\"color:#ec7f32\">Transat</span>, ce n'est que le début !"
 future_message = "On améliore l'appli grâce à vos retours, et des nouvelles fonctionnalités banger arrivent très bientôt !\n\nGros bisous,\nLa team Transat"
 
+[email_support_request]
+subject = "🆘 Nouvelle demande de support : {{.Subject}}"
+title = "Nouvelle demande de support"
+
 [weather]
 thunderstorm = "Orage"
 drizzle = "Bruine"
