@@ -19,4 +19,5 @@ func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *s
 	// Endpoints
 	statsGroup.Get("/endpoints", statsHandler.GetEndpointStatistics)
 	statsGroup.Get("/global", statsHandler.GetGlobalStatistics)
+	statsGroup.Get("/top-users", statsHandler.GetTopUserStatistics)
 }

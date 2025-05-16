@@ -35,6 +35,20 @@ type EndpointStatistic struct {
 	ErrorCount         int       `json:"error_count"`
 }
 
+// UserStatistic represents aggregated statistics for a user
+type UserStatistic struct {
+	Email              string    `json:"email"`
+	RequestCount       int       `json:"request_count"`
+	AvgDurationMs      float64   `json:"avg_duration_ms"`
+	MinDurationMs      int       `json:"min_duration_ms"`
+	MaxDurationMs      int       `json:"max_duration_ms"`
+	SuccessRatePercent float64   `json:"success_rate_percent"`
+	FirstRequest       time.Time `json:"first_request"`
+	LastRequest        time.Time `json:"last_request"`
+	SuccessCount       int       `json:"success_count"`
+	ErrorCount         int       `json:"error_count"`
+}
+
 // GlobalStatistic represents aggregated statistics across all endpoints
 type GlobalStatistic struct {
 	TotalRequestCount        int       `json:"total_request_count"`
@@ -65,6 +79,38 @@ func (s *StatisticsService) GetEndpointStatistics() ([]EndpointStatistic, error)
 		var stat EndpointStatistic
 		if err := rows.Scan(
 			&stat.Endpoint, &stat.Method, &stat.RequestCount, &stat.AvgDurationMs,
+			&stat.MinDurationMs, &stat.MaxDurationMs, &stat.SuccessRatePercent,
+			&stat.FirstRequest, &stat.LastRequest, &stat.SuccessCount, &stat.ErrorCount,
+		); err != nil {
+			return nil, err
+		}
+		stats = append(stats, stat)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
+
+// GetTopUserStatistics retrieves the top 10 users by request count
+func (s *StatisticsService) GetTopUserStatistics() ([]UserStatistic, error) {
+	rows, err := s.db.Query(`SELECT 
+		email, request_count, avg_duration_ms, 
+		min_duration_ms, max_duration_ms, success_rate_percent,
+		first_request, last_request, success_count, error_count
+		FROM top_users_statistics`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []UserStatistic
+	for rows.Next() {
+		var stat UserStatistic
+		if err := rows.Scan(
+			&stat.Email, &stat.RequestCount, &stat.AvgDurationMs,
 			&stat.MinDurationMs, &stat.MaxDurationMs, &stat.SuccessRatePercent,
 			&stat.FirstRequest, &stat.LastRequest, &stat.SuccessCount, &stat.ErrorCount,
 		); err != nil {
