@@ -133,7 +133,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		INSERT INTO newf (email, password, first_name, last_name, language)
 		VALUES ($1, $2, $3, $4, COALESCE ((SELECT id_languages FROM languages WHERE code = $5 LIMIT 1), 1));
 	`
-	_, err = tx.Exec(insertUserQuery, newf.Email, newf.Password, newf.FirstName, newf.LastName, newf.Language)
+	_, err = tx.Exec(insertUserQuery, strings.ToLower(newf.Email), newf.Password, newf.FirstName, newf.LastName, newf.Language)
 	if err != nil {
 		// Handle specific errors like duplicate email
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
@@ -265,7 +265,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		LEFT JOIN languages l ON n.language = l.id_languages
 		WHERE n.email = $1;
 	`
-	err := h.DB.QueryRow(query, candidate.Email).Scan(
+	err := h.DB.QueryRow(query, strings.ToLower(candidate.Email)).Scan(
 		&storedNewf.Email,
 		&storedNewf.Password,
 		&role,
@@ -424,7 +424,7 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 		  );
 	`
 	var result sql.Result
-	result, err = tx.Exec(query, req.Email, req.VerificationCode)
+	result, err = tx.Exec(query, strings.ToLower(req.Email), req.VerificationCode)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to execute verification update")
 		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
@@ -448,7 +448,7 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 		var exists int
 		// Use the main DB connection for check, no need for tx
 		checkQuery := `SELECT COUNT(*) FROM newf WHERE email = $1 AND verification_code = $2`
-		errCheck := h.DB.QueryRow(checkQuery, req.Email, req.VerificationCode).Scan(&exists)
+		errCheck := h.DB.QueryRow(checkQuery, strings.ToLower(req.Email), req.VerificationCode).Scan(&exists)
 
 		// Set err for defer rollback before returning
 		err = fmt.Errorf("verification failed")
@@ -468,7 +468,7 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 
 	// Verification successful, clear the code (optional)
 	clearCodeQuery := `UPDATE newf SET verification_code = NULL, verification_code_expiration = NULL WHERE email = $1`
-	_, err = tx.Exec(clearCodeQuery, req.Email)
+	_, err = tx.Exec(clearCodeQuery, strings.ToLower(req.Email))
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to clear verification code after success")
 		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
@@ -504,7 +504,7 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 	if h.EmailService != nil {
 		// Capture data for the goroutine
 		recipient := req.Email
-		languageCode, langErr := utils.GetLanguageCode(h.DB, req.Email) // Use helper
+		languageCode, langErr := utils.GetLanguageCode(h.DB, strings.ToLower(req.Email)) // Use helper
 		if langErr != nil {
 			utils.LogMessage(utils.LevelWarn, "Failed to get language for welcome email, using default 'fr'")
 			languageCode = "fr" // Default
@@ -581,7 +581,7 @@ func (h *AuthHandler) RequestVerificationCode(c *fiber.Ctx) error {
 				WHERE nr.email = $1 AND r.name != 'VERIFYING'
 			);
 	`
-	err := h.DB.QueryRow(checkQuery, req.Email).Scan(&userExists, &isVerified)
+	err := h.DB.QueryRow(checkQuery, strings.ToLower(req.Email)).Scan(&userExists, &isVerified)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed check user status for verification code request")
 		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
@@ -752,7 +752,7 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 			  AND verification_code = $3
 			  AND verification_code_expiration > NOW();
 		`
-		result, err := h.DB.Exec(query, string(hashedNewPassword), req.Email, req.VerificationCode)
+		result, err := h.DB.Exec(query, string(hashedNewPassword), strings.ToLower(req.Email), req.VerificationCode)
 		if err != nil {
 			updateErr = err // Store error to log later
 		} else {
