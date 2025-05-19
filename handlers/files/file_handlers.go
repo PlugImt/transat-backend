@@ -113,8 +113,8 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	destinationPath := filepath.Join(h.DataFolder, finalFilename)
 	utils.LogLineKeyValue(utils.LevelInfo, "Destination Path", destinationPath)
 
-	// Create the destination file
 	// Sanitize destinationPath to prevent path traversal
+	destinationPath = filepath.Clean(destinationPath)
 	if strings.Contains(destinationPath, "..") || filepath.IsAbs(destinationPath) {
 		utils.LogMessage(utils.LevelError, "Invalid destination path (potential path traversal)")
 		utils.LogLineKeyValue(utils.LevelError, "Path", destinationPath)

@@ -68,7 +68,7 @@ func (s *WeatherService) GetWeather(lang string) (*models.WeatherData, error) {
 		return nil, fmt.Errorf("invalid weather API URL")
 	}
 
-	resp, err := http.Get(url)
+	resp, err := http.Get(url) // #nosec G107
 	if err != nil {
 		return nil, fmt.Errorf("failed to get weather data: %w", err)
 	}
