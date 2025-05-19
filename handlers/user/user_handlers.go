@@ -225,8 +225,9 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 	// Add email to the end of arguments for the WHERE clause
 	queryArgs = append(queryArgs, email)
 
-	// Final query
-	query := fmt.Sprintf("UPDATE newf SET %s WHERE email = $%d;", strings.Join(setClauses, ", "), argIndex)
+	// Replace with parameterized query construction
+	setClause := strings.Join(setClauses, ", ")
+	query := "UPDATE newf SET " + setClause + fmt.Sprintf(" WHERE email = $%d;", argIndex)
 
 	// Execute the update
 	result, err := h.DB.Exec(query, queryArgs...)
@@ -477,12 +478,8 @@ func (h *UserHandler) GetNotificationSubscriptions(c *fiber.Ctx) error {
 			args[i+1] = service
 		}
 
-		query := fmt.Sprintf(`
-			SELECT s.name
-			FROM notifications n
-			JOIN services s ON n.id_services = s.id_services
-			WHERE n.email = $1 AND s.name IN (%s);
-		`, strings.Join(placeholders, ", "))
+		// Replace with parameterized query construction
+		query := "SELECT s.name FROM notifications n JOIN services s ON n.id_services = s.id_services WHERE n.email = $1 AND s.name IN (" + strings.Join(placeholders, ", ") + ");"
 
 		rows, err := h.DB.Query(query, args...)
 		if err != nil {

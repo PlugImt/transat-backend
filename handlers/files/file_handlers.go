@@ -113,19 +113,14 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	destinationPath := filepath.Join(h.DataFolder, finalFilename)
 	utils.LogLineKeyValue(utils.LevelInfo, "Destination Path", destinationPath)
 
-	// Open the uploaded file stream
-	srcFile, err := fileHeader.Open()
-	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to open uploaded file stream")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to read uploaded file",
-		})
-	}
-	defer srcFile.Close()
-
 	// Create the destination file
+	// Sanitize destinationPath to prevent path traversal
+	if strings.Contains(destinationPath, "..") || filepath.IsAbs(destinationPath) {
+		utils.LogMessage(utils.LevelError, "Invalid destination path (potential path traversal)")
+		utils.LogLineKeyValue(utils.LevelError, "Path", destinationPath)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid file path"})
+	}
 	dstFile, err := os.Create(destinationPath)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to create destination file")
@@ -137,6 +132,18 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 		})
 	}
 	defer dstFile.Close()
+
+	// Open the uploaded file stream
+	srcFile, err := fileHeader.Open()
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to open uploaded file stream")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to read uploaded file",
+		})
+	}
+	defer srcFile.Close()
 
 	// Copy the file contents
 	_, err = io.Copy(dstFile, srcFile)

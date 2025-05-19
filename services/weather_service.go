@@ -63,6 +63,11 @@ func (s *WeatherService) GetWeather(lang string) (*models.WeatherData, error) {
 
 	url := fmt.Sprintf("https://api.openweathermap.org/data/2.5/weather?lat=%s&lon=%s&units=metric&appid=%s&lang=%s", s.lat, s.lon, s.apiKey, lang)
 
+	// Validate the URL before making the request
+	if !strings.HasPrefix(url, "https://api.openweathermap.org/") {
+		return nil, fmt.Errorf("invalid weather API URL")
+	}
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get weather data: %w", err)
