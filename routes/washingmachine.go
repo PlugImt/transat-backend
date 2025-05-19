@@ -14,5 +14,7 @@ func SetupWashingMachineRoutes(router fiber.Router) {
 	washingMachines := router.Group("/washingmachines")
 
 	// Define routes
+	router.Get("/washingmachines", handler.GetWashingMachines())
+	washingMachines.Get("", handler.GetWashingMachines())
 	washingMachines.Get("/", handler.GetWashingMachines())
 }
