@@ -1,3 +1,4 @@
+-- +goose Up
 -- Create view for top users statistics
 CREATE OR REPLACE VIEW top_users_statistics AS
 SELECT 
