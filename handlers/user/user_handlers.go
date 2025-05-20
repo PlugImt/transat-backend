@@ -173,8 +173,11 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 		updateFields["phone_number"] = req.PhoneNumber
 	}
 	if req.GraduationYear != 0 { // Assuming 0 is not a valid year
-		// Add validation for year range if needed
-		updateFields["graduation_year"] = req.GraduationYear
+		if req.GraduationYear < 1900 || req.GraduationYear > time.Now().Year()+5 {
+			utils.LogMessage(utils.LevelWarn, "Invalid graduation year provided")
+		} else {
+			updateFields["graduation_year"] = req.GraduationYear
+		}
 	}
 	if req.Campus != "" {
 		updateFields["campus"] = req.Campus
