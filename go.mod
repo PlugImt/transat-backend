@@ -8,8 +8,8 @@ require (
 	cloud.google.com/go/translate v1.12.4
 	github.com/BurntSushi/toml v1.3.2
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/getsentry/sentry-go v0.32.0
-	github.com/getsentry/sentry-go/fiber v0.32.0
+	github.com/getsentry/sentry-go v0.33.0
+	github.com/getsentry/sentry-go/fiber v0.33.0
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/joho/godotenv v1.5.1

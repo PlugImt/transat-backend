@@ -40,6 +40,7 @@ func SentryInit() {
 
 			return event
 		},
+		EnableLogs:    true,
 		EnableTracing: true,
 	}); err != nil {
 		fmt.Printf("Sentry initialization failed: %v\n", err)
