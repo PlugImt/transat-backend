@@ -197,6 +197,10 @@ func main() {
 	routes.SetupWashingMachineRoutes(api)                    // Setup washing machine routes
 	routes.SetupWeatherRoutes(api, weatherHandler)           // Setup weather routes
 
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.SendString("OK")
+	})
+
 	// Start Server
 	port := os.Getenv("PORT")
 	if port == "" {
