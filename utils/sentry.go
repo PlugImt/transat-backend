@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
@@ -17,7 +18,7 @@ func SentryInit() {
 	commitSHA := GetEnvCommitSHA()
 	host := GetEnvHost()
 
-	LogMessage(LevelInfo, "Initializing Sentry with env: "+env+", commitSHA: "+commitSHA+", host: "+host)
+	log.Printf("║ %s: %s\n", LevelInfo, "Initializing Sentry with env: "+env+", commitSHA: "+commitSHA+", host: "+host)
 
 	if err := sentry.Init(sentry.ClientOptions{
 		Dsn:         "https://121ef29a5b1be0fb38b2dc2eb116f255@o4509277512859648.ingest.de.sentry.io/4509277597597776",

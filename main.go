@@ -31,6 +31,7 @@ var jwtSecret []byte
 
 func init() {
 	utils.SentryInit()
+	utils.InitLogger()
 
 	err := godotenv.Load()
 	if err != nil {
