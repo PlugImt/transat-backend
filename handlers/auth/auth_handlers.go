@@ -183,6 +183,25 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong setting up verification"})
 	}
 
+	// Subscribe user to all available notification services
+	subscribeToAllServicesQuery := `
+		INSERT INTO notifications (email, id_services)
+		SELECT $1, id_services FROM services;
+	`
+	_, err = tx.Exec(subscribeToAllServicesQuery, newf.Email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to subscribe user to all notification services")
+		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		// Don't fail registration if subscription fails, just log the error
+		// We'll continue with the commit
+		utils.LogMessage(utils.LevelWarn, "Registration will proceed despite subscription error")
+		err = nil // Reset error so commit proceeds
+	} else {
+		utils.LogMessage(utils.LevelInfo, "User subscribed to all notification services")
+	}
+
 	// Commit the transaction now
 	commitErr := tx.Commit()
 	if commitErr != nil {
