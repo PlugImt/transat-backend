@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"github.com/plugimt/transat-backend/handlers/restaurant"
-	"github.com/plugimt/transat-backend/services"
 	"github.com/robfig/cron/v3"
 )
 

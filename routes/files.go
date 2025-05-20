@@ -6,6 +6,7 @@ import (
 
 	"github.com/plugimt/transat-backend/handlers/files" // Import the files handlers
 	"github.com/plugimt/transat-backend/middlewares"
+	"github.com/plugimt/transat-backend/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -17,6 +18,11 @@ func SetupFileRoutes(router fiber.Router, db *sql.DB) {
 	if err != nil {
 		// Log the error and potentially panic or exit if file handling is critical
 		log.Fatalf("💥 Failed to initialize File Handler: %v", err)
+	}
+
+	// Ensure data folder exists
+	if err := utils.EnsureDataFolder(); err != nil {
+		log.Fatalf("💥 Failed to ensure data folder exists: %v", err)
 	}
 
 	// Public route to serve files (no auth needed usually)

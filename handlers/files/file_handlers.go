@@ -26,17 +26,13 @@ type FileHandler struct {
 // NewFileHandler creates a new FileHandler.
 // It ensures the data folder exists upon creation.
 func NewFileHandler(db *sql.DB) (*FileHandler, error) {
-	dataFolder := os.Getenv("DATA_FOLDER")
-	if dataFolder == "" {
-		dataFolder = "/data" // Default path
-		log.Println("DATA_FOLDER environment variable not set, using default '/data'")
+	// Ensure data folder exists during initialization
+	if err := utils.EnsureDataFolder(); err != nil {
+		return nil, fmt.Errorf("failed to ensure data folder: %w", err)
 	}
 
-	// Ensure data folder exists during initialization
-	// Using utils.EnsureDataFolder assumes it's defined there
-	if err := utils.EnsureDataFolder(); err != nil {
-		return nil, fmt.Errorf("failed to ensure data folder '%s': %w", dataFolder, err)
-	}
+	// Get the data folder path from our utility
+	dataFolder := utils.GetDataFolderPath()
 
 	return &FileHandler{
 		DB:         db,
@@ -61,6 +57,15 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	utils.LogLineKeyValue(utils.LevelInfo, "Content-Type", c.Get("Content-Type"))
 
 	// --- File Handling ---
+	// Check if the request is multipart form
+	if !strings.HasPrefix(c.Get("Content-Type"), "multipart/form-data") {
+		utils.LogMessage(utils.LevelError, "Invalid Content-Type, expected multipart/form-data")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid Content-Type, expected multipart/form-data",
+		})
+	}
+
 	// Prioritize FormFile for standard uploads
 	fileHeader, err := c.FormFile("file") // Use "file" as the default key, adjust if needed
 	if err != nil {
@@ -68,7 +73,6 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 		if fileHeader, err = c.FormFile("image"); err != nil { // Check common alternative "image"
 			utils.LogMessage(utils.LevelError, "No file uploaded with key 'file' or 'image'")
 			utils.LogLineKeyValue(utils.LevelError, "Error", err)
-			// Try manual multipart form parsing as a last resort? (Can be complex)
 			utils.LogFooter()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "No file uploaded (use key 'file' or 'image')",
@@ -109,18 +113,21 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	// Construct final filename: safeBaseName_uniqueID.ext
 	finalFilename := fmt.Sprintf("%s_%s%s", safeBaseName, uniqueID, fileExt)
 
+	// --- Ensure Data Folder Exists ---
+	if err := utils.EnsureDataFolder(); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to ensure data folder exists")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Server storage error",
+		})
+	}
+
 	// --- Saving File ---
 	destinationPath := filepath.Join(h.DataFolder, finalFilename)
 	utils.LogLineKeyValue(utils.LevelInfo, "Destination Path", destinationPath)
 
-	// Sanitize destinationPath to prevent path traversal
-	destinationPath = filepath.Clean(destinationPath)
-	if strings.Contains(destinationPath, "..") || filepath.IsAbs(destinationPath) {
-		utils.LogMessage(utils.LevelError, "Invalid destination path (potential path traversal)")
-		utils.LogLineKeyValue(utils.LevelError, "Path", destinationPath)
-		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid file path"})
-	}
+	// Create destination file
 	dstFile, err := os.Create(destinationPath)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to create destination file")
@@ -174,9 +181,8 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id_files`
 
-	// Store the *original* filename in the DB for user display?
-	// Store the *final* (unique) filename as the path identifier.
-	// Note: 'path' column now stores the unique path in the data folder.
+	// Store the *original* filename in the DB for user display
+	// Store the full path to the file for retrieval
 	err = h.DB.QueryRow(insertQuery, originalFilename, destinationPath, email).Scan(&fileID)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to record file in database")
@@ -201,7 +207,6 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 
 	// --- Response ---
 	// Construct the URL based on the *final* filename used for serving
-	// Assuming /api/data/ serves files based on the filename part of the path
 	serveURL := fmt.Sprintf("/api/data/%s", finalFilename)
 
 	return c.JSON(fiber.Map{
