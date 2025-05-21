@@ -49,7 +49,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 			-- COALESCE(n.notification_token, '') AS notification_token, -- Maybe don't expose token?
 			n.password_updated_date, -- Consider format or omitting
 			COALESCE(l.code, 'fr') AS language, -- Get language code
-			(SELECT COUNT(*) FROM newf) AS total_newf -- Calculate total users separately if needed
+			(SELECT id_newf FROM newf ORDER BY creation_date DESC LIMIT 1) AS total_newf -- Calculate total users separately if needed
 		FROM newf n
 		LEFT JOIN languages l ON n.language = l.id_languages
 		WHERE n.email = $1;
