@@ -192,10 +192,11 @@ func main() {
 	routes.SetupTraqRoutes(api, db)
 	routes.SetupFileRoutes(api, db)
 	routes.SetupRestaurantRoutes(api, restHandler)
-	routes.SetupRealCampusRoutes(api, db)                    // Existing RealCampus routes
-	routes.SetupStatisticsRoutes(api, db, statisticsService) // Setup statistics routes
-	routes.SetupWashingMachineRoutes(api)                    // Setup washing machine routes
-	routes.SetupWeatherRoutes(api, weatherHandler)           // Setup weather routes
+	routes.SetupRealCampusRoutes(api, db)                        // Existing RealCampus routes
+	routes.SetupStatisticsRoutes(api, db, statisticsService)     // Setup statistics routes
+	routes.SetupWashingMachineRoutes(api)                        // Setup washing machine routes
+	routes.SetupWeatherRoutes(api, weatherHandler)               // Setup weather routes
+	routes.SetupNotificationRoutes(api, db, notificationService) // Setup notification test routes
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
