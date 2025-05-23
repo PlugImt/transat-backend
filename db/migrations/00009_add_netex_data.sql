@@ -39,6 +39,19 @@ CREATE TABLE NETEX_StopPlace_QuayRef (
     UNIQUE (stop_place_id, quay_id)
 );
 
+CREATE TABLE NETEX_Line (
+    id TEXT PRIMARY KEY,                -- ex: "NAOLIBORG:Line:3B:LOC"
+    version TEXT,
+    name TEXT,
+    short_name TEXT,
+    transport_mode TEXT,
+    public_code TEXT,
+    private_code TEXT,
+    colour TEXT,
+    text_colour TEXT,
+    route_sort_order INTEGER,
+    UNIQUE (id)
+);
 
 -- +goose StatementEnd
 
@@ -47,4 +60,5 @@ CREATE TABLE NETEX_StopPlace_QuayRef (
 DROP TABLE NETEX_StopPlace;
 DROP TABLE NETEX_Quay;
 DROP TABLE NETEX_StopPlace_QuayRef;
+DROP TABLE NETEX_Line;
 -- +goose StatementEnd

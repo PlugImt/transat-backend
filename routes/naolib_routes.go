@@ -16,8 +16,9 @@ func SetupNaolibRoutes(router fiber.Router, naolibService *services.NaolibServic
 	// Route pour obtenir les prochains départs
 	naolib.Get("/departures/chantrerie", handler.GetNextDeparturesChantrerie)
 
-	// TODO: protéger cette route !
-	naolib.Post("/import-netex-data", handler.ImportNetexData)
+	// TODO: protéger ces routes !
+	naolib.Post("/import/netex/stops", handler.ImportNetexStops)
+	naolib.Post("/import/netex/offer", handler.ImportNetexOffer)
 
 	naolib.Get("/search", handler.SearchStopPlace)
 

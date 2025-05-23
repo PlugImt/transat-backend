@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 
 	"github.com/gofiber/fiber/v2"
@@ -35,7 +36,45 @@ func (h *NaolibHandler) GetNextDeparturesChantrerie(c *fiber.Ctx) error {
 	return c.JSON(departures)
 }
 
-func (h *NaolibHandler) ImportNetexData(c *fiber.Ctx) error {
+func (h *NaolibHandler) ImportNetexOffer(c *fiber.Ctx) error {
+	var body struct {
+		Url string `json:"url"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+	}
+
+	url := body.Url
+
+	if url == "" {
+		return c.Status(fiber.StatusBadRequest).SendString("URL is required")
+	}
+
+	fileName, err := netex.DownloadAndExtractIfNeededOffer(url)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+	}
+	defer os.Remove(fileName)
+
+	netexData, err := netex.DecodeNetexOfferData(fileName)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+	}
+
+	fmt.Println(netexData)
+
+	err = netex.SaveNetexOfferToDatabase(netexData, h.db)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+	}
+
+	return c.JSON(map[string]any{
+		"success": true,
+	})
+}
+
+func (h *NaolibHandler) ImportNetexStops(c *fiber.Ctx) error {
 	var body struct {
 		Url string `json:"url"`
 	}
@@ -56,12 +95,12 @@ func (h *NaolibHandler) ImportNetexData(c *fiber.Ctx) error {
 	}
 	defer os.Remove(fileName)
 
-	netexData, err := netex.DecodeNetexData(fileName)
+	netexData, err := netex.DecodeNetexStopsData(fileName)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 
-	err = netex.SaveNetexToDatabase(netexData, h.db)
+	err = netex.SaveNetexStopsToDatabase(netexData, h.db)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}

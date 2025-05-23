@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -103,7 +104,103 @@ func DownloadAndExtractIfNeeded(url string) (string, error) {
 	return fileName, nil
 }
 
-func DecodeNetexData(file string) (*models.PublicationDelivery, error) {
+func DownloadAndExtractIfNeededOffer(url string) (string, error) {
+	// download the file
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+
+	// save the file to the local filesystem to /tmp/<random id>
+	fileName := fmt.Sprintf("/tmp/%s", uuid.New().String())
+	file, err := os.Create(fileName)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	io.Copy(file, resp.Body)
+	defer resp.Body.Close()
+	defer os.Remove(fileName)
+
+	// check the file's first 4 bytes to see if it's a ZIP file
+	zipHeader := []byte{0x50, 0x4B, 0x03, 0x04}
+	zipHeaderBytes := make([]byte, 4)
+	_, err = file.ReadAt(zipHeaderBytes, 0)
+	if err != nil {
+		return "", err
+	}
+	if !bytes.Equal(zipHeaderBytes, zipHeader) {
+		return "", fmt.Errorf("invalid file")
+	}
+
+	utils.LogMessage(utils.LevelInfo, "💥 File is a ZIP file")
+	dst := fmt.Sprintf("/tmp/%s", uuid.New().String())
+	archive, err := zip.OpenReader(fileName)
+	if err != nil {
+		panic(err)
+	}
+	defer archive.Close()
+
+	if len(archive.File) == 0 {
+		return "", fmt.Errorf("invalid file")
+	}
+
+	// this time, the ZIP contains a folder which contains a lot of XML files. We are only interested in the xxx_commun.xml file.
+	// we need to unzip the file and return the path to the xxx_commun.xml file.
+
+	// find the xxx_commun.xml file
+	var communFileName string
+	for _, f := range archive.File {
+		filePath := filepath.Join(dst, f.Name)
+		if !strings.HasSuffix(filePath, "_commun.xml") {
+			continue
+		}
+
+		fmt.Println("unzipping file ", filePath)
+
+		if !strings.HasPrefix(filePath, filepath.Clean(dst)+string(os.PathSeparator)) {
+			fmt.Println("invalid file path")
+			return "", fmt.Errorf("invalid file path")
+		}
+		if f.FileInfo().IsDir() {
+			fmt.Println("creating directory...")
+			os.MkdirAll(filePath, os.ModePerm)
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+			panic(err)
+		}
+
+		fmt.Println("opening file ", filePath)
+		dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			panic(err)
+		}
+
+		fileInArchive, err := f.Open()
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println("writing file ", filePath)
+		if _, err := io.Copy(dstFile, fileInArchive); err != nil {
+			panic(err)
+		}
+
+		dstFile.Close()
+		fileInArchive.Close()
+
+		communFileName = filePath
+	}
+
+	// delete the zip file
+	os.Remove(fileName)
+
+	return communFileName, nil
+}
+
+func DecodeNetexStopsData(file string) (*models.PublicationDelivery, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -118,7 +215,22 @@ func DecodeNetexData(file string) (*models.PublicationDelivery, error) {
 	return &netexData, nil
 }
 
-func SaveNetexToDatabase(netexData *models.PublicationDelivery, db *sql.DB) error {
+func DecodeNetexOfferData(fileName string) (*models.NETEXCommonFile, error) {
+	data, err := os.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	var netexData models.NETEXCommonFile
+	err = xml.Unmarshal(data, &netexData)
+	if err != nil {
+		return nil, err
+	}
+
+	return &netexData, nil
+}
+
+func SaveNetexStopsToDatabase(netexData *models.PublicationDelivery, db *sql.DB) error {
 	stopPlaces := netexData.DataObjects.GeneralFrame.Members.StopPlaces
 	quays := netexData.DataObjects.GeneralFrame.Members.Quays
 
@@ -165,6 +277,48 @@ func SaveNetexToDatabase(netexData *models.PublicationDelivery, db *sql.DB) erro
 			if err != nil {
 				return err
 			}
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func SaveNetexOfferToDatabase(netexData *models.NETEXCommonFile, db *sql.DB) error {
+	lines := netexData.DataObjects.GeneralFrame.Members.Lines
+
+	// on crée une transaction et on supprime toutes les données existantes, avant de les insérer
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("DELETE FROM NETEX_Line")
+	if err != nil {
+		return err
+	}
+
+	for _, line := range lines {
+		routeSortOrder := 0
+		if line.KeyList != nil {
+			for _, keyValue := range line.KeyList {
+				if keyValue.Key == "route_sort_order" {
+					routeSortOrder, err = strconv.Atoi(keyValue.Value)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		_, err := tx.Exec("INSERT INTO NETEX_Line (id, version, name, short_name, transport_mode, public_code, private_code, colour, text_colour, route_sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)", line.ID, line.Version, line.Name, line.ShortName, line.TransportMode, line.PublicCode, line.PrivateCode, line.Presentation.Colour, line.Presentation.TextColour, routeSortOrder)
+		if err != nil {
+			return err
 		}
 	}
 
