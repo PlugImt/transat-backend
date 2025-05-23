@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Siri xmlns="http://www.siri.org.uk/siri" xmlns:ns2="http://www.ifopt.org.uk/acsb"
+    xmlns:ns3="http://www.ifopt.org.uk/ifopt" xmlns:ns4="http://da-tex2.eu/schema/2_0RC1/2_0"
+    version="2.0">
+    <ServiceRequest>
+        <RequestorRef>opendata</RequestorRef>
+         {{ range .Stops }}
+         <StopMonitoringRequest version="2.0">
+            <MonitoringRef>{{ . }}</MonitoringRef>
+        </StopMonitoringRequest>
+        {{ end }} 
+    </ServiceRequest>
+</Siri>
