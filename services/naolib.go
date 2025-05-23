@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/plugimt/transat-backend/models"
@@ -16,23 +15,17 @@ var httpClient = &http.Client{
 }
 
 type NaolibService struct {
-	mu         sync.Mutex
-	cache      map[string][]models.Departure
-	cacheTime  time.Duration
-	lastUpdate map[string]time.Time
-	db         *sql.DB
+	db *sql.DB
 }
 
-func NewNaolibService(db *sql.DB, refreshTime time.Duration) *NaolibService {
+func NewNaolibService(db *sql.DB) *NaolibService {
 	return &NaolibService{
-		db:         db,
-		cache:      make(map[string][]models.Departure),
-		cacheTime:  refreshTime,
-		lastUpdate: make(map[string]time.Time),
+		db: db,
 	}
 }
 
 func (s *NaolibService) GetDepartures(stopPlaceId string) (map[string]models.Departures, error) {
+
 	rows, err := s.db.Query("SELECT id FROM NETEX_Quay WHERE site_ref_stopplace_id = $1", stopPlaceId)
 	if err != nil {
 		return nil, err

@@ -119,7 +119,7 @@ func main() {
 	// Initialize Handlers that need explicit instantiation (e.g., for Cron)
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
 
-	naolibService := services.NewNaolibService(db, 30*time.Second)
+	naolibService := services.NewNaolibService(db)
 
 	// Initialize Weather Service and Handler
 	weatherService, err := services.NewWeatherService()
