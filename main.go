@@ -199,7 +199,7 @@ func main() {
 	routes.SetupWashingMachineRoutes(api)                        // Setup washing machine routes
 	routes.SetupWeatherRoutes(api, weatherHandler)               // Setup weather routes
 	routes.SetupNotificationRoutes(api, db, notificationService) // Setup notification test routes
-	routes.SetupNaolibRoutes(api, naolibService)
+	routes.SetupNaolibRoutes(api, naolibService, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
