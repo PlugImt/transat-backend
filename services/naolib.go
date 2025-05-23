@@ -59,11 +59,11 @@ func (s *NaolibService) GetDepartures(stopPlaceId string) (map[string]models.Dep
 			lineDepartures = models.Departures{
 				DepartureDirectionAller: models.DepartureDirection{
 					Direction:  "",
-					Departures: []models.MonitoredStopVisit{},
+					Departures: []models.Departure{},
 				},
 				DepartureDirectionRetour: models.DepartureDirection{
 					Direction:  "",
-					Departures: []models.MonitoredStopVisit{},
+					Departures: []models.Departure{},
 				},
 			}
 		}
@@ -78,6 +78,16 @@ func (s *NaolibService) GetDepartures(stopPlaceId string) (map[string]models.Dep
 					lineDepartures.DepartureDirectionAller.Direction += " / " + departure.MonitoredVehicleJourney.DestinationName
 				}
 			}
+
+			departure := models.Departure{
+				LineRef:         lineRef,
+				Direction:       lineDepartures.DepartureDirectionAller.Direction,
+				DestinationName: departure.MonitoredVehicleJourney.DestinationName,
+				DepartureTime:   departure.MonitoredVehicleJourney.MonitoredCall.ExpectedDepartureTime,
+				ArrivalTime:     departure.MonitoredVehicleJourney.MonitoredCall.ExpectedArrivalTime,
+				VehicleMode:     departure.MonitoredVehicleJourney.VehicleMode,
+			}
+
 			lineDepartures.DepartureDirectionAller.Departures = append(lineDepartures.DepartureDirectionAller.Departures, departure)
 		} else {
 			if lineDepartures.DepartureDirectionRetour.Direction == "" {
@@ -86,6 +96,15 @@ func (s *NaolibService) GetDepartures(stopPlaceId string) (map[string]models.Dep
 				if !strings.Contains(lineDepartures.DepartureDirectionRetour.Direction, departure.MonitoredVehicleJourney.DestinationName) {
 					lineDepartures.DepartureDirectionRetour.Direction += " / " + departure.MonitoredVehicleJourney.DestinationName
 				}
+			}
+
+			departure := models.Departure{
+				LineRef:         lineRef,
+				Direction:       lineDepartures.DepartureDirectionRetour.Direction,
+				DestinationName: departure.MonitoredVehicleJourney.DestinationName,
+				DepartureTime:   departure.MonitoredVehicleJourney.MonitoredCall.ExpectedDepartureTime,
+				ArrivalTime:     departure.MonitoredVehicleJourney.MonitoredCall.ExpectedArrivalTime,
+				VehicleMode:     departure.MonitoredVehicleJourney.VehicleMode,
 			}
 
 			lineDepartures.DepartureDirectionRetour.Departures = append(lineDepartures.DepartureDirectionRetour.Departures, departure)
