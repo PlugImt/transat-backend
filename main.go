@@ -119,6 +119,8 @@ func main() {
 	// Initialize Handlers that need explicit instantiation (e.g., for Cron)
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
 
+	naolibService := services.NewNaolibService(30 * time.Second)
+
 	// Initialize Weather Service and Handler
 	weatherService, err := services.NewWeatherService()
 	if err != nil {
@@ -197,6 +199,7 @@ func main() {
 	routes.SetupWashingMachineRoutes(api)                        // Setup washing machine routes
 	routes.SetupWeatherRoutes(api, weatherHandler)               // Setup weather routes
 	routes.SetupNotificationRoutes(api, db, notificationService) // Setup notification test routes
+	routes.SetupNaolibRoutes(api, naolibService)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
