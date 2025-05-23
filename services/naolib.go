@@ -1,14 +1,14 @@
 package services
 
 import (
-	"encoding/json"
-	"fmt"
+	"database/sql"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/plugimt/transat-backend/models"
-	"github.com/plugimt/transat-backend/utils"
+	"github.com/plugimt/transat-backend/services/netex"
 )
 
 var httpClient = &http.Client{
@@ -20,46 +20,86 @@ type NaolibService struct {
 	cache      map[string][]models.Departure
 	cacheTime  time.Duration
 	lastUpdate map[string]time.Time
+	db         *sql.DB
 }
 
-func NewNaolibService(refreshTime time.Duration) *NaolibService {
+func NewNaolibService(db *sql.DB, refreshTime time.Duration) *NaolibService {
 	return &NaolibService{
+		db:         db,
 		cache:      make(map[string][]models.Departure),
 		cacheTime:  refreshTime,
 		lastUpdate: make(map[string]time.Time),
 	}
 }
 
-func (s *NaolibService) GetNextDepartures(stopID string) ([]models.Departure, error) {
-	s.mu.Lock()
-	if lastUpdateTime, updateExists := s.lastUpdate[stopID]; updateExists {
-		if departures, ok := s.cache[stopID]; ok && time.Since(lastUpdateTime) < s.cacheTime {
-			s.mu.Unlock()
-			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Using cached departures for %s", stopID))
-			return departures, nil
-		}
-	}
-
-	url := fmt.Sprintf("https://open.tan.fr/ewp/tempsattentelieu.json/%s/2", stopID)
-
-	resp, err := httpClient.Get(url)
+func (s *NaolibService) GetDepartures(stopPlaceId string) (map[string]models.Departures, error) {
+	rows, err := s.db.Query("SELECT id FROM NETEX_Quay WHERE site_ref_stopplace_id = $1", stopPlaceId)
 	if err != nil {
-		return nil, fmt.Errorf("erreur lors de la requête HTTP: %v", err)
+		return nil, err
 	}
-	defer resp.Body.Close()
+	defer rows.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("erreur HTTP: code %d", resp.StatusCode)
+	var quays []string
+	for rows.Next() {
+		var quay string
+		err = rows.Scan(&quay)
+		if err != nil {
+			return nil, err
+		}
+		quays = append(quays, quay)
 	}
 
-	var departuresData []models.Departure
-	if err := json.NewDecoder(resp.Body).Decode(&departuresData); err != nil {
-		return nil, fmt.Errorf("erreur lors du décodage JSON: %v", err)
+	siriResponse, err := netex.CallStopMonitoringRequest(quays)
+	if err != nil {
+		return nil, err
 	}
 
-	s.cache[stopID] = departuresData
-	s.lastUpdate[stopID] = time.Now()
-	s.mu.Unlock()
+	departures := siriResponse.ServiceDelivery.StopMonitoringDelivery.MonitoredStopVisits
 
-	return departuresData, nil
+	departuresMap := make(map[string]models.Departures)
+
+	for _, departure := range departures {
+		lineRef := departure.MonitoredVehicleJourney.LineRef
+
+		lineDepartures, ok := departuresMap[lineRef]
+		if !ok {
+			lineDepartures = models.Departures{
+				DepartureDirectionAller: models.DepartureDirection{
+					Direction:  "",
+					Departures: []models.MonitoredStopVisit{},
+				},
+				DepartureDirectionRetour: models.DepartureDirection{
+					Direction:  "",
+					Departures: []models.MonitoredStopVisit{},
+				},
+			}
+		}
+
+		if departure.MonitoredVehicleJourney.DirectionName == "A" {
+			// si la destination n'est pas "" (valeur par défaut), ça signifie qu'on l'a déjà changé. on doit aller vérifier
+			// si c'est la même destination, sinon on rajoute la destination avec "/ <destination>"
+			if lineDepartures.DepartureDirectionAller.Direction == "" {
+				lineDepartures.DepartureDirectionAller.Direction = departure.MonitoredVehicleJourney.DestinationName
+			} else {
+				if !strings.Contains(lineDepartures.DepartureDirectionAller.Direction, departure.MonitoredVehicleJourney.DestinationName) {
+					lineDepartures.DepartureDirectionAller.Direction += " / " + departure.MonitoredVehicleJourney.DestinationName
+				}
+			}
+			lineDepartures.DepartureDirectionAller.Departures = append(lineDepartures.DepartureDirectionAller.Departures, departure)
+		} else {
+			if lineDepartures.DepartureDirectionRetour.Direction == "" {
+				lineDepartures.DepartureDirectionRetour.Direction = departure.MonitoredVehicleJourney.DestinationName
+			} else {
+				if !strings.Contains(lineDepartures.DepartureDirectionRetour.Direction, departure.MonitoredVehicleJourney.DestinationName) {
+					lineDepartures.DepartureDirectionRetour.Direction += " / " + departure.MonitoredVehicleJourney.DestinationName
+				}
+			}
+
+			lineDepartures.DepartureDirectionRetour.Departures = append(lineDepartures.DepartureDirectionRetour.Departures, departure)
+		}
+
+		departuresMap[lineRef] = lineDepartures
+	}
+
+	return departuresMap, nil
 }

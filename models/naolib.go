@@ -22,3 +22,14 @@ type Ligne struct {
 type Arret struct {
 	CodeArret string `json:"codeArret"`
 }
+
+// custom
+type DepartureDirection struct {
+	Direction  string               `json:"direction"`
+	Departures []MonitoredStopVisit `json:"departures"`
+}
+
+type Departures struct {
+	DepartureDirectionAller  DepartureDirection `json:"aller"`
+	DepartureDirectionRetour DepartureDirection `json:"retour"`
+}
