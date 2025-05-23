@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/plugimt/transat-backend/models"
-	"github.com/plugimt/transat-backend/services/netex"
+	"github.com/plugimt/transat-backend/services/naolib/siri"
 )
 
 var httpClient = &http.Client{
@@ -42,7 +42,7 @@ func (s *NaolibService) GetDepartures(stopPlaceId string) (map[string]models.Dep
 		quays = append(quays, quay)
 	}
 
-	siriResponse, err := netex.CallStopMonitoringRequest(quays)
+	siriResponse, err := siri.CallStopMonitoringRequest(quays)
 	if err != nil {
 		return nil, err
 	}

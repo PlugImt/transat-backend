@@ -8,7 +8,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/services"
-	"github.com/plugimt/transat-backend/services/netex"
+	"github.com/plugimt/transat-backend/services/naolib/netex"
+	"github.com/plugimt/transat-backend/services/naolib/siri"
 )
 
 const (
@@ -150,7 +151,7 @@ func (h *NaolibHandler) SearchStopPlace(c *fiber.Ctx) error {
 
 func (h *NaolibHandler) GenerateNetexRequest(c *fiber.Ctx) error {
 	stops := []string{"CTRE2", "CTRE4"}
-	request, err := netex.GenerateStopMonitoringRequest(stops)
+	request, err := siri.GenerateStopMonitoringRequest(stops)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error() + "\n")
 	}

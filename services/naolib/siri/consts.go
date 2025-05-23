@@ -1,4 +1,4 @@
-package netex
+package siri
 
 const (
 	RequestorRef = "opendata"
