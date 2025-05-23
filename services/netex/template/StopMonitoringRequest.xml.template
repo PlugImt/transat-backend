@@ -3,7 +3,7 @@
     xmlns:ns3="http://www.ifopt.org.uk/ifopt" xmlns:ns4="http://da-tex2.eu/schema/2_0RC1/2_0"
     version="2.0">
     <ServiceRequest>
-        <RequestorRef>opendata</RequestorRef>
+        <RequestorRef>{{ .RequestorRef }}</RequestorRef>
          {{ range .Stops }}
          <StopMonitoringRequest version="2.0">
             <MonitoringRef>{{ . }}</MonitoringRef>

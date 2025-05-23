@@ -18,4 +18,8 @@ func SetupNaolibRoutes(router fiber.Router, naolibService *services.NaolibServic
 
 	// TODO: protéger cette route !
 	naolib.Post("/import-netex-data", handler.ImportNetexData)
+
+	naolib.Get("/search", handler.SearchStopPlace)
+
+	naolib.Get("/generate-request", handler.GenerateNetexRequest)
 }

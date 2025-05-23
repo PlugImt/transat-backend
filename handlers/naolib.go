@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/services/netex"
 	"github.com/plugimt/transat-backend/utils"
@@ -68,61 +69,60 @@ func (h *NaolibHandler) ImportNetexData(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 
-	stopPlaces := netexData.DataObjects.GeneralFrame.Members.StopPlaces
-	quays := netexData.DataObjects.GeneralFrame.Members.Quays
-
-	// on crée une transaction et on supprime toutes les données existantes, avant de les insérer
-	tx, err := h.db.Begin()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	defer tx.Rollback()
-
-	_, err = tx.Exec("DELETE FROM NETEX_StopPlace")
+	err = netex.SaveNetexToDatabase(netexData, h.db)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 
-	_, err = tx.Exec("DELETE FROM NETEX_Quay")
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	_, err = tx.Exec("DELETE FROM NETEX_StopPlace_QuayRef")
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	for _, stopPlace := range stopPlaces {
-		_, err := tx.Exec("INSERT INTO NETEX_StopPlace (id, modification, name, longitude, latitude, transport_mode, other_transport_modes, stop_place_type, weighting) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", stopPlace.ID, stopPlace.Modification, stopPlace.Name, stopPlace.Centroid.Location.Longitude, stopPlace.Centroid.Location.Latitude, stopPlace.TransportMode, stopPlace.OtherTransportModes, stopPlace.StopPlaceType, stopPlace.Weighting)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-		}
-	}
-
-	for _, quay := range quays {
-		_, err := tx.Exec("INSERT INTO NETEX_Quay (id, name, longitude, latitude, site_ref_stopplace_id, transport_mode) VALUES ($1, $2, $3, $4, $5, $6)", quay.ID, quay.Name, quay.Centroid.Location.Longitude, quay.Centroid.Location.Latitude, quay.SiteRef.Ref, quay.TransportMode)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-		}
-	}
-
-	// now, populate the NETEX_StopPlace_QuayRef link table
-	for _, stopPlace := range stopPlaces {
-		for _, quayRef := range stopPlace.QuayRefs {
-			_, err := tx.Exec("INSERT INTO NETEX_StopPlace_QuayRef (stop_place_id, quay_id, quay_ref_version) VALUES ($1, $2, $3)", stopPlace.ID, quayRef.Ref, quayRef.Version)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-			}
-		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	return c.JSON(map[string]interface{}{
+	return c.JSON(map[string]any{
 		"success": true,
 	})
+}
+
+func (h *NaolibHandler) SearchStopPlace(c *fiber.Ctx) error {
+	query := c.Query("query")
+	if query == "" {
+		return c.Status(fiber.StatusBadRequest).SendString("Query is required")
+	}
+
+	rows, err := h.db.Query("SELECT id, name FROM NETEX_StopPlace WHERE name ILIKE $1", "%"+query+"%")
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+	}
+	defer rows.Close()
+
+	var stopPlaces []models.StopPlace
+	for rows.Next() {
+		var stopPlace models.StopPlace
+		err = rows.Scan(&stopPlace.ID, &stopPlace.Name)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		}
+		stopPlaces = append(stopPlaces, stopPlace)
+	}
+
+	type StopPlaceResponse struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+
+	stopPlacesArray := make([]StopPlaceResponse, len(stopPlaces))
+	for i, stopPlace := range stopPlaces {
+		stopPlacesArray[i] = StopPlaceResponse{
+			ID:   stopPlace.ID,
+			Name: stopPlace.Name,
+		}
+	}
+
+	return c.JSON(stopPlacesArray)
+}
+
+func (h *NaolibHandler) GenerateNetexRequest(c *fiber.Ctx) error {
+	stops := []string{"CTRE2", "CTRE4"}
+	request, err := netex.GenerateStopMonitoringRequest(stops)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString(err.Error() + "\n")
+	}
+
+	return c.SendString(request + "\n")
 }

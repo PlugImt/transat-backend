@@ -22,9 +22,11 @@ func GenerateStopMonitoringRequest(stops []string) (string, error) {
 	}
 
 	templateData := struct {
-		Stops []string
+		RequestorRef string
+		Stops        []string
 	}{
-		Stops: stops,
+		RequestorRef: RequestorRef,
+		Stops:        stops,
 	}
 
 	tmpl, err := template.New("StopMonitoringRequest.xml.template").Parse(string(content))
