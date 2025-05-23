@@ -22,4 +22,6 @@ func SetupNaolibRoutes(router fiber.Router, naolibService *services.NaolibServic
 	naolib.Get("/search", handler.SearchStopPlace)
 
 	naolib.Get("/generate-request", handler.GenerateNetexRequest)
+
+	naolib.Get("/get-departures", handler.GetDepartures)
 }

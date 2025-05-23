@@ -3,5 +3,7 @@ package netex
 const (
 	RequestorRef = "opendata"
 	datasetId    = "NAOLIBORG"
-	API          = "https://api.okina.fr/gateway/sem/realtime/anshar/services"
+	APIScheme    = "https"
+	APIHost      = "api.okina.fr"
+	APIPath      = "/gateway/sem/realtime/anshar/services"
 )
