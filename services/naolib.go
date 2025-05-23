@@ -2,25 +2,22 @@ package services
 
 import (
 	"database/sql"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services/naolib/netex"
 	"github.com/plugimt/transat-backend/services/naolib/siri"
 )
 
-var httpClient = &http.Client{
-	Timeout: 10 * time.Second,
-}
-
 type NaolibService struct {
-	db *sql.DB
+	db           *sql.DB
+	netexService *netex.NetexService
 }
 
-func NewNaolibService(db *sql.DB) *NaolibService {
+func NewNaolibService(db *sql.DB, netexService *netex.NetexService) *NaolibService {
 	return &NaolibService{
-		db: db,
+		db:           db,
+		netexService: netexService,
 	}
 }
 
@@ -79,7 +76,13 @@ func (s *NaolibService) GetDepartures(stopPlaceId string) (map[string]models.Dep
 				}
 			}
 
+			line, err := s.netexService.GetLine(lineRef)
+			if err != nil {
+				return nil, err
+			}
+
 			departure := models.Departure{
+				Line:            *line,
 				LineRef:         lineRef,
 				Direction:       lineDepartures.DepartureDirectionAller.Direction,
 				DestinationName: departure.MonitoredVehicleJourney.DestinationName,
@@ -98,7 +101,13 @@ func (s *NaolibService) GetDepartures(stopPlaceId string) (map[string]models.Dep
 				}
 			}
 
+			line, err := s.netexService.GetLine(lineRef)
+			if err != nil {
+				return nil, err
+			}
+
 			departure := models.Departure{
+				Line:            *line,
 				LineRef:         lineRef,
 				Direction:       lineDepartures.DepartureDirectionRetour.Direction,
 				DestinationName: departure.MonitoredVehicleJourney.DestinationName,

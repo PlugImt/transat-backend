@@ -120,7 +120,7 @@ type GeneralFrameOffer struct {
 	TypeOfFrameRef TypeOfFrameRef `xml:"TypeOfFrameRef"`
 	Members        struct {
 		Network     Network     `xml:"Network"`
-		Lines       []Line      `xml:"Line"`
+		Lines       []SIRILine  `xml:"Line"`
 		Operators   []Operator  `xml:"Operator"`
 		Authorities []Authority `xml:"Authority"`
 	} `xml:"members"`
@@ -144,7 +144,7 @@ type AuthorityRef struct {
 	Version string `xml:"version,attr,omitempty"`
 }
 
-type Line struct {
+type SIRILine struct {
 	ID                      string                  `xml:"id,attr"`
 	Version                 string                  `xml:"version,attr"`
 	KeyList                 []KeyValue              `xml:"keyList>KeyValue"`

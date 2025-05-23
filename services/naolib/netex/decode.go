@@ -18,7 +18,17 @@ import (
 	"github.com/plugimt/transat-backend/utils"
 )
 
-func DownloadAndExtractIfNeeded(url string) (string, error) {
+type NetexService struct {
+	db *sql.DB
+}
+
+func NewNetexService(db *sql.DB) *NetexService {
+	return &NetexService{
+		db: db,
+	}
+}
+
+func (n *NetexService) DownloadAndExtractIfNeeded(url string) (string, error) {
 	// download the file
 	resp, err := http.Get(url)
 	if err != nil {
@@ -104,7 +114,7 @@ func DownloadAndExtractIfNeeded(url string) (string, error) {
 	return fileName, nil
 }
 
-func DownloadAndExtractIfNeededOffer(url string) (string, error) {
+func (n *NetexService) DownloadAndExtractIfNeededOffer(url string) (string, error) {
 	// download the file
 	resp, err := http.Get(url)
 	if err != nil {
@@ -156,14 +166,10 @@ func DownloadAndExtractIfNeededOffer(url string) (string, error) {
 			continue
 		}
 
-		fmt.Println("unzipping file ", filePath)
-
 		if !strings.HasPrefix(filePath, filepath.Clean(dst)+string(os.PathSeparator)) {
-			fmt.Println("invalid file path")
 			return "", fmt.Errorf("invalid file path")
 		}
 		if f.FileInfo().IsDir() {
-			fmt.Println("creating directory...")
 			os.MkdirAll(filePath, os.ModePerm)
 			continue
 		}
@@ -172,7 +178,6 @@ func DownloadAndExtractIfNeededOffer(url string) (string, error) {
 			panic(err)
 		}
 
-		fmt.Println("opening file ", filePath)
 		dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 		if err != nil {
 			panic(err)
@@ -183,7 +188,6 @@ func DownloadAndExtractIfNeededOffer(url string) (string, error) {
 			panic(err)
 		}
 
-		fmt.Println("writing file ", filePath)
 		if _, err := io.Copy(dstFile, fileInArchive); err != nil {
 			panic(err)
 		}
@@ -200,7 +204,7 @@ func DownloadAndExtractIfNeededOffer(url string) (string, error) {
 	return communFileName, nil
 }
 
-func DecodeNetexStopsData(file string) (*models.PublicationDelivery, error) {
+func (n *NetexService) DecodeNetexStopsData(file string) (*models.PublicationDelivery, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -215,7 +219,7 @@ func DecodeNetexStopsData(file string) (*models.PublicationDelivery, error) {
 	return &netexData, nil
 }
 
-func DecodeNetexOfferData(fileName string) (*models.NETEXCommonFile, error) {
+func (n *NetexService) DecodeNetexOfferData(fileName string) (*models.NETEXCommonFile, error) {
 	data, err := os.ReadFile(fileName)
 	if err != nil {
 		return nil, err
@@ -230,12 +234,12 @@ func DecodeNetexOfferData(fileName string) (*models.NETEXCommonFile, error) {
 	return &netexData, nil
 }
 
-func SaveNetexStopsToDatabase(netexData *models.PublicationDelivery, db *sql.DB) error {
+func (n *NetexService) SaveNetexStopsToDatabase(netexData *models.PublicationDelivery) error {
 	stopPlaces := netexData.DataObjects.GeneralFrame.Members.StopPlaces
 	quays := netexData.DataObjects.GeneralFrame.Members.Quays
 
 	// on crée une transaction et on supprime toutes les données existantes, avant de les insérer
-	tx, err := db.Begin()
+	tx, err := n.db.Begin()
 	if err != nil {
 		return err
 	}
@@ -288,11 +292,11 @@ func SaveNetexStopsToDatabase(netexData *models.PublicationDelivery, db *sql.DB)
 	return nil
 }
 
-func SaveNetexOfferToDatabase(netexData *models.NETEXCommonFile, db *sql.DB) error {
+func (n *NetexService) SaveNetexOfferToDatabase(netexData *models.NETEXCommonFile) error {
 	lines := netexData.DataObjects.GeneralFrame.Members.Lines
 
 	// on crée une transaction et on supprime toutes les données existantes, avant de les insérer
-	tx, err := db.Begin()
+	tx, err := n.db.Begin()
 	if err != nil {
 		return err
 	}

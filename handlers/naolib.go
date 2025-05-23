@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"fmt"
 	"os"
 
 	"github.com/gofiber/fiber/v2"
@@ -17,14 +16,16 @@ const (
 )
 
 type NaolibHandler struct {
-	service *services.NaolibService
-	db      *sql.DB
+	service      *services.NaolibService
+	netexService *netex.NetexService
+	db           *sql.DB
 }
 
-func NewNaolibHandler(service *services.NaolibService, db *sql.DB) *NaolibHandler {
+func NewNaolibHandler(service *services.NaolibService, netexService *netex.NetexService, db *sql.DB) *NaolibHandler {
 	return &NaolibHandler{
-		service: service,
-		db:      db,
+		service:      service,
+		netexService: netexService,
+		db:           db,
 	}
 }
 
@@ -52,20 +53,18 @@ func (h *NaolibHandler) ImportNetexOffer(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString("URL is required")
 	}
 
-	fileName, err := netex.DownloadAndExtractIfNeededOffer(url)
+	fileName, err := h.netexService.DownloadAndExtractIfNeededOffer(url)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 	defer os.Remove(fileName)
 
-	netexData, err := netex.DecodeNetexOfferData(fileName)
+	netexData, err := h.netexService.DecodeNetexOfferData(fileName)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 
-	fmt.Println(netexData)
-
-	err = netex.SaveNetexOfferToDatabase(netexData, h.db)
+	err = h.netexService.SaveNetexOfferToDatabase(netexData)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
@@ -90,18 +89,18 @@ func (h *NaolibHandler) ImportNetexStops(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString("URL is required")
 	}
 
-	fileName, err := netex.DownloadAndExtractIfNeeded(url)
+	fileName, err := h.netexService.DownloadAndExtractIfNeeded(url)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 	defer os.Remove(fileName)
 
-	netexData, err := netex.DecodeNetexStopsData(fileName)
+	netexData, err := h.netexService.DecodeNetexStopsData(fileName)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 
-	err = netex.SaveNetexStopsToDatabase(netexData, h.db)
+	err = h.netexService.SaveNetexStopsToDatabase(netexData)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}

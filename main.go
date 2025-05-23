@@ -18,6 +18,7 @@ import (
 	"github.com/plugimt/transat-backend/routes"
 	"github.com/plugimt/transat-backend/scheduler" // Import our scheduler package
 	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/services/naolib/netex"
 	"github.com/plugimt/transat-backend/utils"
 	"github.com/robfig/cron/v3"
 
@@ -119,7 +120,9 @@ func main() {
 	// Initialize Handlers that need explicit instantiation (e.g., for Cron)
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
 
-	naolibService := services.NewNaolibService(db)
+// Naolib
+	netexService := netex.NewNetexService(db)
+	naolibService := services.NewNaolibService(db, netexService)
 
 	// Initialize Weather Service and Handler
 	weatherService, err := services.NewWeatherService()
@@ -199,7 +202,7 @@ func main() {
 	routes.SetupWashingMachineRoutes(api)                        // Setup washing machine routes
 	routes.SetupWeatherRoutes(api, weatherHandler)               // Setup weather routes
 	routes.SetupNotificationRoutes(api, db, notificationService) // Setup notification test routes
-	routes.SetupNaolibRoutes(api, naolibService, db)
+	routes.SetupNaolibRoutes(api, naolibService, netexService, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
