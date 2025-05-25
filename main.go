@@ -197,6 +197,7 @@ func main() {
 	routes.SetupWashingMachineRoutes(api)                        // Setup washing machine routes
 	routes.SetupWeatherRoutes(api, weatherHandler)               // Setup weather routes
 	routes.SetupNotificationRoutes(api, db, notificationService) // Setup notification test routes
+	routes.SetupAdminRoutes(api, db, statisticsService)          // Setup admin routes
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
