@@ -2,7 +2,6 @@ package middlewares
 
 import (
 	"database/sql"
-	"fmt"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -65,7 +64,7 @@ func RestrictTo(db *sql.DB, allowedRoles ...string) fiber.Handler {
 		args[0] = strings.ToLower(email)
 
 		for i, role := range allowedRoles {
-			placeholders[i] = fmt.Sprintf("$%d", i+2) // Start from $2 since $1 is email
+			placeholders[i] = "$" + string(rune(i+2)) // Start from $2 since $1 is email
 			args[i+1] = strings.ToUpper(role)
 		}
 
