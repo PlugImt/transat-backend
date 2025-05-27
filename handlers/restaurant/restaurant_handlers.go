@@ -473,23 +473,34 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 	// 2. Get latest base menu from DB for comparison
 	latestDbMenu, err := h.getLatestMenuFromDB(1) // Get French menu (langID 1)
 	utils.LogLineKeyValue(utils.LevelDebug, "Latest DB Menu", latestDbMenu)
-	needsUpdate := true // Assume update needed unless proven otherwise
+	needsUpdate := true
+	shouldNotify := true
+	similarity := 0.0
+
 	if err != nil {
 		utils.LogMessage(utils.LevelWarn, "Cron: Failed to get latest base menu from DB for comparison")
 		utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
-		// Proceed with saving the fetched menu as we can't compare
 	} else if latestDbMenu != nil {
 		// Compare fetched menu with DB menu using similarity score
-		similarity := h.calculateMenuSimilarity(&latestDbMenu.MenuData, baseMenuData)
+		similarity = h.calculateMenuSimilarity(&latestDbMenu.MenuData, baseMenuData)
 		utils.LogLineKeyValue(utils.LevelInfo, "Menu similarity score", similarity)
 
-		// Only consider it a new menu if similarity is below threshold (meaning it's different enough)
-		if similarity >= h.menuSimilarityThreshold {
-			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cron: Fetched menu similarity (%f) is above threshold (%f). No update needed.",
-				similarity, h.menuSimilarityThreshold))
+		if similarity >= 1.0 {
+			utils.LogMessage(utils.LevelInfo, "Cron: Fetched menu is identical to DB menu. No update needed.")
 			needsUpdate = false
+			shouldNotify = false
 		} else {
 			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cron: Menu change detected (similarity: %f).", similarity))
+			needsUpdate = true
+
+			// Only send a notification if there is a lot of change (less than 60% similarity = more than 40% difference)
+			if similarity < 0.6 {
+				utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cron: Significant menu change detected (%f similarity). Will send notification.", similarity))
+				shouldNotify = true
+			} else {
+				utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cron: Minor menu change detected (%f similarity). Will update DB but skip notification.", similarity))
+				shouldNotify = false
+			}
 		}
 	} else {
 		utils.LogMessage(utils.LevelInfo, "Cron: No existing base menu found in DB. Saving fetched menu.")
@@ -513,8 +524,7 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 		h.cacheMutex.Lock()
 		h.cachedMenus[1] = baseMenuData // Update French cache
 		h.lastFetchTime = fetchedTime   // Update fetch time since we got new data
-		// Invalidate caches for other languages? Or let them fetch/translate on demand?
-		// Let's invalidate other languages for simplicity.
+		// Remove other languages for simplicity (they will be translated if requested)
 		for langID := range h.cachedMenus {
 			if langID != 1 {
 				delete(h.cachedMenus, langID)
@@ -523,25 +533,25 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 		h.cacheMutex.Unlock()
 		utils.LogMessage(utils.LevelInfo, "Cron: Updated menu cache")
 
-		// 5. Trigger notifications (only if base menu was updated)
-		if h.NotifService != nil {
+		// 5. Trigger notifications (only if significant change detected)
+		if shouldNotify && h.NotifService != nil {
 			// Check if we already sent a notification today
 			today := time.Now().Format("2006-01-02")
 			if h.lastNotificationDate != today {
-				utils.LogMessage(utils.LevelInfo, "Cron: Triggering daily menu notification send")
+				utils.LogMessage(utils.LevelInfo, "Cron: Triggering daily menu notification send (significant change detected)")
 				notifErr := h.NotifService.SendDailyMenuNotification()
 				if notifErr != nil {
 					utils.LogMessage(utils.LevelError, "Cron: Failed to send daily menu notification")
 					utils.LogLineKeyValue(utils.LevelError, "Error", notifErr)
-					// Log error, but don't necessarily fail the whole check-update cycle because of notification failure
 				} else {
-					// Record that we sent a notification today
 					h.lastNotificationDate = today
 					utils.LogMessage(utils.LevelInfo, "Cron: Notification sent successfully, won't send more today")
 				}
 			} else {
 				utils.LogMessage(utils.LevelInfo, "Cron: Already sent a notification today, skipping")
 			}
+		} else if !shouldNotify {
+			utils.LogMessage(utils.LevelInfo, "Cron: Menu change was minor, skipping notification")
 		} else {
 			utils.LogMessage(utils.LevelWarn, "Cron: NotificationService not available.")
 		}
