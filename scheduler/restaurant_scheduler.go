@@ -24,25 +24,25 @@ func NewRestaurantScheduler(handler *restaurant.RestaurantHandler) *RestaurantSc
 	}
 }
 
-// Start begins the periodic menu check schedule
 func (s *RestaurantScheduler) Start() {
 	utils.LogMessage(utils.LevelInfo, "Starting restaurant menu scheduler")
-	
-	// Run immediately at startup
+
 	go s.checkAndUpdateMenu()
-	
+
 	go func() {
-		// Signal that the scheduler is running
 		close(s.runningChan)
-		
-		// Create a ticker that ticks every 10 minutes
+
 		ticker := time.NewTicker(10 * time.Minute)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ticker.C:
-				go s.checkAndUpdateMenu() // Run in goroutine to avoid blocking the ticker
+				if s.isScheduledTimeAllowed(time.Now()) {
+					go s.checkAndUpdateMenu()
+				} else {
+					utils.LogMessage(utils.LevelDebug, "Scheduler: Outside allowed time window (weekdays 9h-14h), skipping check")
+				}
 			case <-s.stopChan:
 				utils.LogMessage(utils.LevelInfo, "Stopping restaurant menu scheduler")
 				return
@@ -64,10 +64,27 @@ func (s *RestaurantScheduler) Stop() {
 	}
 }
 
-// checkAndUpdateMenu calls the restaurant handler to check for menu updates
+func (s *RestaurantScheduler) isScheduledTimeAllowed(t time.Time) bool {
+	// Check if it's a weekend (Saturday = 6, Sunday = 0)
+	weekday := t.Weekday()
+	if weekday == time.Saturday || weekday == time.Sunday {
+		return false
+	}
+
+	hour := t.Hour()
+	return hour >= 9 && hour < 14
+}
+
 func (s *RestaurantScheduler) checkAndUpdateMenu() {
+	now := time.Now()
+
+	if !s.isScheduledTimeAllowed(now) {
+		utils.LogMessage(utils.LevelInfo, "Scheduler: Outside allowed time window (weekdays 9h-14h), skipping menu check")
+		return
+	}
+
 	utils.LogMessage(utils.LevelInfo, "Running scheduled menu check")
-	
+
 	updated, err := s.restaurantHandler.CheckAndUpdateMenuCron()
 	if err != nil {
 		log.Printf("Error in scheduled menu check: %v", err)
@@ -76,4 +93,4 @@ func (s *RestaurantScheduler) checkAndUpdateMenu() {
 	} else {
 		utils.LogMessage(utils.LevelInfo, "No menu update needed during scheduled check")
 	}
-} 
+}
