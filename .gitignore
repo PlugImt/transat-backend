@@ -31,3 +31,10 @@ data/
 Transat_2.0_Backend
 transat-backend
 .DS_Store
+
+
+/db/backup
+
+
+
+.env*
