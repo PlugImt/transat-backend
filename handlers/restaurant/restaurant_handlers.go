@@ -533,11 +533,16 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 		h.cacheMutex.Unlock()
 		utils.LogMessage(utils.LevelInfo, "Cron: Updated menu cache")
 
-		// 5. Trigger notifications (only if significant change detected)
+		// 5. Trigger notifications (only if a significant change is detected and time/day conditions are met)
 		if shouldNotify && h.NotifService != nil {
-			// Check if we already sent a notification today
-			today := time.Now().Format("2006-01-02")
-			if h.lastNotificationDate != today {
+			now := time.Now()
+			today := now.Format("2006-01-02")
+
+			if h.lastNotificationDate == today {
+				utils.LogMessage(utils.LevelInfo, "Cron: Already sent a notification today, skipping")
+			} else if !h.isNotificationTimeAllowed(now) {
+				utils.LogMessage(utils.LevelInfo, "Cron: Outside notification time window (9h-14h, weekdays only), skipping notification")
+			} else {
 				utils.LogMessage(utils.LevelInfo, "Cron: Triggering daily menu notification send (significant change detected)")
 				notifErr := h.NotifService.SendDailyMenuNotification()
 				if notifErr != nil {
@@ -547,8 +552,6 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 					h.lastNotificationDate = today
 					utils.LogMessage(utils.LevelInfo, "Cron: Notification sent successfully, won't send more today")
 				}
-			} else {
-				utils.LogMessage(utils.LevelInfo, "Cron: Already sent a notification today, skipping")
 			}
 		} else if !shouldNotify {
 			utils.LogMessage(utils.LevelInfo, "Cron: Menu change was minor, skipping notification")
@@ -616,7 +619,15 @@ func (h *RestaurantHandler) calculateMenuSimilarity(menu1, menu2 *models.MenuDat
 	return float64(matches) / float64(maxItems)
 }
 
-// --- Helper Functions ---
+func (h *RestaurantHandler) isNotificationTimeAllowed(t time.Time) bool {
+	weekday := t.Weekday()
+	if weekday == time.Saturday || weekday == time.Sunday {
+		return false
+	}
+
+	hour := t.Hour()
+	return hour >= 7 && hour < 16
+}
 
 // getMenuCategory maps API fields to internal category names.
 func getMenuCategory(pole string, accompagnement string, periode string) string {
@@ -637,15 +648,13 @@ func getMenuCategory(pole string, accompagnement string, periode string) string 
 		if periode == "midi" {
 			return "grilladesMidi"
 		}
-		return "grilladesSoir" // Assume soir if not midi
+		return "grilladesSoir"
 	case "Les Cuistots migrateurs":
-		return "migrateurs" // Assume migrateurs are same midi/soir? API data might clarify.
+		return "migrateurs"
 	case "Le Végétarien":
-		return "cibo" // Assume cibo/vegetarian is same midi/soir?
+		return "cibo"
 	default:
-		// Log unknown poles?
-		// log.Printf("Warning: Unknown menu pole encountered: '%s'", pole)
-		return "" // Ignore unknown poles
+		return ""
 	}
 }
 
