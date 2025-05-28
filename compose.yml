@@ -23,10 +23,6 @@ services:
       - db
     environment:
       - DB_HOST=db
-      - DB_PORT=${DB_PORT}
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASS=${DB_PASS}
     develop:
       watch:
         - path: .
@@ -36,7 +32,6 @@ services:
             - .env
             - .git
             - .gitignore
-            - .DS_Store
             - .idea
 
 volumes:
