@@ -1,7 +1,3 @@
-
-
-#viveRealcampus 
-
 # Transat-backend
 
 Le backend de Transat est un serveur Fiber, développé en Go, connecté à une base de données PostgreSQL.
