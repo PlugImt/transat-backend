@@ -183,7 +183,7 @@ func main() {
 	})
 
 	// API Group
-	api := app.Group("/api")
+	api := app.Group("/")
 
 	// Setup Routes using the new structure
 	// Pass necessary dependencies (db, jwtSecret, services) to setup functions
