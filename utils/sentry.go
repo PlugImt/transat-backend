@@ -13,24 +13,27 @@ import (
 var SentryHandler fiber.Handler
 
 // To initialize Sentry's handler, you need to initialize Sentry itself beforehand
-func SentryInit() {
-	env := GetEnvName()
-	commitSHA := GetEnvCommitSHA()
-	host := GetEnvHost()
+func SentryInit(dsn string, environment string, release string, serverName string, tracesSampleRate float64) {
+	log.Printf("║ %s: %s\n", LevelInfo, "Initializing Sentry with env: "+environment+", release: "+release+", serverName: "+serverName)
 
-	log.Printf("║ %s: %s\n", LevelInfo, "Initializing Sentry with env: "+env+", commitSHA: "+commitSHA+", host: "+host)
+	if dsn == "" {
+		log.Printf("║ %s: %s\n", LevelWarn, "Sentry DSN is not configured. Sentry will not be initialized.")
+		// Assign a no-op handler if Sentry is not initialized
+		SentryHandler = func(c *fiber.Ctx) error {
+			return c.Next()
+		}
+		return
+	}
 
 	if err := sentry.Init(sentry.ClientOptions{
-		Dsn:         "https://121ef29a5b1be0fb38b2dc2eb116f255@o4509277512859648.ingest.de.sentry.io/4509277597597776",
-		Environment: env,
-		Tags: map[string]string{
-			"host":    host,
-			"version": commitSHA,
-		},
+		Dsn:         dsn,
+		Environment: environment,
+		Release:     release,
+		ServerName:  serverName,
 		// Set TracesSampleRate to 1.0 to capture 100%
 		// of transactions for tracing.
 		// We recommend adjusting this value in production,
-		TracesSampleRate: 1.0,
+		TracesSampleRate: tracesSampleRate,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			if hint.Context != nil {
 				if req, ok := hint.Context.Value(sentry.RequestContextKey).(*http.Request); ok {
@@ -41,10 +44,15 @@ func SentryInit() {
 
 			return event
 		},
-		EnableLogs:    true,
-		EnableTracing: true,
+		EnableLogs:    true, // Consider making this configurable too if needed
+		EnableTracing: true, // Consider making this configurable too if needed
 	}); err != nil {
 		fmt.Printf("Sentry initialization failed: %v\n", err)
+		// Assign a no-op handler in case of initialization failure
+		SentryHandler = func(c *fiber.Ctx) error {
+			return c.Next()
+		}
+		return
 	}
 
 	SentryHandler = sentryfiber.New(sentryfiber.Options{

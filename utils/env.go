@@ -4,27 +4,30 @@ import (
 	"os"
 )
 
-func GetEnvName() string {
-	env := os.Getenv("RAILWAY_ENVIRONMENT_NAME")
-	if env == "" {
-		env = "development"
+// GetEnvOrDefault retrieves an environment variable or returns a default value.
+func GetEnvOrDefault(key string, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
 	}
-	return env
+	return value
+}
+
+func GetEnvName() string {
+	// Uses RAILWAY_ENVIRONMENT_NAME first, then falls back to "development"
+	return GetEnvOrDefault("RAILWAY_ENVIRONMENT_NAME", "development")
 }
 
 func GetEnvCommitSHA() string {
-	commitSHA := os.Getenv("RAILWAY_GIT_COMMIT_SHA")
-	if commitSHA == "" {
-		commitSHA = "unknown"
-	}
-	return commitSHA
+	// Uses RAILWAY_GIT_COMMIT_SHA first, then falls back to "unknown"
+	return GetEnvOrDefault("RAILWAY_GIT_COMMIT_SHA", "unknown")
 }
 
 func GetEnvHost() string {
 	host, err := os.Hostname()
 	if err != nil {
-		host = "unknown"
 		LogMessage(LevelError, "Error getting hostname: "+err.Error())
+		return "unknown"
 	}
 	return host
 }

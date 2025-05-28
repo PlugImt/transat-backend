@@ -2,13 +2,34 @@ package utils
 
 import (
 	"fmt"
-	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 var jwtSecret []byte
+var jwtExpirationHours time.Duration = 24 * time.Hour // Default expiration
+
+// InitJWT initializes the JWT secret and expiration time.
+func InitJWT(secret []byte, expirationHoursEnv string) error {
+	if len(secret) == 0 {
+		return fmt.Errorf("JWT secret cannot be empty")
+	}
+	jwtSecret = secret
+
+	if expirationHoursEnv != "" {
+		expHours, err := strconv.Atoi(expirationHoursEnv)
+		if err != nil {
+			// Log and continue with default if parsing fails
+			LogMessage(LevelWarn, fmt.Sprintf("Invalid JWT_EXPIRATION_HOURS: '%s'. Using default %v. Error: %v", expirationHoursEnv, jwtExpirationHours, err))
+		} else {
+			jwtExpirationHours = time.Duration(expHours) * time.Hour
+		}
+	} // else, default is used
+	LogMessage(LevelInfo, fmt.Sprintf("JWT Initialized. Expiration: %v", jwtExpirationHours))
+	return nil
+}
 
 // JWTClaims represents the claims in a JWT token with enhanced security fields
 type JWTClaims struct {
@@ -21,23 +42,12 @@ type JWTClaims struct {
 // GenerateJWT creates a secure JWT token with enhanced claims
 func GenerateJWT(email, role string, fingerprint string) (string, error) {
 	if jwtSecret == nil {
-		jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-		if len(jwtSecret) == 0 {
-			return "", fmt.Errorf("JWT secret is not set")
-		}
+		// This should not happen if InitJWT was called
+		return "", fmt.Errorf("JWT secret is not initialized. Call utils.InitJWT during startup.")
 	}
 
-	// Set expiration time - 24 hours by default
-	expirationHours := 2400000000000
-	expirationEnv := os.Getenv("JWT_EXPIRATION_HOURS")
-	if expirationEnv != "" {
-		if _, err := fmt.Sscanf(expirationEnv, "%d", &expirationHours); err != nil {
-			return "", fmt.Errorf("invalid JWT_EXPIRATION_HOURS: %v", err)
-		}
-	}
-
-	// Create expiration time
-	expirationTime := time.Now().Add(time.Duration(expirationHours) * time.Hour)
+	// Create expiration time using the configured duration
+	expirationTime := time.Now().Add(jwtExpirationHours)
 
 	// Create enhanced claims
 	claims := &JWTClaims{
@@ -69,10 +79,8 @@ func GenerateJWT(email, role string, fingerprint string) (string, error) {
 // ValidateJWT validates a JWT token with enhanced security checks
 func ValidateJWT(tokenString string) (*jwt.Token, error) {
 	if jwtSecret == nil {
-		jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-		if len(jwtSecret) == 0 {
-			return nil, fmt.Errorf("JWT secret is not set")
-		}
+		// This should not happen if InitJWT was called
+		return nil, fmt.Errorf("JWT secret is not initialized. Call utils.InitJWT during startup.")
 	}
 
 	// Parse token with custom claims

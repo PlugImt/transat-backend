@@ -2,67 +2,82 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 )
 
-// EnsureDataFolder checks if the data folder exists, creates it if not.
-// Reads the target path from the DATA_FOLDER environment variable or defaults to "./data".
-func EnsureDataFolder() error {
-	path := os.Getenv("DATA_FOLDER")
+var configuredDataFolder string
+
+// InitFilePaths initializes the data folder path and ensures it exists.
+func InitFilePaths(dataFolderFromConfig string) error {
+	path := dataFolderFromConfig
 	if path == "" {
-		// Default to a relative path in the current working directory
-		path = "./data"
-		log.Println("DATA_FOLDER environment variable not set, using default './data'")
+		path = "./data" // Default to a relative path
+		LogMessage(LevelInfo, "Data folder not specified in config, using default './data'")
 	}
 
-	// Convert to absolute path if relative
-	if !filepath.IsAbs(path) {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			log.Printf("Error converting relative path to absolute: %v", err)
-			return fmt.Errorf("error converting relative path to absolute: %w", err)
-		}
-		path = absPath
-		log.Printf("Using absolute path: %s", path)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		LogMessage(LevelError, fmt.Sprintf("Error converting data folder path '%s' to absolute: %v", path, err))
+		return fmt.Errorf("error converting data folder path to absolute: %w", err)
 	}
+	configuredDataFolder = absPath
+	LogMessage(LevelInfo, fmt.Sprintf("Data folder path configured to: %s", configuredDataFolder))
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		log.Printf("Data folder '%s' does not exist. Creating...", path)
-		// Create the directory and any necessary parents
-		if err := os.MkdirAll(path, 0750); err != nil { // 0750 allows owner rwx, group rx
-			log.Printf("Failed to create data folder '%s': %v", path, err)
-			return fmt.Errorf("failed to create data folder '%s': %w", path, err)
+	// Ensure the directory exists
+	if _, err := os.Stat(configuredDataFolder); os.IsNotExist(err) {
+		LogMessage(LevelInfo, fmt.Sprintf("Data folder '%s' does not exist. Creating...", configuredDataFolder))
+		if errMkdir := os.MkdirAll(configuredDataFolder, 0750); errMkdir != nil {
+			LogMessage(LevelError, fmt.Sprintf("Failed to create data folder '%s': %v", configuredDataFolder, errMkdir))
+			return fmt.Errorf("failed to create data folder '%s': %w", configuredDataFolder, errMkdir)
 		}
-		log.Printf("Data folder '%s' created successfully.", path)
+		LogMessage(LevelInfo, fmt.Sprintf("Data folder '%s' created successfully.", configuredDataFolder))
 	} else if err != nil {
-		// Another error occurred (e.g., permission denied)
-		log.Printf("Error checking data folder '%s': %v", path, err)
-		return fmt.Errorf("error checking data folder '%s': %w", path, err)
+		LogMessage(LevelError, fmt.Sprintf("Error checking data folder '%s': %v", configuredDataFolder, err))
+		return fmt.Errorf("error checking data folder '%s': %w", configuredDataFolder, err)
 	} else {
-		// Folder exists
-		log.Printf("Data folder '%s' already exists.", path)
+		LogMessage(LevelInfo, fmt.Sprintf("Data folder '%s' already exists.", configuredDataFolder))
 	}
 	return nil
 }
 
-// GetDataFolderPath returns the configured data folder path
-func GetDataFolderPath() string {
-	path := os.Getenv("DATA_FOLDER")
-	if path == "" {
-		path = "./data"
-	}
-
-	// Convert to absolute path if relative
-	if !filepath.IsAbs(path) {
-		absPath, err := filepath.Abs(path)
-		if err == nil {
-			path = absPath
+// EnsureDataFolder checks if the configured data folder exists.
+// It is recommended to call InitFilePaths at startup instead of this function directly.
+// If InitFilePaths was not called, this function attempts a fallback initialization.
+func EnsureDataFolder() error {
+	if configuredDataFolder == "" {
+		LogMessage(LevelWarn, "EnsureDataFolder called before InitFilePaths. Attempting default initialization for safety.")
+		if err := InitFilePaths("./data"); err != nil { // Use default path for fallback
+			return fmt.Errorf("fallback InitFilePaths failed in EnsureDataFolder: %w", err)
+		}
+	} else {
+		// If already configured, just verify existence as an additional check, though InitFilePaths should have handled it.
+		if _, err := os.Stat(configuredDataFolder); os.IsNotExist(err) {
+			LogMessage(LevelError, fmt.Sprintf("Configured data folder '%s' does not exist. This should have been created by InitFilePaths.", configuredDataFolder))
+			return fmt.Errorf("configured data folder '%s' not found after InitFilePaths was expected to run", configuredDataFolder)
+		} else if err != nil {
+			LogMessage(LevelError, fmt.Sprintf("Error re-checking data folder '%s': %v", configuredDataFolder, err))
+			return fmt.Errorf("error re-checking data folder: %w", err)
 		}
 	}
+	LogMessage(LevelDebug, "EnsureDataFolder check completed.")
+	return nil
+}
 
-	return path
+// GetDataFolderPath returns the configured data folder path.
+// Relies on InitFilePaths being called for proper initialization.
+// Returns a fallback path if not initialized, with a warning.
+func GetDataFolderPath() string {
+	if configuredDataFolder == "" {
+		LogMessage(LevelWarn, "GetDataFolderPath called before InitFilePaths. Returning fallback default './data'.")
+		absPath, err := filepath.Abs("./data") // Fallback default
+		if err != nil {
+			LogMessage(LevelError, "Could not get absolute path for default ./data in GetDataFolderPath fallback.")
+			return "./data"
+		}
+		return absPath
+	}
+	return configuredDataFolder
 }
 
 // Note: Other file-related utility functions could be added here later.
