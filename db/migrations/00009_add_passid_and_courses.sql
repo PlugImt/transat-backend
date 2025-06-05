@@ -4,10 +4,10 @@ ALTER TABLE newf ADD COLUMN pass_id INTEGER;
 
 CREATE TABLE courses (
     id SERIAL PRIMARY KEY,
-    time_slot VARCHAR(20) NOT NULL,
+    date DATE NOT NULL,
     title VARCHAR(255) NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
+    start_time VARCHAR(10) NOT NULL,
+    end_time VARCHAR(10) NOT NULL,
     teacher VARCHAR(255),
     room VARCHAR(255),
     "group" VARCHAR(255),
