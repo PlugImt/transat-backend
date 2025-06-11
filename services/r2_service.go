@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -51,8 +52,6 @@ func NewR2Service() (*R2Service, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyID, accessKeySecret, "")),
 		config.WithRegion("auto"),
-		config.WithRequestChecksumCalculation(0),
-		config.WithResponseChecksumValidation(0),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load SDK config: %w", err)
@@ -62,6 +61,7 @@ func NewR2Service() (*R2Service, error) {
 	endpoint := fmt.Sprintf("https://%s.eu.r2.cloudflarestorage.com", accountID)
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(endpoint)
+		o.UsePathStyle = true
 	})
 
 	log.Println("✅ R2 service initialized successfully")
@@ -103,7 +103,8 @@ func (s *R2Service) DeleteFile(key string) error {
 }
 
 func (s *R2Service) GetPublicURL(key string) string {
-	return fmt.Sprintf("%s/%s", s.publicURL, key)
+	publicURL := strings.TrimRight(s.publicURL, "/")
+	return fmt.Sprintf("%s/%s", publicURL, key)
 }
 
 func (s *R2Service) GetPresignedURL(key string, duration time.Duration) (string, error) {

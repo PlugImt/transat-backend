@@ -32,5 +32,5 @@ func SetupFileRoutes(router fiber.Router, db *sql.DB, r2Service *services.R2Serv
 
 	// Admin route (example - secure appropriately!)
 	// Requires admin check within handler or a specific admin middleware
-	router.Get("/all-files", fileHandler.ListAllFiles) // List all files on server
+	router.Get("/all-files", middlewares.JWTMiddleware, fileHandler.ListAllFiles) // List all files on server
 }
