@@ -126,6 +126,12 @@ func main() {
 	}
 	weatherHandler := handlers.NewWeatherHandler(weatherService)
 
+	// Initialize R2 Service
+	r2Service, err := services.NewR2Service()
+	if err != nil {
+		log.Fatalf("💥 Failed to create R2 Service: %v", err)
+	}
+
 	// Initialize and start schedulers
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
@@ -190,7 +196,7 @@ func main() {
 	routes.SetupAuthRoutes(api, db, jwtSecret, notificationService, emailService)
 	routes.SetupUserRoutes(api, db, notificationService) // Pass notificationService if needed by user handlers
 	routes.SetupTraqRoutes(api, db)
-	routes.SetupFileRoutes(api, db)
+	routes.SetupFileRoutes(api, db, r2Service)
 	routes.SetupRestaurantRoutes(api, restHandler)
 	routes.SetupRealCampusRoutes(api, db)
 	routes.SetupPlanningRoutes(api, db)
