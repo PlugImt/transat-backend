@@ -1,3 +1,53 @@
+// @title API Transat
+// @version 2.0
+// @description API Backend pour l'application Transat - l'application du campus de Nantes d'IMT Atlantique
+//
+// @contact.name	Équipe Transat
+// @contact.website	https://transat.dev
+//
+// @license.name	MIT
+// @license.url	https://opensource.org/licenses/MIT
+//
+// @servers.url http://localhost:3000/api
+// @servers.description Localhost
+//
+// @servers.url https://api.transat.dev/api
+// @servers.description Production
+//
+// @securitydefinitions.bearerauth BearerAuth
+//
+// @tag.name		System
+// @tag.description	Endpoints système (statut, santé)
+//
+// @tag.name		Auth
+// @tag.description	Endpoints d'authentification et de gestion des comptes utilisateurs
+//
+// @tag.name		Newf (user)
+// @tag.description	Endpoints de gestion du profil utilisateur
+//
+// @tag.name		Weather
+// @tag.description	Endpoints météorologiques
+//
+// @tag.name		Restaurant
+// @tag.description	Endpoints de menu de restaurant
+//
+// @tag.name		WashingMachine
+// @tag.description	Endpoints de statut des machines à laver
+//
+// @tag.name		Traq
+// @tag.description	Endpoints de gestion des boissons et produits du Traq
+//
+// @tag.name		Files
+// @tag.description	Endpoints de gestion des fichiers
+//
+// @tag.name		Statistics
+// @tag.description	Endpoints de statistiques d'utilisation
+//
+// @tag.name		Planning
+// @tag.description	Tout ce qui est lié aux emplois du temps (de PASS/Alcuin)
+//
+// @externalDocs.description  Voir la documentation du projet
+// @externalDocs.url          https://docs.transat.dev
 package main
 
 import (
@@ -10,6 +60,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/swagger"
 	"github.com/joho/godotenv"
 	"github.com/plugimt/transat-backend/handlers"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant" // Import restaurant handler explicitly
@@ -23,6 +74,7 @@ import (
 
 	_ "github.com/lib/pq"
 	_ "github.com/nicksnyder/go-i18n/v2/i18n" // Keep for i18n initialization if still needed here
+	_ "github.com/plugimt/transat-backend/docs"
 	"github.com/pressly/goose/v3"
 )
 
@@ -183,10 +235,19 @@ func main() {
 	// 8. Add statistics middleware to capture all requests
 	app.Use(middlewares.StatisticsMiddleware(statisticsService))
 
-	// Status Route
-	app.Get("/status", func(c *fiber.Ctx) error {
-		return c.SendString("API is up and running")
-	})
+	if os.Getenv("ENV") == "development" {
+		app.Get("/docs/swagger.yaml", func(c *fiber.Ctx) error {
+			swaggerFile, err := os.ReadFile("docs/swagger.yaml")
+			if err != nil {
+				return c.SendStatus(fiber.StatusInternalServerError)
+			}
+			return c.SendString(string(swaggerFile))
+		})
+		app.Get("/swagger/*", swagger.New(swagger.Config{
+			URL: "http://localhost:3000/docs/swagger.yaml",
+		}))
+		utils.LogMessage(utils.LevelInfo, "🔗 Swagger UI available at http://localhost:3000/swagger/index.html")
+	}
 
 	// API Group
 	api := app.Group("/api")
@@ -204,10 +265,7 @@ func main() {
 	routes.SetupWashingMachineRoutes(api)                        // Setup washing machine routes
 	routes.SetupWeatherRoutes(api, weatherHandler)               // Setup weather routes
 	routes.SetupNotificationRoutes(api, db, notificationService) // Setup notification test routes
-
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.SendString("OK")
-	})
+	routes.SetupSystemRoutes(app)
 
 	// Start Server
 	port := os.Getenv("PORT")

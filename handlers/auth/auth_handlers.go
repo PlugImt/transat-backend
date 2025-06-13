@@ -36,6 +36,17 @@ func NewAuthHandler(db *sql.DB, jwtSecret []byte, notifService *services.Notific
 }
 
 // Register handles new user registration.
+// @Summary		Inscription utilisateur
+// @Description	Crée un nouveau compte utilisateur avec email et mot de passe
+// @Tags			Auth
+// @Accept			json
+// @Produce		json
+// @Param			user	body		models.Newf				true	"Informations d'inscription"
+// @Success 	201		{string} 					"Created"
+// @Failure		400		{object}	models.ErrorResponse	"Données invalides"
+// @Failure		409		{object}	models.ErrorResponse	"Utilisateur déjà existant"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var newf models.Newf
 
@@ -259,6 +270,17 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 }
 
 // Login handles user login.
+// @Summary		Connexion utilisateur
+// @Description	Authentifie un utilisateur avec email et mot de passe
+// @Tags			Auth
+// @Accept			json
+// @Produce		json
+// @Param			credentials	body		models.LoginRequest		true	"Informations de connexion"
+// @Success		200			{object}	models.AuthResponse		"Connexion réussie"
+// @Failure		400			{object}	models.ErrorResponse	"Données invalides"
+// @Failure		401			{object}	models.ErrorResponse	"Identifiants invalides ou compte non vérifié"
+// @Failure		500			{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var candidate models.Newf // Data from request body
 
@@ -392,6 +414,16 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 }
 
 // VerifyAccount handles account verification using a code.
+// @Summary		Vérification de compte
+// @Description	Vérifie un compte utilisateur avec un code de vérification
+// @Tags			Auth
+// @Accept			json
+// @Produce		json
+// @Param			verification	body		models.VerificationRequest	true	"Code de vérification"
+// @Success		200				{object}	models.AuthResponse			"Compte vérifié avec succès"
+// @Failure		400				{object}	models.ErrorResponse		"Code invalide ou expiré"
+// @Failure		500				{object}	models.ErrorResponse		"Erreur serveur"
+// @Router			/auth/verify-account [post]
 func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 	var req models.VerificationRequest // Assuming a model like { Email string, VerificationCode string }
 
@@ -571,7 +603,17 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"token": token}) // Return token for seamless experience
 }
 
-// RequestVerificationCode handles requests to resend a verification code.
+// RequestVerificationCode handles the resending of verification codes.
+// @Summary		Demander un code de vérification
+// @Description	Renvoie un nouveau code de vérification par email pour l'activation de compte ou la réinitialisation de mot de passe
+// @Tags			Auth
+// @Accept			json
+// @Produce		json
+// @Param			email	body		models.EmailRequest		true	"Adresse email pour recevoir le code"
+// @Success		200		{object}	models.Response			"Code de vérification envoyé"
+// @Failure		400		{object}	models.ErrorResponse	"Données invalides"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/auth/verification-code [post]
 func (h *AuthHandler) RequestVerificationCode(c *fiber.Ctx) error {
 	var req models.EmailRequest // Assuming { Email string }
 
@@ -711,6 +753,17 @@ func (h *AuthHandler) RequestVerificationCode(c *fiber.Ctx) error {
 }
 
 // ChangePassword handles password change requests (both verified and unverified users).
+// @Summary		Changer le mot de passe
+// @Description	Change le mot de passe d'un utilisateur via ancien mot de passe ou code de vérification
+// @Tags			Auth
+// @Accept			json
+// @Produce		json
+// @Param			request	body		models.ChangePasswordRequest	true	"Données de changement de mot de passe"
+// @Success		200		{object}	models.Response					"Mot de passe changé avec succès"
+// @Failure		400		{object}	models.ErrorResponse			"Données invalides ou code expiré"
+// @Failure		401		{object}	models.ErrorResponse			"Ancien mot de passe invalide"
+// @Failure		500		{object}	models.ErrorResponse			"Erreur serveur"
+// @Router			/auth/change-password [patch]
 func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 	var req models.ChangePasswordRequest // Needs fields like Email, OldPassword (optional), NewPassword, NewPasswordConfirmation, VerificationCode (optional)
 

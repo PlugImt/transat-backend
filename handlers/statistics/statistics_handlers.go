@@ -23,6 +23,15 @@ func NewStatisticsHandler(db *sql.DB, statisticsService *services.StatisticsServ
 }
 
 // GetEndpointStatistics returns statistics for all endpoints
+// @Summary		Obtenir les statistiques par endpoint
+// @Description	Récupère les statistiques d'utilisation détaillées pour tous les endpoints de l'API
+// @Tags			Statistics
+// @Produce		json
+// @Security		BearerAuth
+// @Success		200	{object}	map[string]interface{}	"Statistiques par endpoint récupérées avec succès"
+// @Failure		401	{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500	{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/statistics/endpoints [get]
 func (h *StatisticsHandler) GetEndpointStatistics(c *fiber.Ctx) error {
 	utils.LogHeader("📊 Get Endpoint Statistics")
 
@@ -47,6 +56,15 @@ func (h *StatisticsHandler) GetEndpointStatistics(c *fiber.Ctx) error {
 }
 
 // GetGlobalStatistics returns global statistics across all endpoints
+// @Summary		Obtenir les statistiques globales
+// @Description	Récupère les statistiques globales d'utilisation de l'API (tous endpoints confondus)
+// @Tags			Statistics
+// @Produce		json
+// @Security		BearerAuth
+// @Success		200	{object}	map[string]interface{}	"Statistiques globales récupérées avec succès"
+// @Failure		401	{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500	{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/statistics/global [get]
 func (h *StatisticsHandler) GetGlobalStatistics(c *fiber.Ctx) error {
 	utils.LogHeader("📊 Get Global Statistics")
 

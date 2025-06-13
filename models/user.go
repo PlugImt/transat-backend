@@ -28,6 +28,12 @@ type VerificationCodeData struct {
 
 // --- Request Structs ---
 
+// LoginRequest is used for user authentication.
+type LoginRequest struct {
+	Email    string `json:"email" validate:"required,email" example:"john.doe@example.com"`
+	Password string `json:"password" validate:"required" example:"motdepasse123"`
+} // @name LoginRequest
+
 // VerificationRequest is used for verifying an account.
 type VerificationRequest struct {
 	Email            string `json:"email"`

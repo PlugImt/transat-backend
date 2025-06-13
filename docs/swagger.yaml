@@ -1,0 +1,1298 @@
+components:
+  schemas:
+    files.File:
+      properties:
+        file:
+          format: binary
+          type: string
+      type: object
+    models.AuthResponse:
+      properties:
+        message:
+          example: Connexion réussie
+          type: string
+        success:
+          example: true
+          type: boolean
+        token:
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+          type: string
+      type: object
+    models.ChangePasswordRequest:
+      properties:
+        email:
+          type: string
+        new_password:
+          type: string
+        new_password_confirmation:
+          type: string
+        old_password:
+          description: 'Optional: Used when logged in'
+          type: string
+        verification_code:
+          description: 'Optional: Used for password reset'
+          type: string
+      type: object
+    models.Course:
+      properties:
+        created_at:
+          type: string
+        date:
+          example: "2024-01-15"
+          type: string
+        end_time:
+          example: "10:30"
+          type: string
+        group:
+          example: L3-INFO
+          type: string
+        id:
+          example: 1
+          type: integer
+        room:
+          example: A101
+          type: string
+        start_time:
+          example: "09:00"
+          type: string
+        teacher:
+          example: Prof. Dupont
+          type: string
+        title:
+          example: Mathématiques
+          type: string
+        updated_at:
+          type: string
+        user_email:
+          example: student@example.com
+          type: string
+      required:
+      - date
+      - end_time
+      - start_time
+      - title
+      - user_email
+      type: object
+    models.CreateCourseRequest:
+      properties:
+        date:
+          example: "2024-01-15"
+          type: string
+        end_time:
+          example: "10:30"
+          type: string
+        group:
+          example: L3-INFO
+          type: string
+        room:
+          example: A101
+          type: string
+        start_time:
+          example: "09:00"
+          type: string
+        teacher:
+          example: Prof. Dupont
+          type: string
+        title:
+          example: Mathématiques
+          type: string
+        user_email:
+          example: student@example.com
+          type: string
+      required:
+      - date
+      - end_time
+      - start_time
+      - title
+      - user_email
+      type: object
+    models.EmailRequest:
+      properties:
+        email:
+          type: string
+      type: object
+    models.ErrorResponse:
+      properties:
+        error:
+          example: Message d'erreur
+          type: string
+        message:
+          example: Détail de l'erreur
+          type: string
+      type: object
+    models.FormattedMachine:
+      properties:
+        available:
+          type: boolean
+        number:
+          type: integer
+        time_left:
+          type: integer
+      type: object
+    models.FormattedMachineData:
+      properties:
+        dryer:
+          items:
+            $ref: '#/components/schemas/models.FormattedMachine'
+          type: array
+          uniqueItems: false
+        washing_machine:
+          items:
+            $ref: '#/components/schemas/models.FormattedMachine'
+          type: array
+          uniqueItems: false
+      type: object
+    models.FullMenuData:
+      properties:
+        accompMidi:
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        accompSoir:
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        cibo:
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        grilladesMidi:
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        grilladesSoir:
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        migrateurs:
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        updatedDate:
+          type: string
+      type: object
+    models.LoginRequest:
+      properties:
+        email:
+          example: john.doe@example.com
+          type: string
+        password:
+          example: motdepasse123
+          type: string
+      required:
+      - email
+      - password
+      type: object
+    models.Newf:
+      properties:
+        campus:
+          type: string
+        creation_date:
+          type: string
+        email:
+          type: string
+        first_name:
+          type: string
+        graduation_year:
+          type: integer
+        id_newf:
+          type: integer
+        language:
+          type: string
+        last_name:
+          type: string
+        new_password:
+          type: string
+        new_password_confirmation:
+          type: string
+        notification_token:
+          type: string
+        password:
+          type: string
+        password_updated_date:
+          type: string
+        phone_number:
+          type: string
+        profile_picture:
+          type: string
+        total_newf:
+          type: integer
+        verification_code:
+          type: string
+        verification_code_expiration:
+          description: Formatted time (e.g., "15h04")
+          type: string
+      type: object
+    models.Response:
+      properties:
+        data: {}
+        message:
+          example: Opération réussie
+          type: string
+        success:
+          example: true
+          type: boolean
+      type: object
+    models.TraqArticle:
+      properties:
+        alcohol:
+          type: number
+        creation_date:
+          type: string
+        description:
+          type: string
+        disabled:
+          type: boolean
+        id_traq:
+          type: integer
+        limited:
+          type: boolean
+        name:
+          type: string
+        out_of_stock:
+          type: boolean
+        picture:
+          type: string
+        price:
+          type: number
+        price_half:
+          type: number
+        traq_type:
+          type: string
+      type: object
+    models.TraqType:
+      properties:
+        id_traq_types:
+          type: integer
+        name:
+          type: string
+      type: object
+    models.UpdatePassIDRequest:
+      properties:
+        pass_id:
+          example: 123456789
+          type: integer
+      required:
+      - pass_id
+      type: object
+    models.UserWithPassID:
+      properties:
+        first_name:
+          example: Jean
+          type: string
+        id:
+          example: 1
+          type: integer
+        last_name:
+          example: Dupont
+          type: string
+        pass_id:
+          example: 123456789
+          type: integer
+      type: object
+    models.VerificationRequest:
+      properties:
+        email:
+          type: string
+        verification_code:
+          type: string
+      type: object
+    models.WashingMachineResponse:
+      properties:
+        data:
+          $ref: '#/components/schemas/models.FormattedMachineData'
+        message:
+          type: string
+        success:
+          type: boolean
+      type: object
+  securitySchemes:
+    bearerauth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
+externalDocs:
+  description: Voir la documentation du projet
+  url: https://docs.transat.dev
+info:
+  contact:
+    name: Équipe Transat
+  description: API Backend pour l'application Transat - l'application du campus de
+    Nantes d'IMT Atlantique
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: API Transat
+  version: "2.0"
+openapi: 3.1.0
+paths:
+  /auth/change-password:
+    patch:
+      description: Change le mot de passe d'un utilisateur via ancien mot de passe
+        ou code de vérification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.ChangePasswordRequest'
+        description: Données de changement de mot de passe
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Response'
+          description: Mot de passe changé avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides ou code expiré
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Ancien mot de passe invalide
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      summary: Changer le mot de passe
+      tags:
+      - Auth
+  /auth/login:
+    post:
+      description: Authentifie un utilisateur avec email et mot de passe
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.LoginRequest'
+        description: Informations de connexion
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.AuthResponse'
+          description: Connexion réussie
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Identifiants invalides ou compte non vérifié
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      summary: Connexion utilisateur
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      description: Crée un nouveau compte utilisateur avec email et mot de passe
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.Newf'
+        description: Informations d'inscription
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Utilisateur déjà existant
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      summary: Inscription utilisateur
+      tags:
+      - Auth
+  /auth/verification-code:
+    post:
+      description: Renvoie un nouveau code de vérification par email pour l'activation
+        de compte ou la réinitialisation de mot de passe
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.EmailRequest'
+        description: Adresse email pour recevoir le code
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Response'
+          description: Code de vérification envoyé
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      summary: Demander un code de vérification
+      tags:
+      - Auth
+  /auth/verify-account:
+    post:
+      description: Vérifie un compte utilisateur avec un code de vérification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.VerificationRequest'
+        description: Code de vérification
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.AuthResponse'
+          description: Compte vérifié avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Code invalide ou expiré
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      summary: Vérification de compte
+      tags:
+      - Auth
+  /data/{filename}:
+    get:
+      description: Sert un fichier stocké dans le cloud storage
+      parameters:
+      - description: Nom du fichier à servir
+        in: path
+        name: filename
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/files.File'
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: Fichier servi avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Nom de fichier manquant
+        "404":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Fichier non trouvé
+        "500":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Erreur serveur
+      summary: Servir un fichier
+      tags:
+      - Files
+  /files:
+    get:
+      description: Récupère la liste de tous les fichiers téléchargés par l'utilisateur
+        connecté
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                additionalProperties: {}
+                type: object
+          description: Liste des fichiers récupérée avec succès
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Lister les fichiers de l'utilisateur
+      tags:
+      - Files
+  /files/{filename}:
+    delete:
+      description: Supprime un fichier spécifique appartenant à l'utilisateur connecté
+      parameters:
+      - description: Nom du fichier à supprimer
+        in: path
+        name: filename
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Response'
+          description: Fichier supprimé avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Nom de fichier manquant
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Fichier non trouvé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Supprimer un fichier
+      tags:
+      - Files
+  /newf/me:
+    delete:
+      description: Supprime définitivement le compte de l'utilisateur connecté (action
+        irréversible)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Response'
+          description: Compte supprimé avec succès
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Utilisateur non trouvé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Supprimer le compte utilisateur
+      tags:
+      - Newf (user)
+    get:
+      description: Récupère les informations de profil de l'utilisateur connecté
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                additionalProperties: {}
+                type: object
+          description: Profil utilisateur récupéré avec succès
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Profil utilisateur non trouvé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Obtenir le profil utilisateur
+      tags:
+      - Newf (user)
+    patch:
+      description: Met à jour les informations de profil de l'utilisateur connecté
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.Newf'
+        description: Données de profil à mettre à jour
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Response'
+          description: Profil mis à jour avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Profil utilisateur non trouvé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Mettre à jour le profil utilisateur
+      tags:
+      - Newf (user)
+  /planning/courses:
+    post:
+      description: Ajoute un nouveau cours dans le planning
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.CreateCourseRequest'
+        description: Données du cours
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Response'
+          description: Cours créé avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Créer un nouveau cours
+      tags:
+      - Planning
+  /planning/users:
+    get:
+      description: Récupère la liste de tous les utilisateurs avec leurs informations
+        de Pass ID pour la planification
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.UserWithPassID'
+                type: array
+          description: Liste des utilisateurs récupérée avec succès
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Obtenir les utilisateurs avec Pass ID
+      tags:
+      - Planning
+  /planning/users/{email}/courses:
+    get:
+      description: Récupère la liste des cours d'un utilisateur pour une période donnée
+      parameters:
+      - description: Email de l'utilisateur
+        in: path
+        name: email
+        required: true
+        schema:
+          type: string
+      - description: Date de début (YYYY-MM-DD)
+        example: "2024-01-01"
+        in: query
+        name: start
+        required: true
+        schema:
+          type: string
+      - description: Date de fin (YYYY-MM-DD)
+        example: "2024-01-31"
+        in: query
+        name: end
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.Course'
+                type: array
+          description: Liste des cours récupérée avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Paramètres manquants ou invalides
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Obtenir les cours d'un utilisateur entre deux dates
+      tags:
+      - Planning
+  /planning/users/{email}/courses/today:
+    get:
+      description: Récupère la liste des cours d'un utilisateur pour la journée actuelle
+      parameters:
+      - description: Email de l'utilisateur
+        in: path
+        name: email
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.Course'
+                type: array
+          description: Liste des cours d'aujourd'hui récupérée avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Email manquant
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Obtenir les cours d'aujourd'hui pour un utilisateur
+      tags:
+      - Planning
+  /planning/users/{id_newf}/passid:
+    patch:
+      description: Met à jour le Pass ID d'un utilisateur spécifique s'il est actuellement
+        nul
+      parameters:
+      - description: ID de l'utilisateur
+        in: path
+        name: id_newf
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.UpdatePassIDRequest'
+        description: Nouveau Pass ID
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Response'
+          description: Pass ID mis à jour avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Pass ID déjà défini
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Mettre à jour le Pass ID d'un utilisateur
+      tags:
+      - Planning
+  /restaurant:
+    get:
+      description: Récupère le menu du restaurant avec support multilingue et mise
+        en cache
+      parameters:
+      - description: Code de langue (fr, en, es, etc.)
+        in: query
+        name: language
+        schema:
+          default: fr
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.FullMenuData'
+          description: Menu récupéré avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Code de langue invalide
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Service indisponible
+      summary: Obtenir le menu du restaurant
+      tags:
+      - Restaurant
+  /statistics/endpoints:
+    get:
+      description: Récupère les statistiques d'utilisation détaillées pour tous les
+        endpoints de l'API
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                additionalProperties: {}
+                type: object
+          description: Statistiques par endpoint récupérées avec succès
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Obtenir les statistiques par endpoint
+      tags:
+      - Statistics
+  /statistics/global:
+    get:
+      description: Récupère les statistiques globales d'utilisation de l'API (tous
+        endpoints confondus)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                additionalProperties: {}
+                type: object
+          description: Statistiques globales récupérées avec succès
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Obtenir les statistiques globales
+      tags:
+      - Statistics
+  /traq:
+    get:
+      description: Récupère la liste de tous les articles (boissons/produits) disponibles
+        dans le système Traq
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.TraqArticle'
+                type: array
+          description: Articles Traq récupérés avec succès
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      summary: Obtenir tous les articles Traq
+      tags:
+      - Traq
+    post:
+      description: Crée un nouvel article (boisson/produit) dans le système Traq
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.TraqArticle'
+        description: Données de l'article Traq
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Response'
+          description: Article Traq créé avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Créer un article Traq
+      tags:
+      - Traq
+  /traq/types:
+    get:
+      description: Récupère la liste de tous les types de catégories Traq disponibles
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.TraqType'
+                type: array
+          description: Types Traq récupérés avec succès
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      summary: Obtenir tous les types de Traq
+      tags:
+      - Traq
+    post:
+      description: Crée un nouveau type de catégorie pour les articles Traq
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.TraqType'
+        description: Données du type Traq
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Response'
+          description: Type Traq créé avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Créer un type de Traq
+      tags:
+      - Traq
+  /upload:
+    post:
+      description: Télécharge un fichier et l'enregistre dans le stockage cloud
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/files.File'
+        description: Fichier à uploader
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                additionalProperties: {}
+                type: object
+          description: Fichier téléchargé avec succès
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Données invalides
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Non autorisé
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      security:
+      - BearerAuth: []
+      summary: Télécharger un fichier
+      tags:
+      - Files
+  /washingmachines:
+    get:
+      description: Récupère le statut en temps réel de toutes les machines à laver
+        et sèche-linge disponibles
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.WashingMachineResponse'
+          description: Statut des machines récupéré avec succès
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur lors de la récupération des données
+      summary: Obtenir le statut des machines à laver
+      tags:
+      - WashingMachine
+  /weather:
+    get:
+      description: Récupère les informations météorologiques actuelles avec support
+        multilingue
+      parameters:
+      - description: Code de langue (fr, en, etc.)
+        in: query
+        name: language
+        schema:
+          default: fr
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                additionalProperties: {}
+                type: object
+          description: Données météorologiques
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.ErrorResponse'
+          description: Erreur serveur
+      summary: Obtenir les données météorologiques
+      tags:
+      - Weather
+servers:
+- description: Localhost
+  url: http://localhost:3000/api
+- description: Production
+  url: https://api.transat.dev/api
+tags:
+- description: Endpoints système (statut, santé)
+  name: System
+- description: Endpoints d'authentification et de gestion des comptes utilisateurs
+  name: Auth
+- description: Endpoints de gestion du profil utilisateur
+  name: Newf (user)
+- description: Endpoints météorologiques
+  name: Weather
+- description: Endpoints de menu de restaurant
+  name: Restaurant
+- description: Endpoints de statut des machines à laver
+  name: WashingMachine
+- description: Endpoints de gestion des boissons et produits du Traq
+  name: Traq
+- description: Endpoints de gestion des fichiers
+  name: Files
+- description: Endpoints de statistiques d'utilisation
+  name: Statistics
+- description: Tout ce qui est lié aux emplois du temps (de PASS/Alcuin)
+  name: Planning
