@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 SCRIPT_DIR=$(dirname "$0")
-cd $SCRIPT_DIR/..
+cd $SCRIPT_DIR/.. || exit 1
 
 echo "🔄 Génération de la documentation OpenAPI..."
 
