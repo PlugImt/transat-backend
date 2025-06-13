@@ -70,6 +70,16 @@ func NewRestaurantHandler(db *sql.DB, transService *services.TranslationService,
 
 // GetRestaurantMenu handles requests for the restaurant menu.
 // It uses caching and fetches/translates the menu if needed.
+// @Summary		Obtenir le menu du restaurant
+// @Description	Récupère le menu du restaurant avec support multilingue et mise en cache
+// @Tags			Restaurant
+// @Produce		json
+// @Param			language	query		string	false	"Code de langue (fr, en, es, etc.)"	default(fr)
+// @Success		200			{object}	models.FullMenuData		"Menu récupéré avec succès"
+// @Failure		400			{object}	models.ErrorResponse	"Code de langue invalide"
+// @Failure		500			{object}	models.ErrorResponse	"Erreur serveur"
+// @Failure		503			{object}	models.ErrorResponse	"Service indisponible"
+// @Router			/restaurant [get]
 func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 	utils.LogHeader("🍽️ Get Restaurant Menu")
 

@@ -16,6 +16,10 @@ import (
 	"github.com/plugimt/transat-backend/utils"
 )
 
+type File struct {
+	File string `format:"binary"`
+}
+
 // FileHandler handles file upload, serving, listing, and deletion.
 type FileHandler struct {
 	DB        *sql.DB
@@ -31,6 +35,18 @@ func NewFileHandler(db *sql.DB, r2Service *services.R2Service) (*FileHandler, er
 }
 
 // UploadFile handles file uploads, saves them, and records them in the database.
+// @Summary		Télécharger un fichier
+// @Description	Télécharge un fichier et l'enregistre dans le stockage cloud
+// @Tags			Files
+// @Produce		json
+// @Security		BearerAuth
+// @Accept	multipart/form-data
+// @Param 		file 	formData 	File true "Fichier à uploader"
+// @Success		200		{object}	map[string]interface{}	"Fichier téléchargé avec succès"
+// @Failure		400		{object}	models.ErrorResponse	"Données invalides"
+// @Failure		401		{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/upload [post]
 func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	utils.LogHeader("📄 Upload File")
 
@@ -153,6 +169,16 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 }
 
 // ServeFile serves files stored in R2.
+// @Summary		Servir un fichier
+// @Description	Sert un fichier stocké dans le cloud storage
+// @Tags			Files
+// @Produce		application/octet-stream
+// @Param			filename	path	string	true	"Nom du fichier à servir"
+// @Success		200			{object}	File	"Fichier servi avec succès"
+// @Failure		400			{string}	string	"Nom de fichier manquant"
+// @Failure		404			{string}	string	"Fichier non trouvé"
+// @Failure		500			{string}	string	"Erreur serveur"
+// @Router			/data/{filename} [get]
 func (h *FileHandler) ServeFile(c *fiber.Ctx) error {
 	filename := c.Params("filename")
 	if filename == "" {
@@ -185,6 +211,15 @@ func (h *FileHandler) ServeFile(c *fiber.Ctx) error {
 }
 
 // ListUserFiles lists all files uploaded by the logged-in user.
+// @Summary		Lister les fichiers de l'utilisateur
+// @Description	Récupère la liste de tous les fichiers téléchargés par l'utilisateur connecté
+// @Tags			Files
+// @Produce		json
+// @Security		BearerAuth
+// @Success		200	{object}	map[string]interface{}	"Liste des fichiers récupérée avec succès"
+// @Failure		401	{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500	{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/files [get]
 func (h *FileHandler) ListUserFiles(c *fiber.Ctx) error {
 	email := c.Locals("email").(string)
 
@@ -254,6 +289,18 @@ func (h *FileHandler) ListUserFiles(c *fiber.Ctx) error {
 }
 
 // DeleteFile handles the deletion of a specific file owned by the user.
+// @Summary		Supprimer un fichier
+// @Description	Supprime un fichier spécifique appartenant à l'utilisateur connecté
+// @Tags			Files
+// @Produce		json
+// @Security		BearerAuth
+// @Param			filename	path	string	true	"Nom du fichier à supprimer"
+// @Success		200			{object}	models.Response			"Fichier supprimé avec succès"
+// @Failure		400			{object}	models.ErrorResponse	"Nom de fichier manquant"
+// @Failure		401			{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		404			{object}	models.ErrorResponse	"Fichier non trouvé"
+// @Failure		500			{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/files/{filename} [delete]
 func (h *FileHandler) DeleteFile(c *fiber.Ctx) error {
 	filename := c.Params("filename")
 	email := c.Locals("email").(string)

@@ -29,6 +29,16 @@ func NewUserHandler(db *sql.DB, notifService *services.NotificationService) *Use
 }
 
 // GetNewf retrieves the profile information for the logged-in user.
+// @Summary		Obtenir le profil utilisateur
+// @Description	Récupère les informations de profil de l'utilisateur connecté
+// @Tags			Newf (user)
+// @Produce		json
+// @Security		BearerAuth
+// @Success		200	{object}	map[string]interface{}	"Profil utilisateur récupéré avec succès"
+// @Failure		401	{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		404	{object}	models.ErrorResponse	"Profil utilisateur non trouvé"
+// @Failure		500	{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/newf/me [get]
 func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 	email := c.Locals("email").(string) // Assumes email is set by JWTMiddleware
 	ctx := c.UserContext()              // Obtenir le context.Context de Fiber
@@ -143,6 +153,19 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 }
 
 // UpdateNewf updates the profile information for the logged-in user.
+// @Summary		Mettre à jour le profil utilisateur
+// @Description	Met à jour les informations de profil de l'utilisateur connecté
+// @Tags			Newf (user)
+// @Accept			json
+// @Produce		json
+// @Security		BearerAuth
+// @Param			profile	body	models.Newf	true	"Données de profil à mettre à jour"
+// @Success		200		{object}	models.Response	"Profil mis à jour avec succès"
+// @Failure		400		{object}	models.ErrorResponse	"Données invalides"
+// @Failure		401		{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		404		{object}	models.ErrorResponse	"Profil utilisateur non trouvé"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/newf/me [patch]
 func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 	email := c.Locals("email").(string)
 	var req models.Newf // Use the Newf model to parse incoming update data
@@ -259,6 +282,16 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 // DeleteNewf handles the deletion of the logged-in user's account.
 // IMPORTANT: This is a destructive action and needs careful consideration.
 // Consider soft delete instead of hard delete.
+// @Summary		Supprimer le compte utilisateur
+// @Description	Supprime définitivement le compte de l'utilisateur connecté (action irréversible)
+// @Tags			Newf (user)
+// @Produce		json
+// @Security		BearerAuth
+// @Success		200	{object}	models.Response			"Compte supprimé avec succès"
+// @Failure		401	{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		404	{object}	models.ErrorResponse	"Utilisateur non trouvé"
+// @Failure		500	{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/newf/me [delete]
 func (h *UserHandler) DeleteNewf(c *fiber.Ctx) error {
 	email := c.Locals("email").(string)
 

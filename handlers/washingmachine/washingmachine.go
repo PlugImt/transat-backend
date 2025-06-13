@@ -20,6 +20,13 @@ func NewWashingMachineHandler() *WashingMachineHandler {
 }
 
 // GetWashingMachines returns the status of all washing machines
+// @Summary		Obtenir le statut des machines à laver
+// @Description	Récupère le statut en temps réel de toutes les machines à laver et sèche-linge disponibles
+// @Tags			WashingMachine
+// @Produce		json
+// @Success		200	{object}	models.WashingMachineResponse	"Statut des machines récupéré avec succès"
+// @Failure		500	{object}	models.ErrorResponse			"Erreur lors de la récupération des données"
+// @Router			/washingmachines [get]
 func (h *WashingMachineHandler) GetWashingMachines() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Prepare the request to the external API

@@ -16,6 +16,15 @@ func NewWeatherHandler(weatherService *services.WeatherService) *WeatherHandler 
 	}
 }
 
+// GetWeather récupère les données météorologiques
+// @Summary		Obtenir les données météorologiques
+// @Description	Récupère les informations météorologiques actuelles avec support multilingue
+// @Tags			Weather
+// @Produce		json
+// @Param			language	query		string				false	"Code de langue (fr, en, etc.)"	default(fr)
+// @Success		200			{object}	map[string]interface{}	"Données météorologiques"
+// @Failure		500			{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/weather [get]
 func (h *WeatherHandler) GetWeather(c *fiber.Ctx) error {
 	lang := c.Query("language")
 

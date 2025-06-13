@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
 )
 
@@ -20,6 +21,15 @@ func NewPlanningHandler(db *sql.DB) *PlanningHandler {
 }
 
 // GET /planning/users
+// @Summary		Obtenir les utilisateurs avec Pass ID
+// @Description	Récupère la liste de tous les utilisateurs avec leurs informations de Pass ID pour la planification
+// @Tags			Planning
+// @Produce		json
+// @Security		BearerAuth
+// @Success		200	{array}		models.UserWithPassID	"Liste des utilisateurs récupérée avec succès"
+// @Failure		401	{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500	{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/planning/users [get]
 func (h *PlanningHandler) GetUsersWithPassID(c *fiber.Ctx) error {
 	utils.LogHeader("👥 Get Users With Pass ID")
 
@@ -60,6 +70,20 @@ func (h *PlanningHandler) GetUsersWithPassID(c *fiber.Ctx) error {
 }
 
 // PATCH /planning/users/:id_newf/passid
+// @Summary		Mettre à jour le Pass ID d'un utilisateur
+// @Description	Met à jour le Pass ID d'un utilisateur spécifique s'il est actuellement nul
+// @Tags			Planning
+// @Accept			json
+// @Produce		json
+// @Security		BearerAuth
+// @Param			id_newf	path	int								true	"ID de l'utilisateur"
+// @Param			passid	body	models.UpdatePassIDRequest	true	"Nouveau Pass ID"
+// @Success		200		{object}	models.Response			"Pass ID mis à jour avec succès"
+// @Failure		400		{object}	models.ErrorResponse	"Données invalides"
+// @Failure		401		{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		409		{object}	models.ErrorResponse	"Pass ID déjà défini"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/planning/users/{id_newf}/passid [patch]
 func (h *PlanningHandler) UpdateUserPassIDIfNull(c *fiber.Ctx) error {
 	utils.LogHeader("🔄 Update User Pass ID If Null")
 
@@ -72,10 +96,7 @@ func (h *PlanningHandler) UpdateUserPassIDIfNull(c *fiber.Ctx) error {
 	}
 	utils.LogLineKeyValue(utils.LevelInfo, "Newf ID", id)
 
-	type reqBody struct {
-		PassID int `json:"pass_id"`
-	}
-	var body reqBody
+	var body models.UpdatePassIDRequest
 	if err := c.BodyParser(&body); err != nil {
 		utils.LogMessage(utils.LevelError, "Invalid request body")
 		utils.LogFooter()
@@ -102,6 +123,19 @@ func (h *PlanningHandler) UpdateUserPassIDIfNull(c *fiber.Ctx) error {
 }
 
 // GET /planning/users/:email/courses?start=YYYY-MM-DD&end=YYYY-MM-DD
+// @Summary		Obtenir les cours d'un utilisateur entre deux dates
+// @Description	Récupère la liste des cours d'un utilisateur pour une période donnée
+// @Tags			Planning
+// @Produce		json
+// @Security		BearerAuth
+// @Param			email	path	string	true	"Email de l'utilisateur"
+// @Param			start	query	string	true	"Date de début (YYYY-MM-DD)"	example(2024-01-01)
+// @Param			end		query	string	true	"Date de fin (YYYY-MM-DD)"		example(2024-01-31)
+// @Success		200		{array}		models.Course			"Liste des cours récupérée avec succès"
+// @Failure		400		{object}	models.ErrorResponse	"Paramètres manquants ou invalides"
+// @Failure		401		{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/planning/users/{email}/courses [get]
 func (h *PlanningHandler) GetUserCoursesBetweenDates(c *fiber.Ctx) error {
 	utils.LogHeader("📅 Get User Courses Between Dates")
 
@@ -153,6 +187,17 @@ func (h *PlanningHandler) GetUserCoursesBetweenDates(c *fiber.Ctx) error {
 }
 
 // GET /planning/users/:email/courses/today
+// @Summary		Obtenir les cours d'aujourd'hui pour un utilisateur
+// @Description	Récupère la liste des cours d'un utilisateur pour la journée actuelle
+// @Tags			Planning
+// @Produce		json
+// @Security		BearerAuth
+// @Param			email	path	string	true	"Email de l'utilisateur"
+// @Success		200		{array}		models.Course			"Liste des cours d'aujourd'hui récupérée avec succès"
+// @Failure		400		{object}	models.ErrorResponse	"Email manquant"
+// @Failure		401		{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/planning/users/{email}/courses/today [get]
 func (h *PlanningHandler) GetUserCoursesToday(c *fiber.Ctx) error {
 	utils.LogHeader("📅 Get User Courses Today")
 
@@ -201,20 +246,22 @@ func (h *PlanningHandler) GetUserCoursesToday(c *fiber.Ctx) error {
 }
 
 // POST /planning/courses
+// @Summary		Créer un nouveau cours
+// @Description	Ajoute un nouveau cours dans le planning
+// @Tags			Planning
+// @Accept			json
+// @Produce		json
+// @Security		BearerAuth
+// @Param			course	body	models.CreateCourseRequest	true	"Données du cours"
+// @Success		201		{object}	models.Response			"Cours créé avec succès"
+// @Failure		400		{object}	models.ErrorResponse	"Données invalides"
+// @Failure		401		{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/planning/courses [post]
 func (h *PlanningHandler) CreateCourse(c *fiber.Ctx) error {
 	utils.LogHeader("📚 Create Course")
 
-	type Course struct {
-		Date      string `json:"date"`
-		Title     string `json:"title"`
-		StartTime string `json:"start_time"`
-		EndTime   string `json:"end_time"`
-		Teacher   string `json:"teacher"`
-		Room      string `json:"room"`
-		Group     string `json:"group"`
-		UserEmail string `json:"user_email"`
-	}
-	var course Course
+	var course models.CreateCourseRequest
 	if err := c.BodyParser(&course); err != nil {
 		utils.LogMessage(utils.LevelError, "Invalid request body")
 		utils.LogFooter()

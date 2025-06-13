@@ -61,7 +61,11 @@ func StatisticsMiddleware(statisticsService *services.StatisticsService) fiber.H
 		utils.LogLineKeyValue(utils.LevelDebug, "Path", endpoint)
 		utils.LogLineKeyValue(utils.LevelDebug, "Method", method)
 		utils.LogLineKeyValue(utils.LevelDebug, "Status Code", statusCode)
-		utils.LogLineKeyValue(utils.LevelDebug, "Response Body", string(c.Response().Body()))
+		if len(c.Response().Body()) < 300 {
+			utils.LogLineKeyValue(utils.LevelDebug, "Response Body", string(c.Response().Body()))
+		} else {
+			utils.LogLineKeyValue(utils.LevelDebug, "Response Body", "Response body is too long to log")
+		}
 		utils.LogFooter()
 
 		// Log the request to the statistics service

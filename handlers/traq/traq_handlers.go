@@ -22,6 +22,18 @@ func NewTraqHandler(db *sql.DB) *TraqHandler {
 }
 
 // CreateTraqType handles the creation of a new Traq type.
+// @Summary		Créer un type de Traq
+// @Description	Crée un nouveau type de catégorie pour les articles Traq
+// @Tags			Traq
+// @Accept			json
+// @Produce		json
+// @Security		BearerAuth
+// @Param			type	body	models.TraqType	true	"Données du type Traq"
+// @Success		201		{object}	models.Response			"Type Traq créé avec succès"
+// @Failure		400		{object}	models.ErrorResponse	"Données invalides"
+// @Failure		401		{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/traq/types [post]
 func (h *TraqHandler) CreateTraqType(c *fiber.Ctx) error {
 	utils.LogHeader("🍺 Create Traq Type")
 	var traqType models.TraqType
@@ -64,6 +76,13 @@ func (h *TraqHandler) CreateTraqType(c *fiber.Ctx) error {
 }
 
 // GetAllTraqTypes retrieves all available Traq types.
+// @Summary		Obtenir tous les types de Traq
+// @Description	Récupère la liste de tous les types de catégories Traq disponibles
+// @Tags			Traq
+// @Produce		json
+// @Success		200	{array}		models.TraqType			"Types Traq récupérés avec succès"
+// @Failure		500	{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/traq/types [get]
 func (h *TraqHandler) GetAllTraqTypes(c *fiber.Ctx) error {
 	utils.LogHeader("🍺 Get All Traq Types")
 
@@ -107,6 +126,18 @@ func (h *TraqHandler) GetAllTraqTypes(c *fiber.Ctx) error {
 }
 
 // CreateTraqArticle handles the creation of a new Traq article.
+// @Summary		Créer un article Traq
+// @Description	Crée un nouvel article (boisson/produit) dans le système Traq
+// @Tags			Traq
+// @Accept			json
+// @Produce		json
+// @Security		BearerAuth
+// @Param			article	body	models.TraqArticle	true	"Données de l'article Traq"
+// @Success		201		{object}	models.Response			"Article Traq créé avec succès"
+// @Failure		400		{object}	models.ErrorResponse	"Données invalides"
+// @Failure		401		{object}	models.ErrorResponse	"Non autorisé"
+// @Failure		500		{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/traq [post]
 func (h *TraqHandler) CreateTraqArticle(c *fiber.Ctx) error {
 	utils.LogHeader("🍺 Create Traq Article")
 	var article models.TraqArticle
@@ -177,6 +208,13 @@ func (h *TraqHandler) CreateTraqArticle(c *fiber.Ctx) error {
 }
 
 // GetAllTraqArticles retrieves all Traq articles.
+// @Summary		Obtenir tous les articles Traq
+// @Description	Récupère la liste de tous les articles (boissons/produits) disponibles dans le système Traq
+// @Tags			Traq
+// @Produce		json
+// @Success		200	{array}		models.TraqArticle		"Articles Traq récupérés avec succès"
+// @Failure		500	{object}	models.ErrorResponse	"Erreur serveur"
+// @Router			/traq [get]
 func (h *TraqHandler) GetAllTraqArticles(c *fiber.Ctx) error {
 	utils.LogHeader("🍺 Get All Traq Articles")
 
