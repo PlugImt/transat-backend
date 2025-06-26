@@ -211,12 +211,12 @@ func (h *PlanningHandler) GetUserCoursesToday(c *fiber.Ctx) error {
 
 // POST /planning/courses
 func (h *PlanningHandler) CreateCourse(c *fiber.Ctx) error {
-	utils.LogHeader("📚 Create Course")
+	utils.LogHeader("📚 Process Course (Create/Replace)")
 
 	type Course struct {
 		Date      string `json:"date"`
 		Title     string `json:"title"`
-		StartTime string `json:"start_time"`
+		StartTime string `json:"start_time"` // Assumes ISO 8601 format: "2023-10-27T10:00:00Z"
 		EndTime   string `json:"end_time"`
 		Teacher   string `json:"teacher"`
 		Room      string `json:"room"`
@@ -230,17 +230,79 @@ func (h *PlanningHandler) CreateCourse(c *fiber.Ctx) error {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
+	utils.LogLineKeyValue(utils.LevelInfo, "Processing course for", course.UserEmail)
 	utils.LogLineKeyValue(utils.LevelInfo, "Course Data", course)
 
-	_, err := h.db.Exec(`INSERT INTO courses (date, title, start_time, end_time, teacher, room, "group", user_email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		course.Date, course.Title, course.StartTime, course.EndTime, course.Teacher, course.Room, course.Group, course.UserEmail)
+	// Begin a new database transaction. Ensure atomicity.
+	tx, err := h.db.Begin()
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to create course")
+		utils.LogMessage(utils.LevelError, "Failed to begin transaction")
+		utils.LogFooter()
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Database transaction could not be started"})
+	}
+
+	// Defer a rollback. If anything goes wrong, the transaction will be cancelled.
+	// If tx.Commit() succeeds, this defer does nothing.
+	defer tx.Rollback()
+
+	// --- Step 1: Delete any existing courses that conflict with the new time slot ---
+	// The OVERLAPS operator is perfect for this. It checks if two time periods intersect.
+	// We also ensure we don't delete the exact same course if its title is the same,
+	// as that's an update, not a replacement of a different course. We will handle
+	// its "update" by deleting and re-inserting it.
+	deleteQuery := `
+		DELETE FROM courses
+		WHERE user_email = $1
+		  AND (start_time, end_time) OVERLAPS ($2, $3)
+	`
+	res, err := tx.Exec(deleteQuery, course.UserEmail, course.StartTime, course.EndTime)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete conflicting courses during transaction")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create course", "details": err.Error()})
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to clear conflicting time slot"})
 	}
-	utils.LogMessage(utils.LevelInfo, "Successfully created course")
+
+	deletedCount, _ := res.RowsAffected()
+	if deletedCount > 0 {
+		utils.LogLineKeyValue(utils.LevelInfo, "Deleted conflicting courses", deletedCount)
+	}
+
+	// --- Step 2: Insert the new course into the now-clear time slot ---
+	// We use RETURNING id to get the ID of the newly created course.
+	insertQuery := `
+		INSERT INTO courses (date, title, start_time, end_time, teacher, room, "group", user_email)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id
+	`
+	var newCourseID int
+	err = tx.QueryRow(
+		insertQuery,
+		course.Date, course.Title, course.StartTime, course.EndTime,
+		course.Teacher, course.Room, course.Group, course.UserEmail,
+	).Scan(&newCourseID)
+
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to insert new course during transaction")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to insert new course"})
+	}
+
+	// --- Step 3: Commit the transaction ---
+	// If both the delete and insert were successful, we commit the changes to the database.
+	if err := tx.Commit(); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to commit transaction")
+		utils.LogFooter()
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to finalize course creation"})
+	}
+
+	utils.LogLineKeyValue(utils.LevelInfo, "Successfully created/replaced course with ID", newCourseID)
 	utils.LogFooter()
-	return c.Status(http.StatusCreated).JSON(fiber.Map{"success": true})
+	// Using 201 Created is appropriate because a new resource representation has been created.
+	return c.Status(http.StatusCreated).JSON(fiber.Map{
+		"success": true,
+		"status":  "created_or_replaced",
+		"id":      newCourseID,
+	})
 }
