@@ -6,23 +6,18 @@ import (
 
 	"github.com/plugimt/transat-backend/handlers/files" // Import the files handlers
 	"github.com/plugimt/transat-backend/middlewares"
-	"github.com/plugimt/transat-backend/utils"
+	"github.com/plugimt/transat-backend/services"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 // SetupFileRoutes configures routes for file operations.
-func SetupFileRoutes(router fiber.Router, db *sql.DB) {
+func SetupFileRoutes(router fiber.Router, db *sql.DB, r2Service *services.R2Service) {
 	// Initialize File Handler
-	fileHandler, err := files.NewFileHandler(db)
+	fileHandler, err := files.NewFileHandler(db, r2Service)
 	if err != nil {
 		// Log the error and potentially panic or exit if file handling is critical
 		log.Fatalf("💥 Failed to initialize File Handler: %v", err)
-	}
-
-	// Ensure data folder exists
-	if err := utils.EnsureDataFolder(); err != nil {
-		log.Fatalf("💥 Failed to ensure data folder exists: %v", err)
 	}
 
 	// Public route to serve files (no auth needed usually)

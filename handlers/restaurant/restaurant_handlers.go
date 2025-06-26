@@ -474,12 +474,15 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 	latestDbMenu, err := h.getLatestMenuFromDB(1) // Get French menu (langID 1)
 	utils.LogLineKeyValue(utils.LevelDebug, "Latest DB Menu", latestDbMenu)
 	needsUpdate := true
-	shouldNotify := true
+	shouldNotify := false
 	similarity := 0.0
 
 	if err != nil {
 		utils.LogMessage(utils.LevelWarn, "Cron: Failed to get latest base menu from DB for comparison")
 		utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
+		// No comparison possible, but still update DB
+		needsUpdate = true
+		shouldNotify = false
 	} else if latestDbMenu != nil {
 		// Compare fetched menu with DB menu using similarity score
 		similarity = h.calculateMenuSimilarity(&latestDbMenu.MenuData, baseMenuData)
@@ -504,6 +507,8 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 		}
 	} else {
 		utils.LogMessage(utils.LevelInfo, "Cron: No existing base menu found in DB. Saving fetched menu.")
+		needsUpdate = true
+		shouldNotify = false
 	}
 
 	// 3. Save to DB if changed (or no previous version)

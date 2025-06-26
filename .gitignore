@@ -35,6 +35,7 @@ transat-backend
 
 /db/backup
 
+tmp/
 
 
 .env*

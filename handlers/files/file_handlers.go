@@ -6,43 +6,33 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
-	"log" // Using standard log
-	"os"
+	"log"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/plugimt/transat-backend/utils" // For logger if needed, EnsureDataFolder moved here potentially?
+	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // FileHandler handles file upload, serving, listing, and deletion.
 type FileHandler struct {
-	DB         *sql.DB
-	DataFolder string // Make data folder path configurable
+	DB        *sql.DB
+	R2Service *services.R2Service
 }
 
 // NewFileHandler creates a new FileHandler.
-// It ensures the data folder exists upon creation.
-func NewFileHandler(db *sql.DB) (*FileHandler, error) {
-	// Ensure data folder exists during initialization
-	if err := utils.EnsureDataFolder(); err != nil {
-		return nil, fmt.Errorf("failed to ensure data folder: %w", err)
-	}
-
-	// Get the data folder path from our utility
-	dataFolder := utils.GetDataFolderPath()
-
+func NewFileHandler(db *sql.DB, r2Service *services.R2Service) (*FileHandler, error) {
 	return &FileHandler{
-		DB:         db,
-		DataFolder: dataFolder,
+		DB:        db,
+		R2Service: r2Service,
 	}, nil
 }
 
 // UploadFile handles file uploads, saves them, and records them in the database.
 func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
-	utils.LogHeader("📄 Upload File") // Using custom logger
+	utils.LogHeader("📄 Upload File")
 
 	// Get user email from JWT (set by middleware)
 	email, ok := c.Locals("email").(string)
@@ -56,7 +46,6 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	utils.LogLineKeyValue(utils.LevelInfo, "User", email)
 	utils.LogLineKeyValue(utils.LevelInfo, "Content-Type", c.Get("Content-Type"))
 
-	// --- File Handling ---
 	// Check if the request is multipart form
 	if !strings.HasPrefix(c.Get("Content-Type"), "multipart/form-data") {
 		utils.LogMessage(utils.LevelError, "Invalid Content-Type, expected multipart/form-data")
@@ -66,11 +55,10 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 		})
 	}
 
-	// Prioritize FormFile for standard uploads
-	fileHeader, err := c.FormFile("file") // Use "file" as the default key, adjust if needed
+	// Get the uploaded file
+	fileHeader, err := c.FormFile("file")
 	if err != nil {
-		// Fallback for different key or manual parsing if needed
-		if fileHeader, err = c.FormFile("image"); err != nil { // Check common alternative "image"
+		if fileHeader, err = c.FormFile("image"); err != nil {
 			utils.LogMessage(utils.LevelError, "No file uploaded with key 'file' or 'image'")
 			utils.LogLineKeyValue(utils.LevelError, "Error", err)
 			utils.LogFooter()
@@ -87,178 +75,113 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	utils.LogLineKeyValue(utils.LevelInfo, "File Size", fileHeader.Size)
 	utils.LogLineKeyValue(utils.LevelInfo, "MIME Header", fileHeader.Header.Get("Content-Type"))
 
-	// --- File Validation (Example: Image Check) ---
-	// Keep the image check, but make it optional or configurable?
-	// For a generic file handler, you might remove this or check based on allowed types.
-	// if !strings.HasPrefix(fileHeader.Header.Get("Content-Type"), "image/") {
-	// 	utils.LogMessage(utils.LevelWarn, "Uploaded file is not an image")
-	// 	utils.LogFooter()
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": "Uploaded file type is not allowed (expected image)",
-	// 	})
-	// }
-
-	// --- Filename Generation ---
+	// Generate unique filename
 	originalFilename := filepath.Base(fileHeader.Filename)
 	fileExt := filepath.Ext(originalFilename)
-	// Sanitize filename (remove potentially harmful characters, replace spaces, etc.) - IMPORTANT
 	safeBaseName := sanitizeFilename(strings.TrimSuffix(originalFilename, fileExt))
 
-	// Generate a unique filename to prevent collisions and overwrites
-	// Using user email + timestamp + hash of original name seems robust
 	timestamp := time.Now().UnixNano()
 	hashInput := fmt.Sprintf("%s_%s_%d", email, originalFilename, timestamp)
 	hash := sha256.Sum256([]byte(hashInput))
-	uniqueID := hex.EncodeToString(hash[:8]) // Use first 8 bytes (16 hex chars)
-	// Construct final filename: safeBaseName_uniqueID.ext
+	uniqueID := hex.EncodeToString(hash[:8])
 	finalFilename := fmt.Sprintf("%s_%s%s", safeBaseName, uniqueID, fileExt)
 
-	// --- Ensure Data Folder Exists ---
-	if err := utils.EnsureDataFolder(); err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to ensure data folder exists")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Server storage error",
-		})
-	}
-
-	// --- Saving File ---
-	destinationPath := filepath.Join(h.DataFolder, finalFilename)
-	utils.LogLineKeyValue(utils.LevelInfo, "Destination Path", destinationPath)
-
-	// Create destination file
-	dstFile, err := os.Create(destinationPath)
+	// Open the uploaded file
+	file, err := fileHeader.Open()
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to create destination file")
-		utils.LogLineKeyValue(utils.LevelError, "Path", destinationPath)
+		utils.LogMessage(utils.LevelError, "Failed to open uploaded file")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to create file on server",
+			"error": "Failed to process uploaded file",
 		})
 	}
-	defer dstFile.Close()
+	defer file.Close()
 
-	// Open the uploaded file stream
-	srcFile, err := fileHeader.Open()
+	// Upload to R2
+	contentType := fileHeader.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	publicURL, err := h.R2Service.UploadFile(finalFilename, file, contentType)
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to open uploaded file stream")
+		utils.LogMessage(utils.LevelError, "Failed to upload file to R2")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to read uploaded file",
-		})
-	}
-	defer srcFile.Close()
-
-	// Copy the file contents
-	_, err = io.Copy(dstFile, srcFile)
-	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to save file contents")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		// Clean up partially written file
-		if closeErr := dstFile.Close(); closeErr != nil {
-			utils.LogMessage(utils.LevelError, "Failed to close destination file during cleanup")
-			utils.LogLineKeyValue(utils.LevelError, "Error", closeErr)
-		} // Close it first
-		if removeErr := os.Remove(destinationPath); removeErr != nil {
-			utils.LogMessage(utils.LevelError, "Failed to remove partially written file during cleanup")
-			utils.LogLineKeyValue(utils.LevelError, "Error", removeErr)
-		} // Attempt removal
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to save file contents",
+			"error": "Failed to store file",
 		})
 	}
 
-	utils.LogMessage(utils.LevelInfo, "File saved successfully")
-
-	// --- Database Record ---
+	// Store in database - only store the filename, not the full URL
 	var fileID int
 	insertQuery := `
 		INSERT INTO files (name, path, email, creation_date, last_access_date)
 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id_files`
 
-	// Store the *original* filename in the DB for user display
-	// Store the full path to the file for retrieval
-	err = h.DB.QueryRow(insertQuery, originalFilename, destinationPath, email).Scan(&fileID)
+	err = h.DB.QueryRow(insertQuery, originalFilename, finalFilename, email).Scan(&fileID)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to record file in database")
 		utils.LogLineKeyValue(utils.LevelError, "Original Name", originalFilename)
-		utils.LogLineKeyValue(utils.LevelError, "Path", destinationPath)
+		utils.LogLineKeyValue(utils.LevelError, "Path", finalFilename)
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
-		// Critical: If DB fails, remove the orphaned file from disk
-		err := os.Remove(destinationPath)
-		if err != nil {
-			utils.LogMessage(utils.LevelError, "Failed to remove orphaned file from disk")
-			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+
+		// Try to delete the uploaded file from R2
+		if delErr := h.R2Service.DeleteFile(finalFilename); delErr != nil {
+			utils.LogMessage(utils.LevelError, "Failed to delete file from R2 after DB error")
+			utils.LogLineKeyValue(utils.LevelError, "Error", delErr)
 		}
+
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to record file in database",
 		})
 	}
 
-	utils.LogMessage(utils.LevelInfo, "File recorded in database")
+	utils.LogMessage(utils.LevelInfo, "File uploaded successfully")
 	utils.LogLineKeyValue(utils.LevelInfo, "File ID", fileID)
 	utils.LogFooter()
 
-	// --- Response ---
-	// Construct the URL based on the *final* filename used for serving
-	serveURL := fmt.Sprintf("/api/data/%s", finalFilename)
-
 	return c.JSON(fiber.Map{
 		"success":  true,
-		"url":      serveURL,         // URL to access the file
-		"file_id":  fileID,           // Database ID
-		"filename": originalFilename, // Original filename for display
+		"url":      publicURL,
+		"file_id":  fileID,
+		"filename": originalFilename,
 	})
 }
 
-// ServeFile serves files stored in the data directory.
+// ServeFile serves files stored in R2.
 func (h *FileHandler) ServeFile(c *fiber.Ctx) error {
-	// Get filename from URL parameter
 	filename := c.Params("filename")
 	if filename == "" {
 		return c.Status(fiber.StatusBadRequest).SendString("Filename parameter is missing")
 	}
-	// Basic sanitization: prevent directory traversal
-	filename = filepath.Base(filename) // Ensures we only have the filename part
 
-	filePath := filepath.Join(h.DataFolder, filename)
 	utils.LogHeader("📄 Serve File")
 	utils.LogLineKeyValue(utils.LevelInfo, "Requested Filename", filename)
-	utils.LogLineKeyValue(utils.LevelInfo, "Serving Path", filePath)
 
-	// Check if file exists BEFORE trying to update DB
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		utils.LogMessage(utils.LevelWarn, "File not found on disk")
-		utils.LogFooter()
-		return c.Status(fiber.StatusNotFound).SendString("File not found")
-	} else if err != nil {
-		utils.LogMessage(utils.LevelError, "Error accessing file")
+	// Update last access date in database
+	updateQuery := `UPDATE files SET last_access_date = CURRENT_TIMESTAMP WHERE path = $1`
+	go func() {
+		if _, err := h.DB.Exec(updateQuery, filename); err != nil {
+			log.Printf("Warning: Failed to update last access date for '%s': %v", filename, err)
+		}
+	}()
+
+	// Get the file from R2
+	reader, err := h.R2Service.GetObject(filename)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get file from R2")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).SendString("Error accessing file")
+		return c.Status(fiber.StatusNotFound).SendString("File not found")
 	}
+	defer reader.Close()
 
-	// Update the last_access_date in the database asynchronously
-	// We update based on the full path stored in the DB.
-	go func(path string) {
-		updateQuery := `UPDATE files SET last_access_date = CURRENT_TIMESTAMP WHERE path = $1`
-		_, err := h.DB.Exec(updateQuery, path)
-		if err != nil {
-			// Log error but don't fail the file serving
-			log.Printf("Warning: Failed to update last access date for '%s': %v", path, err)
-		}
-	}(filePath) // Pass the full path to the goroutine
-
-	utils.LogMessage(utils.LevelInfo, "Serving file")
-	utils.LogFooter()
-	// Send the file using Fiber's efficient SendFile
-	return c.SendFile(filePath) // Let Fiber handle Content-Type, etc.
+	// Stream the file to the response
+	return c.SendStream(reader)
 }
 
 // ListUserFiles lists all files uploaded by the logged-in user.
@@ -289,24 +212,29 @@ func (h *FileHandler) ListUserFiles(c *fiber.Ctx) error {
 	for rows.Next() {
 		var id int
 		var name, path string
-		var creationDate, lastAccessDate time.Time // Use time.Time
+		var creationDate, lastAccessDate time.Time
 
 		if err := rows.Scan(&id, &name, &path, &creationDate, &lastAccessDate); err != nil {
 			utils.LogMessage(utils.LevelError, "Error scanning user file row")
 			utils.LogLineKeyValue(utils.LevelError, "Error", err)
-			continue // Skip this file
+			continue
 		}
 
-		// Extract the filename from the path to build the serving URL
-		serveFilename := filepath.Base(path)
-		serveURL := fmt.Sprintf("/api/data/%s", serveFilename) // Assuming this route structure
+		// Si le chemin contient déjà l'URL complète, l'utiliser directement
+		// Sinon, construire l'URL avec le domaine public
+		var publicURL string
+		if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+			publicURL = path
+		} else {
+			publicURL = h.R2Service.GetPublicURL(path)
+		}
 
 		userFiles = append(userFiles, fiber.Map{
 			"id":            id,
-			"name":          name, // Original name
-			"url":           serveURL,
-			"created":       creationDate.Format(time.RFC3339),   // Format timestamp
-			"last_accessed": lastAccessDate.Format(time.RFC3339), // Format timestamp
+			"name":          name,
+			"url":           publicURL,
+			"created":       creationDate.Format(time.RFC3339),
+			"last_accessed": lastAccessDate.Format(time.RFC3339),
 		})
 	}
 
@@ -327,22 +255,19 @@ func (h *FileHandler) ListUserFiles(c *fiber.Ctx) error {
 
 // DeleteFile handles the deletion of a specific file owned by the user.
 func (h *FileHandler) DeleteFile(c *fiber.Ctx) error {
-	// Filename here likely refers to the *original* filename the user knows.
-	// We need to fetch the actual stored path from the DB based on the original name and user email.
-	originalFilename := c.Params("filename")
+	filename := c.Params("filename")
 	email := c.Locals("email").(string)
 
 	utils.LogHeader("📄 Delete File")
 	utils.LogLineKeyValue(utils.LevelInfo, "User", email)
-	utils.LogLineKeyValue(utils.LevelInfo, "Requested Filename (Original)", originalFilename)
+	utils.LogLineKeyValue(utils.LevelInfo, "Requested Filename", filename)
 
-	if originalFilename == "" {
+	if filename == "" {
 		utils.LogMessage(utils.LevelWarn, "Missing filename parameter for delete")
 		utils.LogFooter()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Filename parameter is required"})
 	}
 
-	// --- Transaction for safety ---
 	tx, err := h.DB.Begin()
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to begin transaction for file deletion")
@@ -350,28 +275,11 @@ func (h *FileHandler) DeleteFile(c *fiber.Ctx) error {
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
 	}
-	// Defer rollback
-	defer func() {
-		if p := recover(); p != nil {
-			err := tx.Rollback()
-			if err != nil {
-				utils.LogMessage(utils.LevelError, "Failed to rollback transaction for file deletion")
-				utils.LogLineKeyValue(utils.LevelError, "Error", err)
-			}
-			panic(p) // re-throw panic after Rollback
-		} else if err != nil {
-			err := tx.Rollback()
-			if err != nil {
-				utils.LogMessage(utils.LevelError, "Failed to rollback transaction for file deletion")
-				utils.LogLineKeyValue(utils.LevelError, "Error", err)
-			}
-		}
-	}()
+	defer tx.Rollback()
 
-	// 1. Get the stored path from the database FOR UPDATE to lock the row
 	var storedPath string
 	query := `SELECT path FROM files WHERE name = $1 AND email = $2 FOR UPDATE;`
-	err = tx.QueryRow(query, originalFilename, email).Scan(&storedPath)
+	err = tx.QueryRow(query, filename, email).Scan(&storedPath)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			utils.LogMessage(utils.LevelWarn, "File not found or permission denied")
@@ -385,12 +293,18 @@ func (h *FileHandler) DeleteFile(c *fiber.Ctx) error {
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error finding file"})
 	}
-	utils.LogLineKeyValue(utils.LevelInfo, "Stored Path", storedPath)
 
-	// 2. Delete record from the database (within transaction)
+	// Delete from R2 first
+	if err := h.R2Service.DeleteFile(storedPath); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete file from R2")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete file from storage"})
+	}
+
+	// Then delete from database
 	deleteQuery := `DELETE FROM files WHERE name = $1 AND email = $2;`
-	var result sql.Result
-	result, err = tx.Exec(deleteQuery, originalFilename, email)
+	result, err := tx.Exec(deleteQuery, filename, email)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to delete file record from DB")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
@@ -398,51 +312,28 @@ func (h *FileHandler) DeleteFile(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete file record"})
 	}
 
-	var rowsAffected int64
-	rowsAffected, err = result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		// Error getting rows affected (should be rare)
 		utils.LogMessage(utils.LevelError, "Failed to get rows affected after delete")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to confirm file record deletion"})
 	}
+
 	if rowsAffected == 0 {
-		// Should not happen if FOR UPDATE query succeeded, but check anyway
 		utils.LogMessage(utils.LevelError, "Delete query affected 0 rows after finding the file")
 		utils.LogFooter()
-		err = fmt.Errorf("inconsistent state during file deletion") // Cause rollback
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete file record consistency error"})
 	}
-	utils.LogMessage(utils.LevelInfo, "File record deleted from database")
 
-	// 3. Delete the actual file from disk *after* DB record is marked for deletion
-	// This happens *before* commit to ensure consistency. If file delete fails, TX rollbacks.
-	err = os.Remove(storedPath)
-	if err != nil && !os.IsNotExist(err) { // Don't error if file was already gone
-		utils.LogMessage(utils.LevelError, "Failed to delete file from disk")
-		utils.LogLineKeyValue(utils.LevelError, "Path", storedPath)
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		// Error is already set, defer will rollback the DB change
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete file from storage"})
-	} else if err == nil {
-		utils.LogMessage(utils.LevelInfo, "File deleted from disk")
-	} else {
-		utils.LogMessage(utils.LevelWarn, "File was already deleted from disk")
-		err = nil // Reset error since it's not a failure condition for the operation
-	}
-
-	// 4. Commit transaction
-	err = tx.Commit()
-	if err != nil {
+	if err = tx.Commit(); err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to commit transaction for file deletion")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to finalize file deletion"})
 	}
 
-	utils.LogMessage(utils.LevelInfo, "File deleted successfully (DB and Disk)")
+	utils.LogMessage(utils.LevelInfo, "File deleted successfully")
 	utils.LogFooter()
 	return c.JSON(fiber.Map{
 		"success": true,
@@ -450,57 +341,67 @@ func (h *FileHandler) DeleteFile(c *fiber.Ctx) error {
 	})
 }
 
-// ListAllFiles (potentially admin-only) lists all files in the data directory.
-// WARNING: This bypasses ownership checks and lists everything. Secure appropriately.
+// ListAllFiles (potentially admin-only) lists all files.
 func (h *FileHandler) ListAllFiles(c *fiber.Ctx) error {
-	// --- Permission Check Placeholder ---
-	// role := c.Locals("role").(string) // Get role from JWT
-	// if role != "ADMIN" { // Example admin check
-	// 	 return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Permission denied"})
-	// }
-	// --- End Permission Check ---
-
 	utils.LogHeader("📄 List All Files (Admin)")
 
-	// Read the configured data directory
-	files, err := os.ReadDir(h.DataFolder)
+	query := `
+		SELECT id_files, name, path, email, creation_date, last_access_date
+		FROM files
+		ORDER BY creation_date DESC;`
+
+	rows, err := h.DB.Query(query)
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to read data directory")
-		utils.LogLineKeyValue(utils.LevelError, "Path", h.DataFolder)
+		utils.LogMessage(utils.LevelError, "Failed to retrieve files from DB")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": fmt.Sprintf("Failed to read data directory '%s'", h.DataFolder),
+			"error": "Failed to retrieve files",
+		})
+	}
+	defer rows.Close()
+
+	var files []fiber.Map
+	for rows.Next() {
+		var id int
+		var name, path, email string
+		var creationDate, lastAccessDate time.Time
+
+		if err := rows.Scan(&id, &name, &path, &email, &creationDate, &lastAccessDate); err != nil {
+			utils.LogMessage(utils.LevelError, "Error scanning file row")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+
+		publicURL := h.R2Service.GetPublicURL(path)
+
+		files = append(files, fiber.Map{
+			"id":            id,
+			"name":          name,
+			"url":           publicURL,
+			"email":         email,
+			"created":       creationDate.Format(time.RFC3339),
+			"last_accessed": lastAccessDate.Format(time.RFC3339),
 		})
 	}
 
-	var fileList []fiber.Map
-	for _, file := range files {
-		if !file.IsDir() { // List only files
-			serveURL := fmt.Sprintf("/api/data/%s", file.Name()) // Assuming route structure
-			fileList = append(fileList, fiber.Map{
-				"name": file.Name(), // This is the unique stored name
-				"url":  serveURL,
-				// Add more info if needed (size, mod time - requires os.Stat)
-			})
-		}
+	if err = rows.Err(); err != nil {
+		utils.LogMessage(utils.LevelError, "Error iterating file rows")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 	}
 
 	utils.LogMessage(utils.LevelInfo, "Listed all files successfully")
-	utils.LogLineKeyValue(utils.LevelInfo, "Count", len(fileList))
+	utils.LogLineKeyValue(utils.LevelInfo, "Count", len(files))
 	utils.LogFooter()
+
 	return c.JSON(fiber.Map{
 		"success": true,
-		"files":   fileList,
+		"files":   files,
 	})
 }
 
-// --- Helper Functions ---
-
 // sanitizeFilename removes or replaces characters potentially harmful in filenames.
-// This is a basic example; enhance as needed (e.g., handle unicode, length limits).
 func sanitizeFilename(filename string) string {
-	// Replace common problematic characters with underscore
 	replacer := strings.NewReplacer(
 		" ", "_",
 		"/", "_",
@@ -512,24 +413,13 @@ func sanitizeFilename(filename string) string {
 		"<", "_",
 		">", "_",
 		"|", "_",
-		"&", "_", // Add others as needed
-		"..", "_", // Prevent path traversal component
+		"&", "_",
+		"..", "_",
 	)
 	sanitized := replacer.Replace(filename)
-
-	// Remove leading/trailing dots or underscores if desired
 	sanitized = strings.Trim(sanitized, "._")
-
-	// Limit length?
-	// maxLen := 100
-	// if len(sanitized) > maxLen {
-	//     sanitized = sanitized[:maxLen]
-	// }
-
-	// Ensure filename is not empty after sanitization
 	if sanitized == "" {
 		sanitized = "default_filename"
 	}
-
 	return sanitized
 }
