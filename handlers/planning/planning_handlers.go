@@ -144,7 +144,11 @@ func (h *PlanningHandler) GetUserCoursesBetweenDates(c *fiber.Ctx) error {
 		}
 		course := make(map[string]interface{})
 		for i, col := range cols {
-			course[col] = vals[i]
+			if t, ok := vals[i].(time.Time); ok {
+				course[col] = t.Format(time.RFC3339)
+			} else {
+				course[col] = vals[i]
+			}
 		}
 		courses = append(courses, course)
 	}
@@ -192,7 +196,11 @@ func (h *PlanningHandler) GetUserCoursesToday(c *fiber.Ctx) error {
 		}
 		course := make(map[string]interface{})
 		for i, col := range cols {
-			course[col] = vals[i]
+			if t, ok := vals[i].(time.Time); ok {
+				course[col] = t.Format(time.RFC3339)
+			} else {
+				course[col] = vals[i]
+			}
 		}
 		courses = append(courses, course)
 	}
