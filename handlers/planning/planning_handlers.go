@@ -23,7 +23,7 @@ func NewPlanningHandler(db *sql.DB) *PlanningHandler {
 func (h *PlanningHandler) GetUsersWithPassID(c *fiber.Ctx) error {
 	utils.LogHeader("👥 Get Users With Pass ID")
 
-	rows, err := h.db.Query(`SELECT id_newf, first_name, last_name, pass_id FROM newf`)
+	rows, err := h.db.Query(`SELECT id_newf, first_name, last_name, pass_id, email FROM newf`)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to fetch users")
 		utils.LogFooter()
@@ -34,9 +34,9 @@ func (h *PlanningHandler) GetUsersWithPassID(c *fiber.Ctx) error {
 	var users []map[string]interface{}
 	for rows.Next() {
 		var id int
-		var firstName, lastName sql.NullString
+		var firstName, lastName, email sql.NullString
 		var passID sql.NullInt64
-		if err := rows.Scan(&id, &firstName, &lastName, &passID); err != nil {
+		if err := rows.Scan(&id, &firstName, &lastName, &passID, &email); err != nil {
 			utils.LogMessage(utils.LevelError, "Failed to scan user")
 			utils.LogFooter()
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to scan user"})
@@ -51,6 +51,7 @@ func (h *PlanningHandler) GetUsersWithPassID(c *fiber.Ctx) error {
 			"id":         id,
 			"first_name": firstName.String,
 			"last_name":  lastName.String,
+			"email":      email.String,
 			"pass_id":    passIDValue,
 		})
 	}
