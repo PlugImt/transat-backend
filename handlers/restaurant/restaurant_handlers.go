@@ -620,7 +620,6 @@ func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) er
 	utils.LogHeader("🔄 Syncing Today's Menu")
 
 	today := time.Now().Format("2006-01-02")
-	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
 
 	// Step 1: Stale Menu Guard Clause
 	utils.LogMessage(utils.LevelInfo, "Checking for stale menu...")
@@ -634,37 +633,58 @@ func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) er
 		}
 	}
 
-	// Get yesterday's menu from database
-	var yesterdayNames []string
-	query := `
-		SELECT DISTINCT ra.name 
-		FROM restaurant_meals rm 
-		JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles 
-		WHERE rm.date_served = $1
-	`
+	var latestMenuNames []string
+	var latestMenuDate sql.NullString
 
-	rows, err := h.DB.Query(query, yesterday)
+	err := h.DB.QueryRow(`
+		SELECT MAX(date_served) 
+		FROM restaurant_meals
+	`).Scan(&latestMenuDate)
+
 	if err != nil {
-		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to query yesterday's menu: %v", err))
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to query latest menu date: %v", err))
 		return err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan menu item: %v", err))
-			continue
+	if !latestMenuDate.Valid {
+		utils.LogMessage(utils.LevelInfo, "No existing menu found, proceeding with sync")
+	} else {
+		query := `
+			SELECT DISTINCT ra.name 
+			FROM restaurant_meals rm 
+			JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles 
+			WHERE rm.date_served = $1
+		`
+
+		rows, err := h.DB.Query(query, latestMenuDate.String)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to query latest menu: %v", err))
+			return err
 		}
-		normalized := h.normalizeItemName(name)
-		if normalized != "" {
-			yesterdayNames = append(yesterdayNames, normalized)
+		defer rows.Close()
+
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan menu item: %v", err))
+				continue
+			}
+			latestMenuNames = append(latestMenuNames, name)
 		}
 	}
 
-	// Calculate similarity
-	similarity := h.calculateSimilarity(fetchedNames, yesterdayNames)
-	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Menu similarity with yesterday: %.2f%%", similarity*100))
+	similarity := h.calculateSimilarity(fetchedNames, latestMenuNames)
+	latestDateStr := "none"
+	if latestMenuDate.Valid {
+		latestDateStr = latestMenuDate.String
+	}
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Menu similarity with latest (%s): %.2f%% (fetched: %d items, latest: %d items)",
+		latestDateStr, similarity*100, len(fetchedNames), len(latestMenuNames)))
+
+	if len(fetchedNames) > 0 && len(latestMenuNames) > 0 {
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Fetched items: %v", fetchedNames))
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Latest items: %v", latestMenuNames))
+	}
 
 	if similarity > 0.8 {
 		utils.LogMessage(utils.LevelWarn, "Stale menu detected (>80% similarity), skipping update")
