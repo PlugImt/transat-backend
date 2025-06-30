@@ -3,15 +3,16 @@ package restaurant
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/services"
@@ -20,63 +21,38 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// RestaurantHandler handles menu fetching, caching, and potentially updates.
 type RestaurantHandler struct {
 	DB           *sql.DB
-	TransService *services.TranslationService  // Service for translating menus
-	NotifService *services.NotificationService // Service for sending notifications
+	TransService *services.TranslationService
+	NotifService *services.NotificationService
 
-	// Cache - Consider a more robust cache implementation (e.g., Redis, dedicated cache library)
-	cacheMutex    sync.RWMutex             // Mutex for thread-safe cache access
-	lastFetchTime time.Time                // Timestamp of the last successful API fetch
-	cachedMenus   map[int]*models.MenuData // Map[languageID] -> MenuData
-	menuSourceURL string                   // URL to fetch the menu from
-	apiRegex      *regexp.Regexp           // Compiled regex for parsing API response
+	cacheMutex    sync.RWMutex
+	lastFetchTime time.Time
+	menuSourceURL string
+	apiRegex      *regexp.Regexp
 
-	// Additional fields for notification control and menu similarity
-	lastNotificationDate    string    // Date when the last notification was sent (YYYY-MM-DD)
-	menuSimilarityThreshold float64   // Threshold for menu similarity (0.0-1.0)
-	nextCacheClearTime      time.Time // Time when the cache should be cleared next
+	lastNotificationDate    string
+	menuSimilarityThreshold float64
 }
 
-// NewRestaurantHandler creates a new RestaurantHandler.
 func NewRestaurantHandler(db *sql.DB, transService *services.TranslationService, notifService *services.NotificationService) *RestaurantHandler {
-	// Compile regex once
-	// regex := regexp.MustCompile(`var loadingData = (\s*\{\s*.*?\s*\}\s*);?`) // Updated Regex to capture object
-	// Corrected regex for the [[...]] format found in data.html
+	// Initialize the regex to match the loadingData array in the API response
 	regex := regexp.MustCompile(`var loadingData\s*=\s*(\[\[.*?\]\]);?`)
-	// Make source URL configurable
 	sourceURL := "https://toast-js.ew.r.appspot.com/coteresto?key=1ohdRUdCYo6e71aLuBh7ZfF2lc_uZqp9D78icU4DPufA"
-
-	// Set cache clear time to 23:00 today
-	now := time.Now()
-	nextCacheClearTime := time.Date(now.Year(), now.Month(), now.Day(), 23, 0, 0, 0, now.Location())
-	if now.After(nextCacheClearTime) {
-		// If it's already past 23:00, set it to 23:00 tomorrow
-		nextCacheClearTime = nextCacheClearTime.Add(24 * time.Hour)
-	}
 
 	return &RestaurantHandler{
 		DB:                      db,
 		TransService:            transService,
 		NotifService:            notifService,
-		cachedMenus:             make(map[int]*models.MenuData),
 		menuSourceURL:           sourceURL,
 		apiRegex:                regex,
-		menuSimilarityThreshold: 0.7, // 70% similarity threshold
-		nextCacheClearTime:      nextCacheClearTime,
+		menuSimilarityThreshold: 0.7,
 	}
 }
 
-// GetRestaurantMenu handles requests for the restaurant menu.
-// It uses caching and fetches/translates the menu if needed.
 func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 	utils.LogHeader("🍽️ Get Restaurant Menu")
 
-	// Check if cache should be cleared
-	h.checkAndClearCache()
-
-	// decode RestaurantRequest from query params
 	language := c.Query("language")
 
 	if language == "" {
@@ -84,183 +60,315 @@ func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 		language = "fr"
 	}
 
-	utils.LogLineKeyValue(utils.LevelInfo, "Requested Language", language)
-
-	// Convert language code to language ID (using helper)
-	langID := getLanguageID(language)
-	if langID == 0 {
-		utils.LogMessage(utils.LevelWarn, "Invalid language code requested")
-		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": fmt.Sprintf("Invalid language code: %s", language),
-		})
-	}
-	utils.LogLineKeyValue(utils.LevelInfo, "Language ID", langID)
-
-	// --- Cache Check ---
-	h.cacheMutex.RLock() // Read lock for checking cache
-	cachedMenu := h.cachedMenus[langID]
-	lastFetch := h.lastFetchTime
-	h.cacheMutex.RUnlock()
-
-	now := time.Now()
-	// Check if cache is valid for today
-	// Allow fetching new data if cache is old, even if it's the same day (e.g., force refresh)
-	// Let's refresh if cache is older than, say, 1 hour? Or just check date?
-	// For simplicity, let's check if it's from today first.
-	isCacheFromToday := !lastFetch.IsZero() &&
-		now.Year() == lastFetch.Year() &&
-		now.Month() == lastFetch.Month() &&
-		now.Day() == lastFetch.Day()
-
-	utils.LogLineKeyValue(utils.LevelDebug, "isCacheFromToday", isCacheFromToday)
-	utils.LogLineKeyValue(utils.LevelDebug, "lastFetch", lastFetch)
-
-	if cachedMenu != nil && isCacheFromToday {
-		utils.LogMessage(utils.LevelInfo, "Returning cached menu data")
-		utils.LogFooter()
-		return c.JSON(models.FullMenuData{
-			MenuData:    *cachedMenu,
-			UpdatedDate: lastFetch.Format(time.RFC3339), // Use standard format
-		})
-	}
-
-	// --- Cache Miss or Stale: Fetch/Update ---
-	utils.LogMessage(utils.LevelInfo, "Cache miss or stale, proceeding to fetch/update")
-
-	// Acquire write lock for potential cache update
-	h.cacheMutex.Lock()
-	defer h.cacheMutex.Unlock() // Ensure unlock happens
-
-	// Double-check cache after acquiring write lock (another request might have updated it)
-	cachedMenu = h.cachedMenus[langID]
-	lastFetch = h.lastFetchTime
-	isCacheFromToday = !lastFetch.IsZero() &&
-		now.Year() == lastFetch.Year() &&
-		now.Month() == lastFetch.Month() &&
-		now.Day() == lastFetch.Day()
-
-	if cachedMenu != nil && isCacheFromToday {
-		utils.LogMessage(utils.LevelInfo, "Returning cached menu data (populated by another request)")
-		utils.LogFooter()
-		return c.JSON(models.FullMenuData{
-			MenuData:    *cachedMenu,
-			UpdatedDate: lastFetch.Format(time.RFC3339),
-		})
-	}
-
-	// --- Fetch from Source API ---
-	utils.LogMessage(utils.LevelInfo, "Fetching fresh menu data from source API")
-	baseMenuData, err := h.fetchMenuFromAPI() // Fetch the base (French) menu
+	// Get today's menu categorized by type
+	menuResponse, err := h.GetTodaysMenuCategorized()
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to fetch menu from source API")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		// Fallback: Try to return the latest data from the database if fetch fails
-		latestDbMenu, dbErr := h.getLatestMenuFromDB(langID)
-		if dbErr == nil && latestDbMenu != nil {
-			utils.LogMessage(utils.LevelWarn, "API fetch failed, returning latest menu from database")
-			utils.LogFooter()
-			// Update cache with DB data? Or leave cache stale? Let's update.
-			h.cachedMenus[langID] = &latestDbMenu.MenuData
-			// Don't update h.lastFetchTime from DB data to encourage refetching API later
-			return c.JSON(latestDbMenu)
-		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get today's menu: %v", err))
 		utils.LogFooter()
-		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-			"error": "Failed to fetch latest menu data",
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve menu",
 		})
 	}
-	// Successfully fetched base menu
-	fetchedTime := time.Now()
 
-	// --- Translation (if needed) ---
-	finalMenuData := baseMenuData
-	if langID != 1 { // Language ID 1 is assumed to be French (source)
-		utils.LogMessage(utils.LevelInfo, "Translating base menu")
-		utils.LogLineKeyValue(utils.LevelInfo, "Target Language", language)
-		translatedMenu, transErr := h.TransService.TranslateMenu(baseMenuData, language)
-		if transErr != nil {
-			utils.LogMessage(utils.LevelError, "Failed to translate menu")
-			utils.LogLineKeyValue(utils.LevelError, "Error", transErr)
-			// Return the base (French) menu with an error? Or just the base menu?
-			// Let's return the base menu and log the error.
-			finalMenuData = baseMenuData // Use base menu as fallback
-		} else {
-			finalMenuData = translatedMenu // Use translated menu
-			utils.LogMessage(utils.LevelInfo, "Menu translated successfully")
-		}
-	}
+	totalItems := len(menuResponse.GrilladesMidi) + len(menuResponse.Migrateurs) + len(menuResponse.Cibo) +
+		len(menuResponse.AccompMidi) + len(menuResponse.GrilladesSoir) + len(menuResponse.AccompSoir)
 
-	// --- Update Cache ---
-	utils.LogMessage(utils.LevelInfo, "Updating menu cache")
-	h.cachedMenus[langID] = finalMenuData
-	// Only update lastFetchTime if the base fetch was successful
-	h.lastFetchTime = fetchedTime
-
-	// --- Update Database (Asynchronously?) ---
-	// We update the DB with the potentially translated menu for the specific language ID
-	// Run this in a goroutine so it doesn't block the response.
-	go func(menuToSave *models.MenuData, langToSave int, fetchTimestamp time.Time) {
-		saveErr := h.saveMenuToDB(menuToSave, langToSave, fetchTimestamp)
-		if saveErr != nil {
-			log.Printf("Error saving menu (lang %d) to DB asynchronously: %v", langToSave, saveErr)
-		} else {
-			log.Printf("Successfully saved menu (lang %d) to DB asynchronously", langToSave)
-			// --- Send Notifications (only if French menu was updated) ---
-			// This logic should ideally live within the save/update function or be triggered by it.
-			// Only notify if the *base* French menu changed and was successfully saved.
-			if langToSave == 1 { // If we just saved the French menu
-				// Check if menu actually changed compared to previous DB version? (Requires extra logic)
-				// For now, notify if base menu was fetched & saved.
-				if h.NotifService != nil {
-					utils.LogMessage(utils.LevelInfo, "Triggering daily menu notification send")
-					notifErr := h.NotifService.SendDailyMenuNotification() // Send the base menu
-					if notifErr != nil {
-						log.Printf("Error sending daily menu notification asynchronously: %v", notifErr)
-					}
-				} else {
-					log.Println("Warning: NotificationService not available for sending menu update.")
-				}
-			}
-		}
-
-	}(finalMenuData, langID, fetchedTime)
-
-	utils.LogMessage(utils.LevelInfo, "Returning fetched/translated menu data")
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved categorized menu with %d total items", totalItems))
 	utils.LogFooter()
 
-	// Return the fresh data
-	return c.JSON(models.FullMenuData{
-		MenuData:    *finalMenuData,
-		UpdatedDate: fetchedTime.Format(time.RFC3339),
+	return c.JSON(menuResponse)
+}
+
+// GetDishDetails retrieves detailed information about a specific dish
+func (h *RestaurantHandler) GetDishDetails(c *fiber.Ctx) error {
+	utils.LogHeader("🍽️ Get Dish Details")
+
+	// Get dish ID from URL parameter
+	dishIDParam := c.Params("id")
+	if dishIDParam == "" {
+		utils.LogMessage(utils.LevelError, "Missing dish ID parameter")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Dish ID is required",
+		})
+	}
+
+	// Convert to integer
+	dishID, err := strconv.Atoi(dishIDParam)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid dish ID: %s", dishIDParam))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid dish ID format",
+		})
+	}
+
+	// Get dish details with ratings and statistics
+	query := `
+		SELECT 
+			ra.id_restaurant_articles,
+			ra.name,
+			ra.first_time_served,
+			ra.last_time_served,
+			COALESCE(AVG(ran.note), 0) as average_rating,
+			COUNT(ran.note) as total_ratings,
+			COUNT(DISTINCT rm.date_served) as times_served
+		FROM restaurant_articles ra
+		LEFT JOIN restaurant_articles_notes ran ON ra.id_restaurant_articles = ran.id_restaurant_articles
+		LEFT JOIN restaurant_meals rm ON ra.id_restaurant_articles = rm.id_restaurant_articles
+		WHERE ra.id_restaurant_articles = $1
+		GROUP BY ra.id_restaurant_articles, ra.name, ra.first_time_served, ra.last_time_served
+	`
+
+	var dishDetails struct {
+		ID              int        `json:"id" db:"id_restaurant_articles"`
+		Name            string     `json:"name" db:"name"`
+		FirstTimeServed time.Time  `json:"first_time_served" db:"first_time_served"`
+		LastTimeServed  *time.Time `json:"last_time_served,omitempty" db:"last_time_served"`
+		AverageRating   float64    `json:"average_rating" db:"average_rating"`
+		TotalRatings    int        `json:"total_ratings" db:"total_ratings"`
+		TimesServed     int        `json:"times_served" db:"times_served"`
+	}
+
+	err = h.DB.QueryRow(query, dishID).Scan(
+		&dishDetails.ID,
+		&dishDetails.Name,
+		&dishDetails.FirstTimeServed,
+		&dishDetails.LastTimeServed,
+		&dishDetails.AverageRating,
+		&dishDetails.TotalRatings,
+		&dishDetails.TimesServed,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Dish not found: ID %d", dishID))
+			utils.LogFooter()
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Dish not found",
+			})
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Database error: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve dish details",
+		})
+	}
+
+	// Capitalize the dish name
+	dishDetails.Name = h.capitalizeItemName(dishDetails.Name)
+
+	// Get recent reviews (optional)
+	reviewsQuery := `
+		SELECT ran.email, ran.note, ran.comment, ra.name
+		FROM restaurant_articles_notes ran
+		JOIN restaurant_articles ra ON ran.id_restaurant_articles = ra.id_restaurant_articles
+		WHERE ran.id_restaurant_articles = $1
+		ORDER BY ran.email
+		LIMIT 10
+	`
+
+	reviewRows, err := h.DB.Query(reviewsQuery, dishID)
+	if err != nil {
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to fetch reviews: %v", err))
+	} else {
+		defer reviewRows.Close()
+
+		var reviews []struct {
+			Email   string `json:"email"`
+			Rating  int    `json:"rating"`
+			Comment string `json:"comment,omitempty"`
+		}
+
+		for reviewRows.Next() {
+			var review struct {
+				Email   string `json:"email"`
+				Rating  int    `json:"rating"`
+				Comment string `json:"comment,omitempty"`
+			}
+			var dishName string // We don't need this but it's in the query
+
+			err := reviewRows.Scan(&review.Email, &review.Rating, &review.Comment, &dishName)
+			if err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to scan review: %v", err))
+				continue
+			}
+			reviews = append(reviews, review)
+		}
+
+		// Create response with reviews
+		response := struct {
+			models.RestaurantArticle
+			AverageRating float64 `json:"average_rating"`
+			TotalRatings  int     `json:"total_ratings"`
+			TimesServed   int     `json:"times_served"`
+			Reviews       []struct {
+				Email   string `json:"email"`
+				Rating  int    `json:"rating"`
+				Comment string `json:"comment,omitempty"`
+			} `json:"recent_reviews"`
+		}{
+			RestaurantArticle: models.RestaurantArticle{
+				ID:              dishDetails.ID,
+				Name:            dishDetails.Name,
+				FirstTimeServed: dishDetails.FirstTimeServed,
+				LastTimeServed:  dishDetails.LastTimeServed,
+			},
+			AverageRating: dishDetails.AverageRating,
+			TotalRatings:  dishDetails.TotalRatings,
+			TimesServed:   dishDetails.TimesServed,
+			Reviews:       reviews,
+		}
+
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved details for dish: %s", dishDetails.Name))
+		utils.LogFooter()
+		return c.JSON(response)
+	}
+
+	// Fallback response without reviews
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved details for dish: %s", dishDetails.Name))
+	utils.LogFooter()
+	return c.JSON(dishDetails)
+}
+
+// PostDishReview allows users to post a review/rating for a specific dish
+func (h *RestaurantHandler) PostDishReview(c *fiber.Ctx) error {
+	utils.LogHeader("🌟 Post Dish Review")
+
+	// Get dish ID from URL parameter
+	dishIDParam := c.Params("id")
+	if dishIDParam == "" {
+		utils.LogMessage(utils.LevelError, "Missing dish ID parameter")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Dish ID is required",
+		})
+	}
+
+	// Convert to integer
+	dishID, err := strconv.Atoi(dishIDParam)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid dish ID: %s", dishIDParam))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid dish ID format",
+		})
+	}
+
+	// Get user email from JWT token (set by middleware)
+	userEmail, ok := c.Locals("email").(string)
+	if !ok || userEmail == "" {
+		utils.LogMessage(utils.LevelError, "No email found in JWT token")
+		utils.LogFooter()
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	// Parse request body (no email needed since it comes from JWT)
+	var reviewRequest struct {
+		Rating  int    `json:"rating" validate:"required,min=1,max=5"`
+		Comment string `json:"comment,omitempty"`
+	}
+
+	if err := c.BodyParser(&reviewRequest); err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse request body: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request format",
+		})
+	}
+
+	// Validate required fields
+	if reviewRequest.Rating < 1 || reviewRequest.Rating > 5 {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid rating: %d", reviewRequest.Rating))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Rating must be between 1 and 5",
+		})
+	}
+
+	// Check if dish exists
+	var dishName string
+	err = h.DB.QueryRow("SELECT name FROM restaurant_articles WHERE id_restaurant_articles = $1", dishID).Scan(&dishName)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Dish not found: ID %d", dishID))
+			utils.LogFooter()
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Dish not found",
+			})
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Database error checking dish: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to verify dish",
+		})
+	}
+
+	// Check if user exists (assuming they should be in newf table)
+	var userExists bool
+	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM newf WHERE email = $1)", userEmail).Scan(&userExists)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Database error checking user: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to verify user",
+		})
+	}
+
+	if !userExists {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("User not found: %s", userEmail))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "User not found",
+		})
+	}
+
+	// Insert or update the review
+	_, err = h.DB.Exec(`
+		INSERT INTO restaurant_articles_notes (email, id_restaurant_articles, note, comment)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (email, id_restaurant_articles) 
+		DO UPDATE SET 
+			note = EXCLUDED.note,
+			comment = EXCLUDED.comment
+	`, userEmail, dishID, reviewRequest.Rating, reviewRequest.Comment)
+
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to save review: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to save review",
+		})
+	}
+
+	// Get updated average rating
+	var newAverageRating float64
+	var totalRatings int
+	err = h.DB.QueryRow(`
+		SELECT COALESCE(AVG(note), 0), COUNT(note)
+		FROM restaurant_articles_notes 
+		WHERE id_restaurant_articles = $1
+	`, dishID).Scan(&newAverageRating, &totalRatings)
+
+	if err != nil {
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to calculate new average: %v", err))
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Review saved for dish %s by %s: %d stars", dishName, userEmail, reviewRequest.Rating))
+	utils.LogFooter()
+
+	return c.JSON(fiber.Map{
+		"message":        "Review saved successfully",
+		"dish_name":      h.capitalizeItemName(dishName),
+		"average_rating": newAverageRating,
+		"total_ratings":  totalRatings,
+		"your_rating":    reviewRequest.Rating,
+		"your_comment":   reviewRequest.Comment,
 	})
 }
 
-// checkAndClearCache checks if it's time to clear the cache and does so if needed
-func (h *RestaurantHandler) checkAndClearCache() {
-	now := time.Now()
-
-	// Check if it's time to clear the cache
-	if now.After(h.nextCacheClearTime) {
-		// Acquire write lock for cache clearing
-		h.cacheMutex.Lock()
-		defer h.cacheMutex.Unlock()
-
-		// Double-check after acquiring lock
-		if now.After(h.nextCacheClearTime) {
-			utils.LogMessage(utils.LevelInfo, "Clearing menu cache (scheduled at 23:00)")
-			h.cachedMenus = make(map[int]*models.MenuData)
-
-			// Set next cache clear time to 23:00 tomorrow
-			h.nextCacheClearTime = time.Date(now.Year(), now.Month(), now.Day(), 23, 0, 0, 0, now.Location()).Add(24 * time.Hour)
-			utils.LogLineKeyValue(utils.LevelInfo, "Next cache clear scheduled for", h.nextCacheClearTime.Format(time.RFC3339))
-		}
-	}
-}
-
-// --- Internal Methods ---
-
-// fetchMenuFromAPI fetches and parses the base menu (French) from the source URL.
 func (h *RestaurantHandler) fetchMenuFromAPI() (*models.MenuData, error) {
 	resp, err := http.Get(h.menuSourceURL)
 	if err != nil {
@@ -292,7 +400,7 @@ func (h *RestaurantHandler) fetchMenuFromAPI() (*models.MenuData, error) {
 }
 
 func (h *RestaurantHandler) parseLoadingData(jsonData string) (*models.MenuData, error) {
-	var nestedItems [][]models.MenuItemAPI // Use specific struct for API parsing
+	var nestedItems [][]models.MenuItemAPI
 	if err := json.Unmarshal([]byte(jsonData), &nestedItems); err != nil {
 		log.Printf("Invalid JSON structure from API: %v", err)
 		return nil, fmt.Errorf("unable to parse menu JSON from API: %w", err)
@@ -302,7 +410,6 @@ func (h *RestaurantHandler) parseLoadingData(jsonData string) (*models.MenuData,
 		return nil, fmt.Errorf("no menu items found in the parsed API data")
 	}
 
-	// Process raw items into structured MenuData
 	return h.processRawMenuItems(nestedItems[0]), nil
 }
 
@@ -315,7 +422,7 @@ func (h *RestaurantHandler) processRawMenuItems(items []models.MenuItemAPI) *mod
 		GrilladesSoir: []string{},
 		AccompSoir:    []string{},
 	}
-	itemMap := make(map[string]map[string]bool) // category -> item -> exists
+	itemMap := make(map[string]map[string]bool)
 
 	for _, item := range items {
 		category := getMenuCategory(item.Pole, item.Accompagnement, item.Periode)
@@ -323,22 +430,18 @@ func (h *RestaurantHandler) processRawMenuItems(items []models.MenuItemAPI) *mod
 			continue // Skip items that don't map to a known category
 		}
 
-		// Combine name and info fields, trimming space
 		menuItemText := strings.TrimSpace(fmt.Sprintf("%s %s %s", item.Nom, item.Info1, item.Info2))
-		// remove all double or more spaces
 		menuItemText = strings.Join(strings.Fields(menuItemText), " ")
 		if menuItemText == "" {
 			continue // Skip empty items
 		}
 
-		// Ensure category map exists
 		if itemMap[category] == nil {
 			itemMap[category] = make(map[string]bool)
 		}
 
-		// Add item if not already present in the map for this category
 		if !itemMap[category][menuItemText] {
-			itemMap[category][menuItemText] = true // Mark as added
+			itemMap[category][menuItemText] = true
 			switch category {
 			case "grilladesMidi":
 				menuData.GrilladesMidi = append(menuData.GrilladesMidi, menuItemText)
@@ -359,104 +462,6 @@ func (h *RestaurantHandler) processRawMenuItems(items []models.MenuItemAPI) *mod
 	return &menuData
 }
 
-// saveMenuToDB saves the provided menu data for the given language ID.
-// It checks if an identical menu for the same language exists for today before inserting.
-func (h *RestaurantHandler) saveMenuToDB(menuData *models.MenuData, langID int, fetchTimestamp time.Time) error {
-	menuJSON, err := json.Marshal(menuData)
-	if err != nil {
-		return fmt.Errorf("failed to marshal menu data for DB: %w", err)
-	}
-
-	// Check if menu data exceeds reasonable size (e.g., TEXT column limit in PG is large, but good to have a sanity check)
-	// const maxMenuSize = 10000 // Example limit
-	// if len(menuJSON) > maxMenuSize {
-	// 	return fmt.Errorf("menu data JSON size (%d) exceeds limit (%d)", len(menuJSON), maxMenuSize)
-	// }
-
-	// Use transaction to check existence and insert atomically
-	tx, err := h.DB.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin DB transaction: %w", err)
-	}
-	defer tx.Rollback() // Rollback if commit doesn't happen
-
-	// Check if this exact menu for this language already exists today
-	var exists bool
-	checkQuery := `
-		SELECT EXISTS (
-			SELECT 1 FROM restaurant
-			WHERE language = $1
-			  AND articles::jsonb = $2::jsonb -- Compare JSON content effectively
-			  AND DATE(updated_date) = DATE($3) -- Check if entry exists for today
-		);`
-	// Use fetchTimestamp for the date check
-	err = tx.QueryRow(checkQuery, langID, string(menuJSON), fetchTimestamp).Scan(&exists)
-	if err != nil {
-		return fmt.Errorf("failed to check for existing menu in DB: %w", err)
-	}
-
-	if exists {
-		log.Printf("Identical menu for language %d already exists in DB for today. Skipping insert.", langID)
-		return nil // Not an error, just no need to insert
-	}
-
-	// Insert the new menu record
-	insertQuery := `
-		INSERT INTO restaurant (articles, language, updated_date)
-		VALUES ($1, $2, $3);
-	`
-	_, err = tx.Exec(insertQuery, string(menuJSON), langID, fetchTimestamp)
-	if err != nil {
-		return fmt.Errorf("failed to insert new menu into DB: %w", err)
-	}
-
-	// Commit the transaction
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit menu insert transaction: %w", err)
-	}
-
-	return nil
-}
-
-// getLatestMenuFromDB retrieves the most recent menu entry for a given language from the database.
-func (h *RestaurantHandler) getLatestMenuFromDB(langID int) (*models.FullMenuData, error) {
-	query := `
-		SELECT id_restaurant, articles, updated_date
-		FROM restaurant
-		WHERE language = $1
-		ORDER BY updated_date DESC
-		LIMIT 1;
-	`
-	var idRestaurant int
-	var articlesJSON string
-	var updatedDate time.Time
-
-	err := h.DB.QueryRow(query, langID).Scan(&idRestaurant, &articlesJSON, &updatedDate)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil // No menu found in DB for this language
-		}
-		return nil, fmt.Errorf("failed to query latest DB menu (lang %d): %w", langID, err)
-	}
-
-	var menuData models.MenuData
-	if err := json.Unmarshal([]byte(articlesJSON), &menuData); err != nil {
-		log.Printf("Failed to parse menu JSON from database (lang %d, date %s): %v", langID, updatedDate, err)
-		// Data in DB is corrupt, return nil or error?
-		return nil, fmt.Errorf("failed to parse menu data from DB: %w", err)
-	}
-
-	utils.LogLineKeyValue(utils.LevelDebug, "Latest DB Menu ID", idRestaurant)
-
-	return &models.FullMenuData{
-		MenuData:    menuData,
-		UpdatedDate: updatedDate.Format(time.RFC3339),
-	}, nil
-}
-
-// CheckAndUpdateMenuCron is intended to be called by the cron job.
-// It fetches the base menu, compares it with the last known base menu in DB,
-// saves if different, and triggers notifications.
 func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 	utils.LogHeader("🤖 Cron: Check & Update Restaurant Menu")
 
@@ -464,164 +469,32 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 	baseMenuData, err := h.fetchMenuFromAPI()
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Cron: Failed to fetch base menu from API")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Error: %v", err))
 		utils.LogFooter()
 		return false, err // Don't proceed if API fetch fails
 	}
-	fetchedTime := time.Now()
 
-	// 2. Get latest base menu from DB for comparison
-	latestDbMenu, err := h.getLatestMenuFromDB(1) // Get French menu (langID 1)
-	utils.LogLineKeyValue(utils.LevelDebug, "Latest DB Menu", latestDbMenu)
-	needsUpdate := true
-	shouldNotify := false
-	similarity := 0.0
+	// 2. Convert to FetchedItems format
+	fetchedItems := h.convertMenuDataToFetchedItems(baseMenuData)
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Converted %d menu items for synchronization", len(fetchedItems)))
 
+	// 3. Synchronize with database
+	err = h.SyncTodaysMenu(fetchedItems)
 	if err != nil {
-		utils.LogMessage(utils.LevelWarn, "Cron: Failed to get latest base menu from DB for comparison")
-		utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
-		// No comparison possible, but still update DB
-		needsUpdate = true
-		shouldNotify = false
-	} else if latestDbMenu != nil {
-		// Compare fetched menu with DB menu using similarity score
-		similarity = h.calculateMenuSimilarity(&latestDbMenu.MenuData, baseMenuData)
-		utils.LogLineKeyValue(utils.LevelInfo, "Menu similarity score", similarity)
-
-		if similarity >= 1.0 {
-			utils.LogMessage(utils.LevelInfo, "Cron: Fetched menu is identical to DB menu. No update needed.")
-			needsUpdate = false
-			shouldNotify = false
-		} else {
-			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cron: Menu change detected (similarity: %f).", similarity))
-			needsUpdate = true
-
-			// Only send a notification if there is a lot of change (less than 60% similarity = more than 40% difference)
-			if similarity < 0.6 {
-				utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cron: Significant menu change detected (%f similarity). Will send notification.", similarity))
-				shouldNotify = true
-			} else {
-				utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cron: Minor menu change detected (%f similarity). Will update DB but skip notification.", similarity))
-				shouldNotify = false
-			}
-		}
-	} else {
-		utils.LogMessage(utils.LevelInfo, "Cron: No existing base menu found in DB. Saving fetched menu.")
-		needsUpdate = true
-		shouldNotify = false
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to sync menu: %v", err))
+		utils.LogFooter()
+		return false, err
 	}
 
-	// 3. Save to DB if changed (or no previous version)
-	updated := false
-	if needsUpdate {
-		utils.LogMessage(utils.LevelInfo, "Cron: Saving updated base menu to DB")
-		saveErr := h.saveMenuToDB(baseMenuData, 1, fetchedTime) // Save French menu
-		if saveErr != nil {
-			utils.LogMessage(utils.LevelError, "Cron: Failed to save updated base menu to DB")
-			utils.LogLineKeyValue(utils.LevelError, "Error", saveErr)
-			utils.LogFooter()
-			// Return false as update failed, but log error
-			return false, saveErr
-		}
-		updated = true // Mark as updated in this cycle
-
-		// 4. Update cache with the new base menu
-		h.cacheMutex.Lock()
-		h.cachedMenus[1] = baseMenuData // Update French cache
-		h.lastFetchTime = fetchedTime   // Update fetch time since we got new data
-		// Remove other languages for simplicity (they will be translated if requested)
-		for langID := range h.cachedMenus {
-			if langID != 1 {
-				delete(h.cachedMenus, langID)
-			}
-		}
-		h.cacheMutex.Unlock()
-		utils.LogMessage(utils.LevelInfo, "Cron: Updated menu cache")
-
-		// 5. Trigger notifications (only if a significant change is detected and time/day conditions are met)
-		if shouldNotify && h.NotifService != nil {
-			now := time.Now()
-			today := now.Format("2006-01-02")
-
-			if h.lastNotificationDate == today {
-				utils.LogMessage(utils.LevelInfo, "Cron: Already sent a notification today, skipping")
-			} else if !h.isNotificationTimeAllowed(now) {
-				utils.LogMessage(utils.LevelInfo, "Cron: Outside notification time window (9h-14h, weekdays only), skipping notification")
-			} else {
-				utils.LogMessage(utils.LevelInfo, "Cron: Triggering daily menu notification send (significant change detected)")
-				notifErr := h.NotifService.SendDailyMenuNotification()
-				if notifErr != nil {
-					utils.LogMessage(utils.LevelError, "Cron: Failed to send daily menu notification")
-					utils.LogLineKeyValue(utils.LevelError, "Error", notifErr)
-				} else {
-					h.lastNotificationDate = today
-					utils.LogMessage(utils.LevelInfo, "Cron: Notification sent successfully, won't send more today")
-				}
-			}
-		} else if !shouldNotify {
-			utils.LogMessage(utils.LevelInfo, "Cron: Menu change was minor, skipping notification")
-		} else {
-			utils.LogMessage(utils.LevelWarn, "Cron: NotificationService not available.")
-		}
+	// 4. Check if notifications should be triggered
+	if h.isNotificationTimeAllowed(time.Now()) && len(fetchedItems) > 0 {
+		utils.LogMessage(utils.LevelInfo, "Menu updated successfully - notifications could be triggered here")
+		// TODO: Implement notification logic if needed
 	}
 
+	utils.LogMessage(utils.LevelInfo, "Menu synchronization completed successfully")
 	utils.LogFooter()
-	return updated, nil // Return true if an update was saved
-}
-
-// calculateMenuSimilarity calculates a similarity score between two menus
-// Returns a value between 0.0 (completely different) and 1.0 (identical)
-func (h *RestaurantHandler) calculateMenuSimilarity(menu1, menu2 *models.MenuData) float64 {
-	// Count total items in each menu
-	totalItems1 := len(menu1.GrilladesMidi) + len(menu1.Migrateurs) + len(menu1.Cibo) +
-		len(menu1.AccompMidi) + len(menu1.GrilladesSoir) + len(menu1.AccompSoir)
-
-	totalItems2 := len(menu2.GrilladesMidi) + len(menu2.Migrateurs) + len(menu2.Cibo) +
-		len(menu2.AccompMidi) + len(menu2.GrilladesSoir) + len(menu2.AccompSoir)
-
-	if totalItems1 == 0 && totalItems2 == 0 {
-		return 1.0 // Both empty, consider identical
-	}
-	if totalItems1 == 0 || totalItems2 == 0 {
-		return 0.0 // One is empty, one is not - very different
-	}
-
-	// Count matching items in each category
-	matches := 0
-
-	// Helper to count matches in a category
-	countMatches := func(slice1, slice2 []string) int {
-		// Convert slice2 to a map for O(1) lookups
-		itemMap := make(map[string]bool)
-		for _, item := range slice2 {
-			itemMap[strings.TrimSpace(item)] = true
-		}
-
-		// Count items from slice1 that are in slice2
-		matchCount := 0
-		for _, item := range slice1 {
-			if itemMap[strings.TrimSpace(item)] {
-				matchCount++
-			}
-		}
-		return matchCount
-	}
-
-	// Count matches in each category
-	matches += countMatches(menu1.GrilladesMidi, menu2.GrilladesMidi)
-	matches += countMatches(menu1.Migrateurs, menu2.Migrateurs)
-	matches += countMatches(menu1.Cibo, menu2.Cibo)
-	matches += countMatches(menu1.AccompMidi, menu2.AccompMidi)
-	matches += countMatches(menu1.GrilladesSoir, menu2.GrilladesSoir)
-	matches += countMatches(menu1.AccompSoir, menu2.AccompSoir)
-
-	// Calculate Jaccard similarity coefficient (intersection over union)
-	maxItems := totalItems1
-	if totalItems2 > maxItems {
-		maxItems = totalItems2
-	}
-
-	return float64(matches) / float64(maxItems)
+	return true, nil
 }
 
 func (h *RestaurantHandler) isNotificationTimeAllowed(t time.Time) bool {
@@ -634,20 +507,16 @@ func (h *RestaurantHandler) isNotificationTimeAllowed(t time.Time) bool {
 	return hour >= 7 && hour < 16
 }
 
-// getMenuCategory maps API fields to internal category names.
 func getMenuCategory(pole string, accompagnement string, periode string) string {
-	// Handle boolean string conversion carefully
 	isAccomp := strings.EqualFold(accompagnement, "TRUE")
 
 	if isAccomp {
 		if periode == "midi" {
 			return "accompMidi"
 		}
-		// Assume anything not "midi" is "soir" for accompaniments
 		return "accompSoir"
 	}
 
-	// Map main dishes based on pole and period
 	switch pole {
 	case "Grillades / Plats traditions":
 		if periode == "midi" {
@@ -663,72 +532,381 @@ func getMenuCategory(pole string, accompagnement string, periode string) string 
 	}
 }
 
-// getLanguageID converts language code string to internal ID.
-// TODO: Fetch this mapping from the database 'languages' table instead of hardcoding.
-func getLanguageID(langCode string) int {
-	switch strings.ToLower(langCode) {
-	case "fr":
-		return 1
-	case "en":
-		return 2
-	case "es":
-		return 3
-	case "de":
-		return 4
-	case "it":
-		return 5
-	case "pt":
-		return 6
-	case "ru":
-		return 7
-	case "zh":
-		return 8
-	case "ko":
-		return 9
-	default:
-		return 0 // Invalid/Unknown
-	}
-}
+// convertMenuDataToFetchedItems converts the old MenuData format to FetchedItem slice
+func (h *RestaurantHandler) convertMenuDataToFetchedItems(menuData *models.MenuData) []models.FetchedItem {
+	var fetchedItems []models.FetchedItem
 
-// compareMenus compares two MenuData structs for equality.
-func compareMenus(menu1, menu2 *models.MenuData) bool {
-	// Use helper to compare slices ignoring order
-	return compareStringSlicesIgnoreOrder(menu1.GrilladesMidi, menu2.GrilladesMidi) &&
-		compareStringSlicesIgnoreOrder(menu1.Migrateurs, menu2.Migrateurs) &&
-		compareStringSlicesIgnoreOrder(menu1.Cibo, menu2.Cibo) &&
-		compareStringSlicesIgnoreOrder(menu1.AccompMidi, menu2.AccompMidi) &&
-		compareStringSlicesIgnoreOrder(menu1.GrilladesSoir, menu2.GrilladesSoir) &&
-		compareStringSlicesIgnoreOrder(menu1.AccompSoir, menu2.AccompSoir)
-}
-
-// compareStringSlicesIgnoreOrder checks if two string slices contain the same elements, regardless of order.
-func compareStringSlicesIgnoreOrder(slice1, slice2 []string) bool {
-	if len(slice1) != len(slice2) {
-		return false
-	}
-	if len(slice1) == 0 {
-		return true // Both empty
+	// Map category names to restaurant IDs based on the database inserts
+	categoryToID := map[string]int{
+		"grilladesMidi": 1,
+		"migrateurs":    2,
+		"cibo":          3,
+		"accompMidi":    4,
+		"grilladesSoir": 5,
+		"accompSoir":    6,
 	}
 
-	map1 := make(map[string]int)
-	for _, s := range slice1 {
-		map1[strings.TrimSpace(s)]++ // Trim space for comparison
-	}
-
-	map2 := make(map[string]int)
-	for _, s := range slice2 {
-		map2[strings.TrimSpace(s)]++ // Trim space
-	}
-
-	// Compare maps
-	if len(map1) != len(map2) {
-		return false // Different number of unique items
-	}
-	for k, v := range map1 {
-		if map2[k] != v {
-			return false // Different count for an item
+	// Process each category
+	for category, items := range map[string][]string{
+		"grilladesMidi": menuData.GrilladesMidi,
+		"migrateurs":    menuData.Migrateurs,
+		"cibo":          menuData.Cibo,
+		"accompMidi":    menuData.AccompMidi,
+		"grilladesSoir": menuData.GrilladesSoir,
+		"accompSoir":    menuData.AccompSoir,
+	} {
+		menuTypeID := categoryToID[category]
+		for _, item := range items {
+			if item != "" {
+				fetchedItems = append(fetchedItems, models.FetchedItem{
+					Name:       item,
+					Category:   category,
+					MenuTypeID: menuTypeID,
+				})
+			}
 		}
 	}
 
-	return true
+	return fetchedItems
+}
+
+// normalizeItemName normalizes menu item names for consistent comparison
+func (h *RestaurantHandler) normalizeItemName(name string) string {
+	// Trim whitespace
+	normalized := strings.TrimSpace(name)
+
+	// Convert to lowercase
+	normalized = strings.ToLower(normalized)
+
+	// Remove extra whitespace between words
+	normalized = strings.Join(strings.Fields(normalized), " ")
+
+	// Remove common punctuation but keep essential characters
+	result := strings.Builder{}
+	for _, r := range normalized {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsSpace(r) {
+			result.WriteRune(r)
+		}
+	}
+
+	return strings.TrimSpace(result.String())
+}
+
+// capitalizeItemName capitalizes only the first character of the item name
+func (h *RestaurantHandler) capitalizeItemName(name string) string {
+	if name == "" {
+		return name
+	}
+
+	// Convert to runes to handle Unicode characters properly
+	runes := []rune(name)
+	if len(runes) > 0 {
+		runes[0] = unicode.ToUpper(runes[0])
+	}
+
+	return string(runes)
+}
+
+// calculateSimilarity calculates Jaccard similarity between two sets of strings
+func (h *RestaurantHandler) calculateSimilarity(set1, set2 []string) float64 {
+	if len(set1) == 0 && len(set2) == 0 {
+		return 1.0 // Both empty sets are identical
+	}
+
+	// Convert slices to maps for set operations
+	map1 := make(map[string]bool)
+	map2 := make(map[string]bool)
+
+	for _, item := range set1 {
+		map1[item] = true
+	}
+
+	for _, item := range set2 {
+		map2[item] = true
+	}
+
+	// Calculate intersection
+	intersection := 0
+	for item := range map1 {
+		if map2[item] {
+			intersection++
+		}
+	}
+
+	// Calculate union
+	union := len(map1) + len(map2) - intersection
+
+	if union == 0 {
+		return 1.0
+	}
+
+	return float64(intersection) / float64(union)
+}
+
+// SyncTodaysMenu synchronizes today's menu with the database
+func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) error {
+	utils.LogHeader("🔄 Syncing Today's Menu")
+
+	today := time.Now().Format("2006-01-02")
+	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+
+	// Step 1: Stale Menu Guard Clause
+	utils.LogMessage(utils.LevelInfo, "Checking for stale menu...")
+
+	// Get normalized names from fetched items
+	var fetchedNames []string
+	for _, item := range fetchedItems {
+		normalized := h.normalizeItemName(item.Name)
+		if normalized != "" {
+			fetchedNames = append(fetchedNames, normalized)
+		}
+	}
+
+	// Get yesterday's menu from database
+	var yesterdayNames []string
+	query := `
+		SELECT DISTINCT ra.name 
+		FROM restaurant_meals rm 
+		JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles 
+		WHERE rm.date_served = $1
+	`
+
+	rows, err := h.DB.Query(query, yesterday)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to query yesterday's menu: %v", err))
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan menu item: %v", err))
+			continue
+		}
+		normalized := h.normalizeItemName(name)
+		if normalized != "" {
+			yesterdayNames = append(yesterdayNames, normalized)
+		}
+	}
+
+	// Calculate similarity
+	similarity := h.calculateSimilarity(fetchedNames, yesterdayNames)
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Menu similarity with yesterday: %.2f%%", similarity*100))
+
+	if similarity > 0.8 {
+		utils.LogMessage(utils.LevelWarn, "Stale menu detected (>80% similarity), skipping update")
+		return nil
+	}
+
+	// Step 2: Process Fetched Menu Items
+	utils.LogMessage(utils.LevelInfo, "Processing fetched menu items...")
+
+	var processedArticleIDs []int
+
+	for _, item := range fetchedItems {
+		normalizedName := h.normalizeItemName(item.Name)
+		if normalizedName == "" {
+			continue
+		}
+
+		// Upsert into restaurant_articles and update last_time_served
+		var articleID int
+		err := h.DB.QueryRow(`
+			INSERT INTO restaurant_articles (name, first_time_served, last_time_served)
+			VALUES ($1, CURRENT_DATE, CURRENT_DATE)
+			ON CONFLICT (name) DO UPDATE SET 
+				last_time_served = CURRENT_DATE
+			RETURNING id_restaurant_articles
+		`, normalizedName).Scan(&articleID)
+
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to upsert article '%s': %v", normalizedName, err))
+			continue
+		}
+
+		processedArticleIDs = append(processedArticleIDs, articleID)
+
+		// Insert/Update restaurant_meals for today
+		_, err = h.DB.Exec(`
+			INSERT INTO restaurant_meals (id_restaurant, id_restaurant_articles, date_served)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (id_restaurant, id_restaurant_articles, date_served) DO NOTHING
+		`, item.MenuTypeID, articleID, today)
+
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to insert meal for article ID %d: %v", articleID, err))
+		}
+	}
+
+	// Step 3: Remove Obsolete Items
+	utils.LogMessage(utils.LevelInfo, "Removing obsolete menu items for today...")
+
+	if len(processedArticleIDs) > 0 {
+		// Build the NOT IN clause
+		placeholders := make([]string, len(processedArticleIDs))
+		args := make([]interface{}, len(processedArticleIDs)+1)
+		args[0] = today
+
+		for i, id := range processedArticleIDs {
+			placeholders[i] = fmt.Sprintf("$%d", i+2)
+			args[i+1] = id
+		}
+
+		deleteQuery := fmt.Sprintf(`
+			DELETE FROM restaurant_meals 
+			WHERE date_served = $1 
+			AND id_restaurant_articles NOT IN (%s)
+		`, strings.Join(placeholders, ","))
+
+		result, err := h.DB.Exec(deleteQuery, args...)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to remove obsolete items: %v", err))
+		} else {
+			rowsAffected, _ := result.RowsAffected()
+			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Removed %d obsolete menu items", rowsAffected))
+		}
+	} else {
+		// If no items were processed, remove all items for today
+		result, err := h.DB.Exec(`DELETE FROM restaurant_meals WHERE date_served = $1`, today)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to clear today's menu: %v", err))
+		} else {
+			rowsAffected, _ := result.RowsAffected()
+			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Cleared all %d items from today's menu", rowsAffected))
+		}
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Successfully synchronized menu with %d items", len(processedArticleIDs)))
+	utils.LogFooter()
+
+	return nil
+}
+
+// GetTodaysMenuWithRatings retrieves today's complete menu with average ratings
+func (h *RestaurantHandler) GetTodaysMenuWithRatings() (*models.MenuResponse, error) {
+	today := time.Now().Format("2006-01-02")
+
+	query := `
+		SELECT 
+			rm.id_restaurant_articles,
+			ra.name,
+			rm.id_restaurant,
+			COALESCE(AVG(ran.note), 0) as average_rating
+		FROM restaurant_meals rm
+		JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles
+		LEFT JOIN restaurant_articles_notes ran ON ra.id_restaurant_articles = ran.id_restaurant_articles
+		WHERE rm.date_served = $1
+		GROUP BY rm.id_restaurant_articles, ra.name, rm.id_restaurant
+		ORDER BY rm.id_restaurant, ra.name
+	`
+
+	rows, err := h.DB.Query(query, today)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query today's menu: %w", err)
+	}
+	defer rows.Close()
+
+	var menuEntries []models.MenuEntry
+	for rows.Next() {
+		var entry models.MenuEntry
+		err := rows.Scan(&entry.ArticleID, &entry.Name, &entry.MenuTypeID, &entry.AverageRating)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan menu entry: %w", err)
+		}
+		// Capitalize the name for display
+		entry.Name = h.capitalizeItemName(entry.Name)
+		menuEntries = append(menuEntries, entry)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating menu rows: %w", err)
+	}
+
+	return &models.MenuResponse{
+		Date:  today,
+		Items: menuEntries,
+	}, nil
+}
+
+// GetTodaysMenuCategorized retrieves today's menu categorized by menu type
+func (h *RestaurantHandler) GetTodaysMenuCategorized() (*models.CategorizedMenuResponse, error) {
+	today := time.Now().Format("2006-01-02")
+
+	query := `
+		SELECT 
+			rm.id_restaurant_articles,
+			ra.name,
+			rm.id_restaurant,
+			COALESCE(AVG(ran.note), 0) as average_rating
+		FROM restaurant_meals rm
+		JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles
+		LEFT JOIN restaurant_articles_notes ran ON ra.id_restaurant_articles = ran.id_restaurant_articles
+		WHERE rm.date_served = $1
+		GROUP BY rm.id_restaurant_articles, ra.name, rm.id_restaurant
+		ORDER BY rm.id_restaurant, ra.name
+	`
+
+	rows, err := h.DB.Query(query, today)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query today's menu: %w", err)
+	}
+	defer rows.Close()
+
+	// Initialize the categorized response
+	response := &models.CategorizedMenuResponse{
+		GrilladesMidi: []models.MenuItemWithRating{},
+		Migrateurs:    []models.MenuItemWithRating{},
+		Cibo:          []models.MenuItemWithRating{},
+		AccompMidi:    []models.MenuItemWithRating{},
+		GrilladesSoir: []models.MenuItemWithRating{},
+		AccompSoir:    []models.MenuItemWithRating{},
+		UpdatedDate:   time.Now().Format(time.RFC3339),
+	}
+
+	// Map menu type IDs to category names
+	menuTypeMap := map[int]string{
+		1: "grilladesMidi",
+		2: "migrateurs",
+		3: "cibo",
+		4: "accompMidi",
+		5: "grilladesSoir",
+		6: "accompSoir",
+	}
+
+	for rows.Next() {
+		var entry models.MenuEntry
+		err := rows.Scan(&entry.ArticleID, &entry.Name, &entry.MenuTypeID, &entry.AverageRating)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan menu entry: %w", err)
+		}
+
+		menuItem := models.MenuItemWithRating{
+			ID:            entry.ArticleID,
+			Name:          h.capitalizeItemName(entry.Name),
+			AverageRating: entry.AverageRating,
+		}
+
+		// Add to appropriate category based on menu type ID
+		switch menuTypeMap[entry.MenuTypeID] {
+		case "grilladesMidi":
+			response.GrilladesMidi = append(response.GrilladesMidi, menuItem)
+		case "migrateurs":
+			response.Migrateurs = append(response.Migrateurs, menuItem)
+		case "cibo":
+			response.Cibo = append(response.Cibo, menuItem)
+		case "accompMidi":
+			response.AccompMidi = append(response.AccompMidi, menuItem)
+		case "grilladesSoir":
+			response.GrilladesSoir = append(response.GrilladesSoir, menuItem)
+		case "accompSoir":
+			response.AccompSoir = append(response.AccompSoir, menuItem)
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating menu rows: %w", err)
+	}
+
+	return response, nil
 }
