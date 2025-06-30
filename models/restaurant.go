@@ -96,3 +96,13 @@ type CategorizedMenuResponse struct {
 	AccompSoir    []MenuItemWithRating `json:"accompSoir"`
 	UpdatedDate   string               `json:"updatedDate"`
 }
+
+// ReviewResponse represents a review with user details
+type ReviewResponse struct {
+	FirstName      string    `json:"first_name"`
+	LastName       string    `json:"last_name"`
+	ProfilePicture string    `json:"profile_picture"`
+	Rating         int       `json:"rating"`
+	Comment        string    `json:"comment,omitempty"`
+	Date           time.Time `json:"date"`
+}

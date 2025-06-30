@@ -3,6 +3,7 @@ package restaurant
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -73,6 +74,13 @@ func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 	totalItems := len(menuResponse.GrilladesMidi) + len(menuResponse.Migrateurs) + len(menuResponse.Cibo) +
 		len(menuResponse.AccompMidi) + len(menuResponse.GrilladesSoir) + len(menuResponse.AccompSoir)
 
+	// If no menu items exist for today, return 204 No Content
+	if totalItems == 0 {
+		utils.LogMessage(utils.LevelInfo, "No menu found for today")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNoContent).JSON(menuResponse)
+	}
+
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved categorized menu with %d total items", totalItems))
 	utils.LogFooter()
 
@@ -83,7 +91,6 @@ func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 func (h *RestaurantHandler) GetDishDetails(c *fiber.Ctx) error {
 	utils.LogHeader("🍽️ Get Dish Details")
 
-	// Get dish ID from URL parameter
 	dishIDParam := c.Params("id")
 	if dishIDParam == "" {
 		utils.LogMessage(utils.LevelError, "Missing dish ID parameter")
@@ -93,7 +100,6 @@ func (h *RestaurantHandler) GetDishDetails(c *fiber.Ctx) error {
 		})
 	}
 
-	// Convert to integer
 	dishID, err := strconv.Atoi(dishIDParam)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid dish ID: %s", dishIDParam))
@@ -158,37 +164,32 @@ func (h *RestaurantHandler) GetDishDetails(c *fiber.Ctx) error {
 	// Capitalize the dish name
 	dishDetails.Name = h.capitalizeItemName(dishDetails.Name)
 
-	// Get recent reviews (optional)
+	// Get all reviews ordered by date (most recent first)
 	reviewsQuery := `
-		SELECT ran.email, ran.note, ran.comment, ra.name
+		SELECT n.first_name, n.last_name, n.profile_picture, ran.note, ran.comment, ran.date
 		FROM restaurant_articles_notes ran
-		JOIN restaurant_articles ra ON ran.id_restaurant_articles = ra.id_restaurant_articles
+		JOIN newf n ON ran.email = n.email
 		WHERE ran.id_restaurant_articles = $1
-		ORDER BY ran.email
-		LIMIT 10
+		ORDER BY ran.date DESC
 	`
 
 	reviewRows, err := h.DB.Query(reviewsQuery, dishID)
 	if err != nil {
 		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to fetch reviews: %v", err))
 	} else {
-		defer reviewRows.Close()
+		defer func(reviewRows *sql.Rows) {
+			err := reviewRows.Close()
+			if err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to close review rows: %v", err))
+			}
+		}(reviewRows)
 
-		var reviews []struct {
-			Email   string `json:"email"`
-			Rating  int    `json:"rating"`
-			Comment string `json:"comment,omitempty"`
-		}
+		var reviews []models.ReviewResponse
 
 		for reviewRows.Next() {
-			var review struct {
-				Email   string `json:"email"`
-				Rating  int    `json:"rating"`
-				Comment string `json:"comment,omitempty"`
-			}
-			var dishName string // We don't need this but it's in the query
+			var review models.ReviewResponse
 
-			err := reviewRows.Scan(&review.Email, &review.Rating, &review.Comment, &dishName)
+			err := reviewRows.Scan(&review.FirstName, &review.LastName, &review.ProfilePicture, &review.Rating, &review.Comment, &review.Date)
 			if err != nil {
 				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to scan review: %v", err))
 				continue
@@ -199,14 +200,10 @@ func (h *RestaurantHandler) GetDishDetails(c *fiber.Ctx) error {
 		// Create response with reviews
 		response := struct {
 			models.RestaurantArticle
-			AverageRating float64 `json:"average_rating"`
-			TotalRatings  int     `json:"total_ratings"`
-			TimesServed   int     `json:"times_served"`
-			Reviews       []struct {
-				Email   string `json:"email"`
-				Rating  int    `json:"rating"`
-				Comment string `json:"comment,omitempty"`
-			} `json:"recent_reviews"`
+			AverageRating float64                 `json:"average_rating"`
+			TotalRatings  int                     `json:"total_ratings"`
+			TimesServed   int                     `json:"times_served"`
+			Reviews       []models.ReviewResponse `json:"recent_reviews"`
 		}{
 			RestaurantArticle: models.RestaurantArticle{
 				ID:              dishDetails.ID,
@@ -225,7 +222,6 @@ func (h *RestaurantHandler) GetDishDetails(c *fiber.Ctx) error {
 		return c.JSON(response)
 	}
 
-	// Fallback response without reviews
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved details for dish: %s", dishDetails.Name))
 	utils.LogFooter()
 	return c.JSON(dishDetails)
@@ -235,7 +231,6 @@ func (h *RestaurantHandler) GetDishDetails(c *fiber.Ctx) error {
 func (h *RestaurantHandler) PostDishReview(c *fiber.Ctx) error {
 	utils.LogHeader("🌟 Post Dish Review")
 
-	// Get dish ID from URL parameter
 	dishIDParam := c.Params("id")
 	if dishIDParam == "" {
 		utils.LogMessage(utils.LevelError, "Missing dish ID parameter")
@@ -245,7 +240,6 @@ func (h *RestaurantHandler) PostDishReview(c *fiber.Ctx) error {
 		})
 	}
 
-	// Convert to integer
 	dishID, err := strconv.Atoi(dishIDParam)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid dish ID: %s", dishIDParam))
@@ -255,7 +249,6 @@ func (h *RestaurantHandler) PostDishReview(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get user email from JWT token (set by middleware)
 	userEmail, ok := c.Locals("email").(string)
 	if !ok || userEmail == "" {
 		utils.LogMessage(utils.LevelError, "No email found in JWT token")
@@ -265,7 +258,6 @@ func (h *RestaurantHandler) PostDishReview(c *fiber.Ctx) error {
 		})
 	}
 
-	// Parse request body (no email needed since it comes from JWT)
 	var reviewRequest struct {
 		Rating  int    `json:"rating" validate:"required,min=1,max=5"`
 		Comment string `json:"comment,omitempty"`
@@ -279,7 +271,6 @@ func (h *RestaurantHandler) PostDishReview(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate required fields
 	if reviewRequest.Rating < 1 || reviewRequest.Rating > 5 {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid rating: %d", reviewRequest.Rating))
 		utils.LogFooter()
@@ -292,7 +283,7 @@ func (h *RestaurantHandler) PostDishReview(c *fiber.Ctx) error {
 	var dishName string
 	err = h.DB.QueryRow("SELECT name FROM restaurant_articles WHERE id_restaurant_articles = $1", dishID).Scan(&dishName)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Dish not found: ID %d", dishID))
 			utils.LogFooter()
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -303,25 +294,6 @@ func (h *RestaurantHandler) PostDishReview(c *fiber.Ctx) error {
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to verify dish",
-		})
-	}
-
-	// Check if user exists (assuming they should be in newf table)
-	var userExists bool
-	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM newf WHERE email = $1)", userEmail).Scan(&userExists)
-	if err != nil {
-		utils.LogMessage(utils.LevelError, fmt.Sprintf("Database error checking user: %v", err))
-		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to verify user",
-		})
-	}
-
-	if !userExists {
-		utils.LogMessage(utils.LevelError, fmt.Sprintf("User not found: %s", userEmail))
-		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "User not found",
 		})
 	}
 
@@ -713,8 +685,8 @@ func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) er
 		// Upsert into restaurant_articles and update last_time_served
 		var articleID int
 		err := h.DB.QueryRow(`
-			INSERT INTO restaurant_articles (name, first_time_served, last_time_served)
-			VALUES ($1, CURRENT_DATE, CURRENT_DATE)
+			INSERT INTO restaurant_articles (name, last_time_served)
+			VALUES ($1, CURRENT_DATE)
 			ON CONFLICT (name) DO UPDATE SET 
 				last_time_served = CURRENT_DATE
 			RETURNING id_restaurant_articles
@@ -832,6 +804,27 @@ func (h *RestaurantHandler) GetTodaysMenuWithRatings() (*models.MenuResponse, er
 // GetTodaysMenuCategorized retrieves today's menu categorized by menu type
 func (h *RestaurantHandler) GetTodaysMenuCategorized() (*models.CategorizedMenuResponse, error) {
 	today := time.Now().Format("2006-01-02")
+
+	// First check if there's any menu for today
+	var menuCount int
+	countQuery := `SELECT COUNT(*) FROM restaurant_meals WHERE date_served = $1`
+	err := h.DB.QueryRow(countQuery, today).Scan(&menuCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check today's menu count: %w", err)
+	}
+
+	// If no menu exists for today, return empty response
+	if menuCount == 0 {
+		return &models.CategorizedMenuResponse{
+			GrilladesMidi: []models.MenuItemWithRating{},
+			Migrateurs:    []models.MenuItemWithRating{},
+			Cibo:          []models.MenuItemWithRating{},
+			AccompMidi:    []models.MenuItemWithRating{},
+			GrilladesSoir: []models.MenuItemWithRating{},
+			AccompSoir:    []models.MenuItemWithRating{},
+			UpdatedDate:   time.Now().Format(time.RFC3339),
+		}, nil
+	}
 
 	query := `
 		SELECT 

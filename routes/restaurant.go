@@ -12,6 +12,5 @@ func SetupRestaurantRoutes(router fiber.Router, h *restaurantHandler.RestaurantH
 	router.Get("/restaurant", h.GetRestaurantMenu)
 	router.Get("/restaurant/:id", h.GetDishDetails)
 
-	// Protected routes (require JWT authentication)
 	router.Post("/restaurant/:id", middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail, h.PostDishReview)
 }

@@ -2,6 +2,9 @@
 -- +goose StatementBegin
 -- Truncate the table to remove all data
 DROP TABLE IF EXISTS restaurant CASCADE;
+DROP TABLE IF EXISTS restaurant_articles CASCADE;
+DROP TABLE IF EXISTS restaurant_articles_notes CASCADE;
+DROP TABLE IF EXISTS restaurant_meals CASCADE;
 
 CREATE TABLE restaurant
 (
@@ -26,6 +29,7 @@ CREATE TABLE restaurant_articles_notes
     id_restaurant_articles INTEGER,
     note                   SMALLINT NOT NULL,
     comment                VARCHAR(500),
+    date                   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (email, id_restaurant_articles),
     FOREIGN KEY (email) REFERENCES newf (email),
     FOREIGN KEY (id_restaurant_articles) REFERENCES restaurant_articles (id_restaurant_articles),
