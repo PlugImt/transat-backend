@@ -61,7 +61,6 @@ func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 		language = "fr"
 	}
 
-	// Get today's menu categorized by type
 	menuResponse, err := h.GetTodaysMenuCategorized()
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get today's menu: %v", err))
@@ -74,7 +73,6 @@ func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 	totalItems := len(menuResponse.GrilladesMidi) + len(menuResponse.Migrateurs) + len(menuResponse.Cibo) +
 		len(menuResponse.AccompMidi) + len(menuResponse.GrilladesSoir) + len(menuResponse.AccompSoir)
 
-	// If no menu items exist for today, return 204 No Content
 	if totalItems == 0 {
 		utils.LogMessage(utils.LevelInfo, "No menu found for today")
 		utils.LogFooter()
@@ -364,7 +362,7 @@ func (h *RestaurantHandler) fetchMenuFromAPI() (*models.MenuData, error) {
 
 	matches := h.apiRegex.FindSubmatch(body)
 	if len(matches) < 2 {
-		log.Printf("Body sample for regex failure: %s", string(body[:200])) // Log beginning of body
+		log.Printf("Body sample for regex failure: %s", string(body[:200]))
 		return nil, fmt.Errorf("regex did not find 'loadingData' array in response")
 	}
 	loadingDataJSON := string(matches[1])
@@ -399,13 +397,13 @@ func (h *RestaurantHandler) processRawMenuItems(items []models.MenuItemAPI) *mod
 	for _, item := range items {
 		category := getMenuCategory(item.Pole, item.Accompagnement, item.Periode)
 		if category == "" {
-			continue // Skip items that don't map to a known category
+			continue
 		}
 
 		menuItemText := strings.TrimSpace(fmt.Sprintf("%s %s %s", item.Nom, item.Info1, item.Info2))
 		menuItemText = strings.Join(strings.Fields(menuItemText), " ")
 		if menuItemText == "" {
-			continue // Skip empty items
+			continue
 		}
 
 		if itemMap[category] == nil {
@@ -443,7 +441,7 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 		utils.LogMessage(utils.LevelError, "Cron: Failed to fetch base menu from API")
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Error: %v", err))
 		utils.LogFooter()
-		return false, err // Don't proceed if API fetch fails
+		return false, err
 	}
 
 	// 2. Convert to FetchedItems format
@@ -460,8 +458,7 @@ func (h *RestaurantHandler) CheckAndUpdateMenuCron() (bool, error) {
 
 	// 4. Check if notifications should be triggered
 	if h.isNotificationTimeAllowed(time.Now()) && len(fetchedItems) > 0 {
-		utils.LogMessage(utils.LevelInfo, "Menu updated successfully - notifications could be triggered here")
-		// TODO: Implement notification logic if needed
+		utils.LogMessage(utils.LevelInfo, "Menu updated successfully - notifications will be triggered here")
 	}
 
 	utils.LogMessage(utils.LevelInfo, "Menu synchronization completed successfully")
@@ -544,13 +541,8 @@ func (h *RestaurantHandler) convertMenuDataToFetchedItems(menuData *models.MenuD
 
 // normalizeItemName normalizes menu item names for consistent comparison
 func (h *RestaurantHandler) normalizeItemName(name string) string {
-	// Trim whitespace
 	normalized := strings.TrimSpace(name)
-
-	// Convert to lowercase
 	normalized = strings.ToLower(normalized)
-
-	// Remove extra whitespace between words
 	normalized = strings.Join(strings.Fields(normalized), " ")
 
 	// Remove common punctuation but keep essential characters
@@ -570,7 +562,6 @@ func (h *RestaurantHandler) capitalizeItemName(name string) string {
 		return name
 	}
 
-	// Convert to runes to handle Unicode characters properly
 	runes := []rune(name)
 	if len(runes) > 0 {
 		runes[0] = unicode.ToUpper(runes[0])
@@ -582,7 +573,7 @@ func (h *RestaurantHandler) capitalizeItemName(name string) string {
 // calculateSimilarity calculates Jaccard similarity between two sets of strings
 func (h *RestaurantHandler) calculateSimilarity(set1, set2 []string) float64 {
 	if len(set1) == 0 && len(set2) == 0 {
-		return 1.0 // Both empty sets are identical
+		return 1.0
 	}
 
 	// Convert slices to maps for set operations
@@ -597,7 +588,6 @@ func (h *RestaurantHandler) calculateSimilarity(set1, set2 []string) float64 {
 		map2[item] = true
 	}
 
-	// Calculate intersection
 	intersection := 0
 	for item := range map1 {
 		if map2[item] {
@@ -605,7 +595,6 @@ func (h *RestaurantHandler) calculateSimilarity(set1, set2 []string) float64 {
 		}
 	}
 
-	// Calculate union
 	union := len(map1) + len(map2) - intersection
 
 	if union == 0 {
@@ -618,13 +607,9 @@ func (h *RestaurantHandler) calculateSimilarity(set1, set2 []string) float64 {
 // SyncTodaysMenu synchronizes today's menu with the database
 func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) error {
 	utils.LogHeader("🔄 Syncing Today's Menu")
-
 	today := time.Now().Format("2006-01-02")
-
-	// Step 1: Stale Menu Guard Clause
 	utils.LogMessage(utils.LevelInfo, "Checking for stale menu...")
 
-	// Get normalized names from fetched items
 	var fetchedNames []string
 	for _, item := range fetchedItems {
 		normalized := h.normalizeItemName(item.Name)
@@ -661,7 +646,12 @@ func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) er
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to query latest menu: %v", err))
 			return err
 		}
-		defer rows.Close()
+		defer func(rows *sql.Rows) {
+			err := rows.Close()
+			if err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to close rows: %v", err))
+			}
+		}(rows)
 
 		for rows.Next() {
 			var name string
@@ -686,12 +676,11 @@ func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) er
 		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Latest items: %v", latestMenuNames))
 	}
 
-	if similarity > 0.8 {
-		utils.LogMessage(utils.LevelWarn, "Stale menu detected (>80% similarity), skipping update")
+	if similarity == 1.0 {
+		utils.LogMessage(utils.LevelWarn, "Similar menu detected (=100% similarity), skipping update")
 		return nil
 	}
 
-	// Step 2: Process Fetched Menu Items
 	utils.LogMessage(utils.LevelInfo, "Processing fetched menu items...")
 
 	var processedArticleIDs []int
@@ -702,7 +691,6 @@ func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) er
 			continue
 		}
 
-		// Upsert into restaurant_articles and update last_time_served
 		var articleID int
 		err := h.DB.QueryRow(`
 			INSERT INTO restaurant_articles (name, last_time_served)
@@ -719,7 +707,6 @@ func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) er
 
 		processedArticleIDs = append(processedArticleIDs, articleID)
 
-		// Insert/Update restaurant_meals for today
 		_, err = h.DB.Exec(`
 			INSERT INTO restaurant_meals (id_restaurant, id_restaurant_articles, date_served)
 			VALUES ($1, $2, $3)
@@ -731,11 +718,9 @@ func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) er
 		}
 	}
 
-	// Step 3: Remove Obsolete Items
 	utils.LogMessage(utils.LevelInfo, "Removing obsolete menu items for today...")
 
 	if len(processedArticleIDs) > 0 {
-		// Build the NOT IN clause
 		placeholders := make([]string, len(processedArticleIDs))
 		args := make([]interface{}, len(processedArticleIDs)+1)
 		args[0] = today
@@ -759,7 +744,6 @@ func (h *RestaurantHandler) SyncTodaysMenu(fetchedItems []models.FetchedItem) er
 			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Removed %d obsolete menu items", rowsAffected))
 		}
 	} else {
-		// If no items were processed, remove all items for today
 		result, err := h.DB.Exec(`DELETE FROM restaurant_meals WHERE date_served = $1`, today)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to clear today's menu: %v", err))
@@ -825,7 +809,6 @@ func (h *RestaurantHandler) GetTodaysMenuWithRatings() (*models.MenuResponse, er
 func (h *RestaurantHandler) GetTodaysMenuCategorized() (*models.CategorizedMenuResponse, error) {
 	today := time.Now().Format("2006-01-02")
 
-	// First check if there's any menu for today
 	var menuCount int
 	countQuery := `SELECT COUNT(*) FROM restaurant_meals WHERE date_served = $1`
 	err := h.DB.QueryRow(countQuery, today).Scan(&menuCount)
@@ -833,17 +816,18 @@ func (h *RestaurantHandler) GetTodaysMenuCategorized() (*models.CategorizedMenuR
 		return nil, fmt.Errorf("failed to check today's menu count: %w", err)
 	}
 
-	// If no menu exists for today, return empty response
+	response := &models.CategorizedMenuResponse{
+		GrilladesMidi: []models.MenuItemWithRating{},
+		Migrateurs:    []models.MenuItemWithRating{},
+		Cibo:          []models.MenuItemWithRating{},
+		AccompMidi:    []models.MenuItemWithRating{},
+		GrilladesSoir: []models.MenuItemWithRating{},
+		AccompSoir:    []models.MenuItemWithRating{},
+		UpdatedDate:   time.Now().Format(time.RFC3339),
+	}
+
 	if menuCount == 0 {
-		return &models.CategorizedMenuResponse{
-			GrilladesMidi: []models.MenuItemWithRating{},
-			Migrateurs:    []models.MenuItemWithRating{},
-			Cibo:          []models.MenuItemWithRating{},
-			AccompMidi:    []models.MenuItemWithRating{},
-			GrilladesSoir: []models.MenuItemWithRating{},
-			AccompSoir:    []models.MenuItemWithRating{},
-			UpdatedDate:   time.Now().Format(time.RFC3339),
-		}, nil
+		return response, nil
 	}
 
 	query := `
@@ -866,18 +850,6 @@ func (h *RestaurantHandler) GetTodaysMenuCategorized() (*models.CategorizedMenuR
 	}
 	defer rows.Close()
 
-	// Initialize the categorized response
-	response := &models.CategorizedMenuResponse{
-		GrilladesMidi: []models.MenuItemWithRating{},
-		Migrateurs:    []models.MenuItemWithRating{},
-		Cibo:          []models.MenuItemWithRating{},
-		AccompMidi:    []models.MenuItemWithRating{},
-		GrilladesSoir: []models.MenuItemWithRating{},
-		AccompSoir:    []models.MenuItemWithRating{},
-		UpdatedDate:   time.Now().Format(time.RFC3339),
-	}
-
-	// Map menu type IDs to category names
 	menuTypeMap := map[int]string{
 		1: "grilladesMidi",
 		2: "migrateurs",
@@ -900,7 +872,6 @@ func (h *RestaurantHandler) GetTodaysMenuCategorized() (*models.CategorizedMenuR
 			AverageRating: entry.AverageRating,
 		}
 
-		// Add to appropriate category based on menu type ID
 		switch menuTypeMap[entry.MenuTypeID] {
 		case "grilladesMidi":
 			response.GrilladesMidi = append(response.GrilladesMidi, menuItem)
