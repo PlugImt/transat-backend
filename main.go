@@ -188,22 +188,32 @@ func main() {
 		return c.SendString("API is up and running")
 	})
 
-	// API Group
+	// TODO: API Group --- LEGACY CODE TO BE REMOVED IN A FUTURE RELEASE
 	api := app.Group("/api")
-
-	// Setup Routes using the new structure
-	// Pass necessary dependencies (db, jwtSecret, services) to setup functions
 	routes.SetupAuthRoutes(api, db, jwtSecret, notificationService, emailService)
-	routes.SetupUserRoutes(api, db, notificationService) // Pass notificationService if needed by user handlers
+	routes.SetupUserRoutes(api, db, notificationService)
 	routes.SetupTraqRoutes(api, db)
 	routes.SetupFileRoutes(api, db, r2Service)
 	routes.SetupRestaurantRoutes(api, restHandler)
 	routes.SetupRealCampusRoutes(api, db)
 	routes.SetupPlanningRoutes(api, db)
-	routes.SetupStatisticsRoutes(api, db, statisticsService)     // Setup statistics routes
-	routes.SetupWashingMachineRoutes(api)                        // Setup washing machine routes
-	routes.SetupWeatherRoutes(api, weatherHandler)               // Setup weather routes
-	routes.SetupNotificationRoutes(api, db, notificationService) // Setup notification test routes
+	routes.SetupStatisticsRoutes(api, db, statisticsService)
+	routes.SetupWashingMachineRoutes(api)
+	routes.SetupWeatherRoutes(api, weatherHandler)
+	routes.SetupNotificationRoutes(api, db, notificationService)
+
+	// API Group --- NEW ROUTES
+	routes.SetupAuthRoutes(app, db, jwtSecret, notificationService, emailService)
+	routes.SetupUserRoutes(app, db, notificationService)
+	routes.SetupTraqRoutes(app, db)
+	routes.SetupFileRoutes(app, db, r2Service)
+	routes.SetupRestaurantRoutes(app, restHandler)
+	routes.SetupRealCampusRoutes(app, db)
+	routes.SetupPlanningRoutes(app, db)
+	routes.SetupStatisticsRoutes(app, db, statisticsService)
+	routes.SetupWashingMachineRoutes(app)
+	routes.SetupWeatherRoutes(app, weatherHandler)
+	routes.SetupNotificationRoutes(app, db, notificationService)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
