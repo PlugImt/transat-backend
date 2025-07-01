@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS restaurant CASCADE;
 DROP TABLE IF EXISTS restaurant_articles CASCADE;
 DROP TABLE IF EXISTS restaurant_articles_notes CASCADE;
 DROP TABLE IF EXISTS restaurant_meals CASCADE;
+DROP TABLE IF EXISTS restaurant_notifications CASCADE;
 
 CREATE TABLE restaurant
 (
@@ -53,5 +54,13 @@ VALUES ('grilladesMidi'),
        ('accompMidi'),
        ('grilladesSoir'),
        ('accompSoir');
+
+CREATE TABLE restaurant_notifications
+(
+    id_restaurant_notifications SERIAL,
+    date                       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notification_sent         BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (id_restaurant_notifications, date)
+);
 
 -- +goose StatementEnd

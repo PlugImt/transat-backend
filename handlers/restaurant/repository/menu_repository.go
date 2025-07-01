@@ -9,16 +9,19 @@ import (
 
 	"github.com/plugimt/transat-backend/handlers/restaurant/internal"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 )
 
 type MenuRepository struct {
-	DB *sql.DB
+	DB           *sql.DB
+	NotifService *services.NotificationService
 }
 
-func NewMenuRepository(db *sql.DB) *MenuRepository {
+func NewMenuRepository(db *sql.DB, notifService *services.NotificationService) *MenuRepository {
 	return &MenuRepository{
-		DB: db,
+		DB:           db,
+		NotifService: notifService,
 	}
 }
 
@@ -124,6 +127,75 @@ func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 	}
 
 	return response, nil
+}
+
+// shouldSendMenuNotification checks if a notification has already been sent today
+func (r *MenuRepository) shouldSendMenuNotification(today string) (bool, error) {
+	var notificationSent bool
+	query := `SELECT notification_sent FROM restaurant_notifications WHERE DATE(date) = $1 ORDER BY date DESC LIMIT 1`
+
+	err := r.DB.QueryRow(query, today).Scan(&notificationSent)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return true, nil
+		}
+		return false, err
+	}
+
+	return !notificationSent, nil
+}
+
+// sendMenuUpdateNotification sends a notification for menu updates and records it
+func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
+	// Get subscribers to RESTAURANT service
+	subscribers, err := r.NotifService.GetSubscribedUsers("RESTAURANT")
+	if err != nil {
+		return fmt.Errorf("failed to get restaurant subscribers: %w", err)
+	}
+
+	if len(subscribers) == 0 {
+		utils.LogMessage(utils.LevelInfo, "No users subscribed to RESTAURANT notifications")
+		return nil
+	}
+
+	var tokens []string
+	for _, sub := range subscribers {
+		if sub.NotificationToken != "" {
+			tokens = append(tokens, sub.NotificationToken)
+		}
+	}
+
+	if len(tokens) == 0 {
+		utils.LogMessage(utils.LevelInfo, "No valid notification tokens found")
+		return nil
+	}
+
+	payload := models.NotificationPayload{
+		NotificationTokens: tokens,
+		Title:              "NOUVEAU MENU V2",
+		Message:            "🤪 On peut laisser des review bientôt. Cette notif est un test merci de l'ignorer",
+		Sound:              "default",
+		ChannelID:          "default",
+		Data: map[string]interface{}{
+			"screen": "Restaurant",
+		},
+	}
+
+	err = r.NotifService.SendPushNotification(payload)
+	if err != nil {
+		return fmt.Errorf("failed to send push notification: %w", err)
+	}
+
+	_, err = r.DB.Exec(`
+		INSERT INTO restaurant_notifications (date, notification_sent) 
+		VALUES (CURRENT_TIMESTAMP, true)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to record notification: %w", err)
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Sent menu notification to %d users", len(tokens)))
+	return nil
 }
 
 // SaveDishReview saves a dish review and returns the updated rating info
@@ -323,8 +395,24 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 	}
 
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Successfully synchronized menu with %d items", len(processedArticleIDs)))
-	utils.LogFooter()
 
+	// Check if we should send a notification (similarity < 80% and no notification sent today)
+	if similarity < 0.8 && len(processedArticleIDs) > 0 {
+		shouldSendNotification, err := r.shouldSendMenuNotification(today)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check notification status: %v", err))
+		} else if shouldSendNotification {
+			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Menu similarity %.2f%% is below 80%%, sending notification", similarity*100))
+			err := r.sendMenuUpdateNotification(today)
+			if err != nil {
+				utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to send menu notification: %v", err))
+			} else {
+				utils.LogMessage(utils.LevelInfo, "Menu update notification sent successfully")
+			}
+		}
+	}
+
+	utils.LogFooter()
 	return nil
 }
 

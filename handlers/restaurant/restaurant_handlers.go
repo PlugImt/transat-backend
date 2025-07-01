@@ -20,7 +20,7 @@ type RestaurantHandler struct {
 }
 
 func NewRestaurantHandler(db *sql.DB, transService *services.TranslationService, notifService *services.NotificationService) *RestaurantHandler {
-	menuRepo := repository.NewMenuRepository(db)
+	menuRepo := repository.NewMenuRepository(db, notifService)
 	menuService := service.NewMenuService()
 	scheduler := NewScheduler(menuRepo, menuService, notifService)
 
