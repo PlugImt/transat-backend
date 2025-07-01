@@ -106,3 +106,13 @@ type ReviewResponse struct {
 	Comment        string    `json:"comment,omitempty"`
 	Date           time.Time `json:"date"`
 }
+
+// ReviewResult represents the result of saving a review
+type ReviewResult struct {
+	Message       string  `json:"message"`
+	DishName      string  `json:"dish_name"`
+	AverageRating float64 `json:"average_rating"`
+	TotalRatings  int     `json:"total_ratings"`
+	YourRating    int     `json:"your_rating"`
+	YourComment   string  `json:"your_comment"`
+}
