@@ -1,9 +1,5 @@
 package models
 
-import (
-	"time"
-)
-
 // Notification represents a record in the 'notifications' table
 type Notification struct {
 	Email       string `json:"email" db:"email"`
@@ -38,6 +34,4 @@ type NotificationPayload struct {
 	Subtitle           string                 `json:"subtitle,omitempty"`
 	TTL                int                    `json:"ttl,omitempty"`
 	ImageURL           string                 `json:"imageUrl,omitempty"`
-}
-
 }
