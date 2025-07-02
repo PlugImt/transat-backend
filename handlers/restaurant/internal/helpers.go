@@ -2,6 +2,7 @@ package internal
 
 import (
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -67,4 +68,15 @@ func CalculateSimilarity(set1, set2 []string) float64 {
 	}
 
 	return float64(intersection) / float64(union)
+}
+
+// IsNotificationTimeAllowed checks if the current time is within allowed notification hours
+func IsNotificationTimeAllowed(t time.Time) bool {
+	weekday := t.Weekday()
+	if weekday == time.Saturday || weekday == time.Sunday {
+		return false
+	}
+
+	hour := t.Hour()
+	return hour >= 7 && hour < 16
 }

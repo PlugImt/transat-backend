@@ -2,7 +2,6 @@ package restaurant
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/plugimt/transat-backend/handlers/restaurant/repository"
 	"github.com/plugimt/transat-backend/handlers/restaurant/service"
@@ -51,22 +50,9 @@ func (s *Scheduler) CheckAndUpdateMenuCron() (bool, error) {
 		return false, err
 	}
 
-	// 4. Check if notifications should be triggered
-	if s.isNotificationTimeAllowed(time.Now()) && len(fetchedItems) > 0 {
-		utils.LogMessage(utils.LevelInfo, "Menu updated successfully - notifications will be triggered here")
-	}
+	// Note: Notifications are automatically handled within SyncTodaysMenu if conditions are met
 
 	utils.LogMessage(utils.LevelInfo, "Menu synchronization completed successfully")
 	utils.LogFooter()
 	return true, nil
-}
-
-func (s *Scheduler) isNotificationTimeAllowed(t time.Time) bool {
-	weekday := t.Weekday()
-	if weekday == time.Saturday || weekday == time.Sunday {
-		return false
-	}
-
-	hour := t.Hour()
-	return hour >= 7 && hour < 16
 }

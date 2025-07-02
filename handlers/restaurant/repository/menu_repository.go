@@ -396,13 +396,13 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Successfully synchronized menu with %d items", len(processedArticleIDs)))
 
-	// Check if we should send a notification (similarity < 80% and no notification sent today)
-	if similarity < 0.8 && len(processedArticleIDs) > 0 {
+	// Check if we should send a notification (similarity < 80% and no notification sent today and time allowed)
+	if similarity < 0.8 && len(processedArticleIDs) > 0 && internal.IsNotificationTimeAllowed(time.Now()) {
 		shouldSendNotification, err := r.shouldSendMenuNotification(today)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check notification status: %v", err))
 		} else if shouldSendNotification {
-			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Menu similarity %.2f%% is below 80%%, sending notification", similarity*100))
+			utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Menu similarity %.2f%% is below 80%% and time is allowed, sending notification", similarity*100))
 			err := r.sendMenuUpdateNotification(today)
 			if err != nil {
 				utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to send menu notification: %v", err))
@@ -410,6 +410,8 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 				utils.LogMessage(utils.LevelInfo, "Menu update notification sent successfully")
 			}
 		}
+	} else if similarity < 0.8 && len(processedArticleIDs) > 0 && !internal.IsNotificationTimeAllowed(time.Now()) {
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Menu similarity %.2f%% is below 80%% but notification time not allowed (weekends or outside 7-16h)", similarity*100))
 	}
 
 	utils.LogFooter()
