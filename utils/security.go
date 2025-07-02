@@ -36,8 +36,9 @@ func GenerateJWT(email, role string, fingerprint string) (string, error) {
 		}
 	}
 
-	// Create expiration time
-	expirationTime := time.Now().Add(time.Duration(expirationHours) * time.Hour)
+	// Create expiration time using Paris timezone
+	now := Now()
+	expirationTime := AddInParis(now, time.Duration(expirationHours)*time.Hour)
 
 	// Create enhanced claims
 	claims := &JWTClaims{
@@ -46,8 +47,8 @@ func GenerateJWT(email, role string, fingerprint string) (string, error) {
 		Fingerprint: fingerprint,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
 			Issuer:    "transat-backend",
 			Subject:   email,
 			ID:        GenerateRandomString(16), // Unique JWT ID
@@ -117,7 +118,7 @@ func GenerateRandomString(length int) string {
 	if err != nil {
 		// Fallback to less secure method in case of error
 		for i := range b {
-			b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
+			b[i] = charset[UnixNanoParis(Now())%int64(len(charset))]
 			time.Sleep(1 * time.Nanosecond)
 		}
 		return string(b)

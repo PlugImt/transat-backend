@@ -112,7 +112,7 @@ func GetVerificationCodeData(db *sql.DB, email string) (models.VerificationCodeD
 	// Format the expiration time (e.g., 15h04)
 	// Consider making the format configurable or using a standard like RFC3339
 	if !expiration.IsZero() {
-		data.VerificationCodeExpiration = expiration.Format("15h04") // Example format
+		data.VerificationCodeExpiration = FormatParis(expiration, "15h04")
 	} else {
 		data.VerificationCodeExpiration = "N/A" // Or empty string
 	}
@@ -123,7 +123,7 @@ func GetVerificationCodeData(db *sql.DB, email string) (models.VerificationCodeD
 // GetLanguageCode fetches the language code (e.g., 'fr', 'en') for a user.
 func GetLanguageCode(db *sql.DB, email string) (string, error) {
 	query := `
-		SELECT COALESCE(l.code, 'fr') -- Default to 'fr' if language or mapping is missing
+		SELECT COALESCE(l.code, 'fr') 
 		FROM newf n
 		LEFT JOIN languages l ON n.language = l.id_languages
 		WHERE n.email = $1;
@@ -133,7 +133,6 @@ func GetLanguageCode(db *sql.DB, email string) (string, error) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Printf("User %s not found when fetching language code", email)
-			// Should we return default 'fr' or an error?
 			return "fr", fmt.Errorf("user not found")
 		}
 		log.Printf("Error fetching language code for %s: %v", email, err)

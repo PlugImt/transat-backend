@@ -4,6 +4,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // NormalizeItemName normalizes menu item names for consistent comparison
@@ -72,11 +74,11 @@ func CalculateSimilarity(set1, set2 []string) float64 {
 
 // IsNotificationTimeAllowed checks if the current time is within allowed notification hours
 func IsNotificationTimeAllowed(t time.Time) bool {
-	weekday := t.Weekday()
-	if weekday == time.Saturday || weekday == time.Sunday {
+	// Use our centralized Paris timezone utilities
+	if !utils.IsWeekdayParis(t) {
 		return false
 	}
 
-	hour := t.Hour()
+	hour := utils.GetHourParis(t)
 	return hour >= 7 && hour < 16
 }

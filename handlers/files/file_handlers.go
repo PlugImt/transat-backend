@@ -80,7 +80,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	fileExt := filepath.Ext(originalFilename)
 	safeBaseName := sanitizeFilename(strings.TrimSuffix(originalFilename, fileExt))
 
-	timestamp := time.Now().UnixNano()
+	timestamp := utils.UnixNanoParis(utils.Now())
 	hashInput := fmt.Sprintf("%s_%s_%d", email, originalFilename, timestamp)
 	hash := sha256.Sum256([]byte(hashInput))
 	uniqueID := hex.EncodeToString(hash[:8])
@@ -233,8 +233,8 @@ func (h *FileHandler) ListUserFiles(c *fiber.Ctx) error {
 			"id":            id,
 			"name":          name,
 			"url":           publicURL,
-			"created":       creationDate.Format(time.RFC3339),
-			"last_accessed": lastAccessDate.Format(time.RFC3339),
+			"created":       utils.FormatParis(creationDate, time.RFC3339),
+			"last_accessed": utils.FormatParis(lastAccessDate, time.RFC3339),
 		})
 	}
 
@@ -380,8 +380,8 @@ func (h *FileHandler) ListAllFiles(c *fiber.Ctx) error {
 			"name":          name,
 			"url":           publicURL,
 			"email":         email,
-			"created":       creationDate.Format(time.RFC3339),
-			"last_accessed": lastAccessDate.Format(time.RFC3339),
+			"created":       utils.FormatParis(creationDate, time.RFC3339),
+			"last_accessed": utils.FormatParis(lastAccessDate, time.RFC3339),
 		})
 	}
 

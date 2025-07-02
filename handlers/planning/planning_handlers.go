@@ -145,7 +145,7 @@ func (h *PlanningHandler) GetUserCoursesBetweenDates(c *fiber.Ctx) error {
 		course := make(map[string]interface{})
 		for i, col := range cols {
 			if t, ok := vals[i].(time.Time); ok {
-				course[col] = t.Format(time.RFC3339)
+				course[col] = utils.FormatParis(t, time.RFC3339)
 			} else {
 				course[col] = vals[i]
 			}
@@ -169,7 +169,7 @@ func (h *PlanningHandler) GetUserCoursesToday(c *fiber.Ctx) error {
 	}
 	utils.LogLineKeyValue(utils.LevelInfo, "User Email", email)
 
-	today := time.Now().Format("2006-01-02")
+	today := utils.FormatParis(utils.Now(), "2006-01-02")
 	utils.LogLineKeyValue(utils.LevelInfo, "Today", today)
 
 	rows, err := h.db.Query(`SELECT * FROM courses WHERE user_email = $1 AND date = $2 ORDER BY start_time`, email, today)
@@ -197,7 +197,7 @@ func (h *PlanningHandler) GetUserCoursesToday(c *fiber.Ctx) error {
 		course := make(map[string]interface{})
 		for i, col := range cols {
 			if t, ok := vals[i].(time.Time); ok {
-				course[col] = t.Format(time.RFC3339)
+				course[col] = utils.FormatParis(t, time.RFC3339)
 			} else {
 				course[col] = vals[i]
 			}

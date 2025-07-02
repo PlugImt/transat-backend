@@ -283,7 +283,7 @@ func (r *MenuRepository) SaveDishReview(dishID int, userEmail string, rating int
 // SyncTodaysMenu synchronizes today's menu with the database
 func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error {
 	utils.LogHeader("🔄 Syncing Today's Menu")
-	today := time.Now().Format("2006-01-02")
+	today := utils.FormatParis(utils.Now(), "2006-01-02")
 	utils.LogMessage(utils.LevelInfo, "Checking for stale menu...")
 
 	var fetchedNames []string
@@ -432,7 +432,7 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Successfully synchronized menu with %d items", len(processedArticleIDs)))
 
 	// Check if we should send a notification (similarity < 80% and no notification sent today and time allowed)
-	if similarity < 0.8 && len(processedArticleIDs) > 0 && internal.IsNotificationTimeAllowed(time.Now()) {
+	if similarity < 0.8 && len(processedArticleIDs) > 0 && internal.IsNotificationTimeAllowed(utils.Now()) {
 		shouldSendNotification, err := r.shouldSendMenuNotification(today)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check notification status: %v", err))
@@ -445,7 +445,7 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 				utils.LogMessage(utils.LevelInfo, "Menu update notification sent successfully")
 			}
 		}
-	} else if similarity < 0.8 && len(processedArticleIDs) > 0 && !internal.IsNotificationTimeAllowed(time.Now()) {
+	} else if similarity < 0.8 && len(processedArticleIDs) > 0 && !internal.IsNotificationTimeAllowed(utils.Now()) {
 		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Menu similarity %.2f%% is below 80%% but notification time not allowed (weekends or outside 7-16h)", similarity*100))
 	}
 
@@ -455,7 +455,7 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 
 // GetTodaysMenuWithRatings retrieves today's complete menu with average ratings
 func (r *MenuRepository) GetTodaysMenuWithRatings() (*models.MenuResponse, error) {
-	today := time.Now().Format("2006-01-02")
+	today := utils.FormatParis(utils.Now(), "2006-01-02")
 
 	query := `
 		SELECT 
@@ -500,7 +500,7 @@ func (r *MenuRepository) GetTodaysMenuWithRatings() (*models.MenuResponse, error
 
 // GetTodaysMenuCategorized retrieves today's menu categorized by menu type
 func (r *MenuRepository) GetTodaysMenuCategorized() (*models.CategorizedMenuResponse, error) {
-	today := time.Now().Format("2006-01-02")
+	today := utils.FormatParis(utils.Now(), "2006-01-02")
 
 	var menuCount int
 	countQuery := `SELECT COUNT(*) FROM restaurant_meals WHERE date_served = $1`
@@ -516,7 +516,7 @@ func (r *MenuRepository) GetTodaysMenuCategorized() (*models.CategorizedMenuResp
 		AccompMidi:    []models.MenuItemWithRating{},
 		GrilladesSoir: []models.MenuItemWithRating{},
 		AccompSoir:    []models.MenuItemWithRating{},
-		UpdatedDate:   time.Now().Format(time.RFC3339),
+		UpdatedDate:   utils.FormatParis(utils.Now(), time.RFC3339),
 	}
 
 	if menuCount == 0 {

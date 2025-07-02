@@ -10,7 +10,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/plugimt/transat-backend/models" // Assuming models are correctly placed
 	"github.com/plugimt/transat-backend/utils"
@@ -509,7 +508,7 @@ func (ns *NotificationService) SendDailyMenuNotification() error {
 	}
 
 	// Randomize selection
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(utils.UnixNanoParis(utils.Now())))
 	randomMessage := messages[r.Intn(len(messages))]
 
 	// Prepare base payload

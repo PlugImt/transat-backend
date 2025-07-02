@@ -65,13 +65,13 @@ func (s *RestaurantScheduler) Stop() {
 }
 
 func (s *RestaurantScheduler) isScheduledTimeAllowed(t time.Time) bool {
-	// Check if it's a weekend (Saturday = 6, Sunday = 0)
-	weekday := t.Weekday()
+	parisTime := utils.ToParisTime(t)
+	weekday := parisTime.Weekday()
 	if weekday == time.Saturday || weekday == time.Sunday {
 		return false
 	}
 
-	hour := t.Hour()
+	hour := parisTime.Hour()
 	return hour >= 9 && hour < 14
 }
 
