@@ -43,6 +43,15 @@ title = "Nouvelle demande de support"
 title = "🍽️ NOUVEAU MENU DISPONIBLE !"
 message = "Un délicieux nouveau menu vous attend au RU ! Découvrez les plats du jour et laissez vos avis. Bon appétit !"
 
+# Button texts for deep links
+[buttons]
+open_app = "Ouvrir l'app"
+check_it_out = "Je check ça"
+open_laundry = "Voir les machines"
+open_restaurant = "Voir le menu"
+download_app = "Télécharger l'app"
+open_profile = "Accéder à mon profil"
+
 [weather]
 thunderstorm = "Orage"
 drizzle = "Bruine"
