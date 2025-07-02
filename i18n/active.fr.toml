@@ -39,6 +39,10 @@ future_message = "On améliore l'appli grâce à vos retours, et des nouvelles f
 subject = "🆘 Nouvelle demande de support : {{.Subject}}"
 title = "Nouvelle demande de support"
 
+[restaurant_notification]
+title = "🍽️ NOUVEAU MENU DISPONIBLE !"
+message = "Un délicieux nouveau menu vous attend au RU ! Découvrez les plats du jour et laissez vos avis. Bon appétit !"
+
 [weather]
 thunderstorm = "Orage"
 drizzle = "Bruine"

@@ -35,6 +35,10 @@ ru_message = "¿Nunca sabes en qué fila ponerte? Recibe el menú del día a las
 future_title = "<span style=\"color:#ec7f32\">Transat</span>, ¡esto es solo el comienzo!"
 future_message = "Estamos mejorando la aplicación gracias a tus comentarios, y pronto llegarán nuevas funcionalidades increíbles.\n\nUn abrazo,\nEl equipo Transat"
 
+[restaurant_notification]
+title = "🍽️ ¡NUEVO MENÚ DISPONIBLE!"
+message = "¡Un delicioso nuevo menú te espera en el RU! Descubre los platos del día y deja tus reseñas. ¡Buen provecho!"
+
 [weather]
 thunderstorm = "Tormenta"
 drizzle = "Llovizna"

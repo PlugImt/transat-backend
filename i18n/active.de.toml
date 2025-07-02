@@ -1,3 +1,7 @@
+[restaurant_notification]
+title = "🍽️ NEUES MENÜ VERFÜGBAR!"
+message = "Ein köstliches neues Menü erwartet Sie im RU! Entdecken Sie die Tagesgerichte und hinterlassen Sie Ihre Kommentare. Guten Appetit!"
+
 [weather]
 thunderstorm = "Gewitter"
 drizzle = "Nieselregen"

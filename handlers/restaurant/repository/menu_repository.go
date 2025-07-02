@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/plugimt/transat-backend/handlers/restaurant/internal"
+	appI18n "github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
@@ -147,8 +149,8 @@ func (r *MenuRepository) shouldSendMenuNotification(today string) (bool, error) 
 
 // sendMenuUpdateNotification sends a notification for menu updates and records it
 func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
-	// Get subscribers to RESTAURANT service
-	subscribers, err := r.NotifService.GetSubscribedUsers("RESTAURANT")
+	// Get subscribers to RESTAURANT service with their language preferences
+	subscribers, err := r.NotifService.GetSubscribedUsersWithLanguage("RESTAURANT")
 	if err != nil {
 		return fmt.Errorf("failed to get restaurant subscribers: %w", err)
 	}
@@ -158,32 +160,65 @@ func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
 		return nil
 	}
 
-	var tokens []string
+	// Group users by language
+	languageGroups := make(map[string][]models.NotificationTargetWithLanguage)
 	for _, sub := range subscribers {
 		if sub.NotificationToken != "" {
-			tokens = append(tokens, sub.NotificationToken)
+			languageGroups[sub.LanguageCode] = append(languageGroups[sub.LanguageCode], sub)
 		}
 	}
 
-	if len(tokens) == 0 {
+	if len(languageGroups) == 0 {
 		utils.LogMessage(utils.LevelInfo, "No valid notification tokens found")
 		return nil
 	}
 
-	payload := models.NotificationPayload{
-		NotificationTokens: tokens,
-		Title:              "NOUVEAU MENU V2",
-		Message:            "🤪 On peut laisser des review bientôt. Cette notif est un test merci de l'ignorer",
-		Sound:              "default",
-		ChannelID:          "default",
-		Data: map[string]interface{}{
-			"screen": "Restaurant",
-		},
-	}
+	totalSent := 0
 
-	err = r.NotifService.SendPushNotification(payload)
-	if err != nil {
-		return fmt.Errorf("failed to send push notification: %w", err)
+	// Send notifications to each language group
+	for langCode, users := range languageGroups {
+		localizer := appI18n.GetLocalizer(langCode)
+
+		title := localizer.MustLocalize(&i18n.LocalizeConfig{
+			MessageID: "restaurant_notification.title",
+			DefaultMessage: &i18n.Message{
+				ID:    "restaurant_notification.title",
+				Other: "🍽️ NEW MENU AVAILABLE!",
+			},
+		})
+
+		message := localizer.MustLocalize(&i18n.LocalizeConfig{
+			MessageID: "restaurant_notification.message",
+			DefaultMessage: &i18n.Message{
+				ID:    "restaurant_notification.message",
+				Other: "A delicious new menu awaits you at the cafeteria! Discover today's dishes and leave your reviews. Enjoy your meal!",
+			},
+		})
+
+		var tokens []string
+		for _, user := range users {
+			tokens = append(tokens, user.NotificationToken)
+		}
+
+		payload := models.NotificationPayload{
+			NotificationTokens: tokens,
+			Title:              title,
+			Message:            message,
+			Sound:              "default",
+			ChannelID:          "default",
+			Data: map[string]interface{}{
+				"screen": "Restaurant",
+			},
+		}
+
+		err = r.NotifService.SendPushNotification(payload)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to send notification to %s users: %v", langCode, err))
+			continue
+		}
+
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Sent menu notification to %d users in %s", len(tokens), langCode))
+		totalSent += len(tokens)
 	}
 
 	_, err = r.DB.Exec(`
@@ -194,7 +229,7 @@ func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
 		return fmt.Errorf("failed to record notification: %w", err)
 	}
 
-	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Sent menu notification to %d users", len(tokens)))
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Successfully sent menu notifications to %d users across %d languages", totalSent, len(languageGroups)))
 	return nil
 }
 
