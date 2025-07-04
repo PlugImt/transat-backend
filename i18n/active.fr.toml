@@ -40,10 +40,9 @@ subject = "🆘 Nouvelle demande de support : {{.Subject}}"
 title = "Nouvelle demande de support"
 
 [restaurant_notification]
-title = "🍽️ NOUVEAU MENU DISPONIBLE !"
-message = "Un délicieux nouveau menu vous attend au RU ! Découvrez les plats du jour et laissez vos avis. Bon appétit !"
+title = "🍽️ MENU DU JOUR DISPONIBLE !"
+message = "Découvrez les plats du jour et laissez vos avis, bon appétit !"
 
-# Button texts for deep links
 [buttons]
 open_app = "Ouvrir l'app"
 check_it_out = "Je check ça"
