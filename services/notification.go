@@ -10,7 +10,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/plugimt/transat-backend/models" // Assuming models are correctly placed
 	"github.com/plugimt/transat-backend/utils"
@@ -159,6 +158,41 @@ func (ns *NotificationService) GetSubscribedUsers(serviceName string) ([]models.
 	if err = rows.Err(); err != nil {
 		log.Printf("Error iterating over subscribed users rows: %v", err)
 		return nil, fmt.Errorf("failed to process subscribed users list: %w", err)
+	}
+
+	return targets, nil
+}
+
+// GetSubscribedUsersWithLanguage retrieves users subscribed to a specific service with their language preferences.
+func (ns *NotificationService) GetSubscribedUsersWithLanguage(serviceName string) ([]models.NotificationTargetWithLanguage, error) {
+	query := `
+		SELECT n.email, COALESCE(newf.notification_token, '') as notification_token, l.code as language_code
+		FROM notifications n
+		JOIN newf ON n.email = newf.email
+		JOIN services s ON n.id_services = s.id_services
+		JOIN languages l ON newf.language = l.id_languages
+		WHERE s.name = $1 AND newf.notification_token IS NOT NULL AND newf.notification_token != '';
+	`
+	rows, err := ns.db.Query(query, serviceName)
+	if err != nil {
+		log.Printf("Error querying subscribed users with language for %s: %v", serviceName, err)
+		return nil, fmt.Errorf("failed to query subscribed users with language: %w", err)
+	}
+	defer rows.Close()
+
+	var targets []models.NotificationTargetWithLanguage
+	for rows.Next() {
+		var target models.NotificationTargetWithLanguage
+		if err := rows.Scan(&target.Email, &target.NotificationToken, &target.LanguageCode); err != nil {
+			log.Printf("Error scanning notification target with language: %v", err)
+			continue // Skip this user on error
+		}
+		targets = append(targets, target)
+	}
+
+	if err = rows.Err(); err != nil {
+		log.Printf("Error iterating over subscribed users with language rows: %v", err)
+		return nil, fmt.Errorf("failed to process subscribed users with language list: %w", err)
 	}
 
 	return targets, nil
@@ -474,7 +508,7 @@ func (ns *NotificationService) SendDailyMenuNotification() error {
 	}
 
 	// Randomize selection
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(utils.UnixNanoParis(utils.Now())))
 	randomMessage := messages[r.Intn(len(messages))]
 
 	// Prepare base payload

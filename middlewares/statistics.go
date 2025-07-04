@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/services"
@@ -15,7 +14,7 @@ import (
 func StatisticsMiddleware(statisticsService *services.StatisticsService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Record request time
-		requestReceived := time.Now()
+		requestReceived := utils.Now()
 
 		// Store original URL path
 		endpoint := c.Path()
@@ -25,7 +24,7 @@ func StatisticsMiddleware(statisticsService *services.StatisticsService) fiber.H
 		err := c.Next()
 
 		// Record response time
-		responseSent := time.Now()
+		responseSent := utils.Now()
 
 		// Extract user email if available
 		userEmail := ""

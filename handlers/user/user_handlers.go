@@ -132,8 +132,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 		response["campus"] = newf.Campus
 	}
 	if passwordUpdated.Valid {
-		// Format the date/time as needed, e.g., RFC3339 or simpler date
-		response["password_updated_date"] = passwordUpdated.Time.Format(time.RFC3339)
+		response["password_updated_date"] = utils.FormatParis(passwordUpdated.Time, time.RFC3339)
 	}
 
 	utils.LogMessage(utils.LevelInfo, "User profile fetched successfully")
@@ -172,12 +171,13 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 		// Add validation for phone number format if needed
 		updateFields["phone_number"] = req.PhoneNumber
 	}
-	if req.GraduationYear != 0 { // Assuming 0 is not a valid year
-		if req.GraduationYear < 1900 || req.GraduationYear > time.Now().Year()+5 {
-			utils.LogMessage(utils.LevelWarn, "Invalid graduation year provided")
-		} else {
-			updateFields["graduation_year"] = req.GraduationYear
+	if req.GraduationYear != 0 {
+		if req.GraduationYear < 1900 || req.GraduationYear > utils.GetYearParis(utils.Now())+5 {
+			utils.LogMessage(utils.LevelWarn, "Invalid graduation year")
+			utils.LogFooter()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid graduation year"})
 		}
+		updateFields["graduation_year"] = req.GraduationYear
 	}
 	if req.Campus != "" {
 		updateFields["campus"] = req.Campus

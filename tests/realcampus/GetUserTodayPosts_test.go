@@ -7,13 +7,13 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"testing"
-	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/plugimt/transat-backend/realcampus/posts"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // TestGetUserTodayPosts_Success tests a successful response from GetUserTodayPosts.
@@ -23,10 +23,8 @@ func TestGetUserTodayPosts_Success(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	// Calculate today's start and end time in UTC.
-	now := time.Now().UTC()
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	endOfDay := startOfDay.Add(24 * time.Hour)
+	// Calculate today's start and end time in Paris timezone.
+	startOfDay, endOfDay := utils.TodayInParis()
 
 	// Prepare an expected query (using regexp for flexible whitespace matching).
 	expectedQuery := regexp.QuoteMeta(`
@@ -51,7 +49,7 @@ func TestGetUserTodayPosts_Success(t *testing.T) {
 
 	// Set up the expected row(s).
 	columns := []string{"id_post", "id_file_1", "id_file_2", "location", "privacy", "creation_date", "path1", "name1", "path2", "name2"}
-	sampleTime := time.Now().UTC()
+	sampleTime := utils.Now()
 	mockRows := sqlmock.NewRows(columns).AddRow(
 		1,                 // id_post
 		101,               // id_file_1
@@ -134,9 +132,7 @@ func TestGetUserTodayPosts_DBError(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	now := time.Now().UTC()
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	endOfDay := startOfDay.Add(24 * time.Hour)
+	startOfDay, endOfDay := utils.TodayInParis()
 
 	expectedQuery := regexp.QuoteMeta(`
 			SELECT 

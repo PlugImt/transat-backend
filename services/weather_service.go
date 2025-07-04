@@ -55,7 +55,7 @@ func (s *WeatherService) GetWeather(lang string) (*models.WeatherData, error) {
 
 	s.cacheLock.Lock()
 	cachedEntry, found := s.cache[lang]
-	if found && time.Since(cachedEntry.Timestamp) < cacheDuration {
+	if found && utils.SinceInParis(cachedEntry.Timestamp) < cacheDuration {
 		s.cacheLock.Unlock()
 		return cachedEntry.Data, nil
 	}
@@ -120,7 +120,7 @@ func (s *WeatherService) GetWeather(lang string) (*models.WeatherData, error) {
 	s.cacheLock.Lock()
 	s.cache[lang] = CachedWeather{
 		Data:      &data,
-		Timestamp: time.Now(),
+		Timestamp: utils.Now(),
 	}
 	s.cacheLock.Unlock()
 

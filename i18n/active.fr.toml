@@ -39,6 +39,18 @@ future_message = "On améliore l'appli grâce à vos retours, et des nouvelles f
 subject = "🆘 Nouvelle demande de support : {{.Subject}}"
 title = "Nouvelle demande de support"
 
+[restaurant_notification]
+title = "🍽️ MENU DU JOUR DISPONIBLE !"
+message = "Découvrez les plats du jour et laissez vos avis, bon appétit !"
+
+[buttons]
+open_app = "Ouvrir l'app"
+check_it_out = "Je check ça"
+open_laundry = "Voir les machines"
+open_restaurant = "Voir le menu"
+download_app = "Télécharger l'app"
+open_profile = "Accéder à mon profil"
+
 [weather]
 thunderstorm = "Orage"
 drizzle = "Bruine"

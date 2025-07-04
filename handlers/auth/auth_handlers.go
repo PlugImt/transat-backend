@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/models"
@@ -360,8 +359,8 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 			Time      string
 		}{
 			FirstName: firstName,
-			Date:      time.Now().Format("02/01/2006"), // Adjust format as needed
-			Time:      time.Now().Format("15:04:05"),   // Adjust format as needed
+			Date:      utils.FormatParis(utils.Now(), "02/01/2006"),
+			Time:      utils.FormatParis(utils.Now(), "15:04:05"),
 		}
 
 		// Run email sending in a separate goroutine
@@ -886,8 +885,8 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 			Time      string
 		}{
 			FirstName: firstName,
-			Date:      time.Now().Format("02/01/2006"),
-			Time:      time.Now().Format("15:04:05"),
+			Date:      utils.FormatParis(utils.Now(), "02/01/2006"),
+			Time:      utils.FormatParis(utils.Now(), "15:04:05"),
 		}
 
 		// Run email sending in a separate goroutine

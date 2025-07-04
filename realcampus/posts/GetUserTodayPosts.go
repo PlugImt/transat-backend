@@ -3,7 +3,6 @@ package posts
 import (
 	"database/sql"
 	"strings"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -36,9 +35,7 @@ func GetUserTodayPosts(db *sql.DB) fiber.Handler {
 
 		utils.LogLineKeyValue(utils.LevelInfo, "User", email)
 
-		now := time.Now().UTC()
-		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-		endOfDay := startOfDay.Add(24 * time.Hour)
+		startOfDay, endOfDay := utils.TodayInParis()
 
 		// Query for posts created today by the user.
 		rows, err := db.Query(`

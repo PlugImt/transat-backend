@@ -12,17 +12,17 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 	"github.com/plugimt/transat-backend/handlers"
-	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant" // Import restaurant handler explicitly
+	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/middlewares"
 	"github.com/plugimt/transat-backend/routes"
-	"github.com/plugimt/transat-backend/scheduler" // Import our scheduler package
+	"github.com/plugimt/transat-backend/scheduler"
 	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 	"github.com/robfig/cron/v3"
 
 	_ "github.com/lib/pq"
-	_ "github.com/nicksnyder/go-i18n/v2/i18n" // Keep for i18n initialization if still needed here
+	_ "github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/pressly/goose/v3"
 )
 
@@ -83,29 +83,22 @@ func init() {
 
 func main() {
 	app := fiber.New(fiber.Config{
-		// Set strict routing
-		StrictRouting: true,
-		// Add security-focused settings
+		StrictRouting:           true,
 		EnableTrustedProxyCheck: true,
-		// Limit the size of request body
-		BodyLimit: 15 * 1024 * 1024, // 15MB
-		// Set read timeout to avoid slow request attacks
-		ReadTimeout: 10 * time.Second,
-		// Set write timeout
-		WriteTimeout: 15 * time.Second,
-		// Set idle timeout
-		IdleTimeout: 120 * time.Second,
+		BodyLimit:               15 * 1024 * 1024, // 15MB
+		ReadTimeout:             10 * time.Second,
+		WriteTimeout:            15 * time.Second,
+		IdleTimeout:             120 * time.Second,
 	})
 
 	app.Use(utils.SentryHandler)
 
-	// Initialize Services
 	notificationService := services.NewNotificationService(db)
 	translationService, err := services.NewTranslationService()
 	if err != nil {
 		log.Fatalf("💥 Failed to create Translation Service: %v", err)
 	}
-	// Initialize Email Service
+
 	emailService := services.NewEmailService(
 		os.Getenv("EMAIL_HOST"),
 		os.Getenv("EMAIL_PORT"),
@@ -113,26 +106,22 @@ func main() {
 		os.Getenv("EMAIL_PASSWORD"),
 		os.Getenv("EMAIL_SENDER_NAME"),
 	)
-	// Initialize Statistics Service
+
 	statisticsService := services.NewStatisticsService(db)
 
-	// Initialize Handlers that need explicit instantiation (e.g., for Cron)
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
 
-	// Initialize Weather Service and Handler
 	weatherService, err := services.NewWeatherService()
 	if err != nil {
 		log.Fatalf("💥 Failed to create Weather Service: %v", err)
 	}
 	weatherHandler := handlers.NewWeatherHandler(weatherService)
 
-	// Initialize R2 Service
 	r2Service, err := services.NewR2Service()
 	if err != nil {
 		log.Fatalf("💥 Failed to create R2 Service: %v", err)
 	}
 
-	// Initialize and start schedulers
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
@@ -144,7 +133,6 @@ func main() {
 	defer c.Stop()
 
 	// ---- SECURITY MIDDLEWARES ----
-
 	// 1. Add security headers to all responses
 	app.Use(middlewares.SecurityHeadersMiddleware())
 
@@ -156,9 +144,9 @@ func main() {
 
 	// Use proper CORS origins in production, or * in development
 	if os.Getenv("ENV") == "production" {
-		corsConfig.AllowOrigins = os.Getenv("ALLOWED_ORIGINS") // Comma-separated list from env var
+		corsConfig.AllowOrigins = os.Getenv("ALLOWED_ORIGINS")
 	} else {
-		corsConfig.AllowOrigins = "*" // Allow all origins in development
+		corsConfig.AllowOrigins = "*"
 	}
 
 	app.Use(cors.New(corsConfig))
