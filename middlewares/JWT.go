@@ -41,6 +41,16 @@ func JWTMiddleware(c *fiber.Ctx) error {
 
 	c.Locals("email", claims["email"])
 
+	// Extract roles from token and store in context for easy access
+	if roles, err := utils.GetRolesFromToken(token); err == nil {
+		c.Locals("roles", roles)
+		utils.LogLineKeyValue(utils.LevelInfo, "Roles", roles)
+	} else {
+		utils.LogMessage(utils.LevelWarn, "Failed to extract roles from token")
+		utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
+		c.Locals("roles", []string{}) // Set empty roles array as fallback
+	}
+
 	utils.LogMessage(utils.LevelInfo, "Token is valid")
 	utils.LogLineKeyValue(utils.LevelInfo, "Email", claims["email"])
 	utils.LogFooter()

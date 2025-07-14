@@ -271,22 +271,18 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	}
 
 	var storedNewf models.Newf // Data fetched from DB
-	var role string
 	var languageCode string
 
-	// Fetch user, their role, and language in one query
-	query := `
-		SELECT n.email, n.password, COALESCE(r.name, 'UNKNOWN') as role, COALESCE(l.code, 'fr') as lang_code
+	// First, fetch user info and language
+	userQuery := `
+		SELECT n.email, n.password, COALESCE(l.code, 'fr') as lang_code
 		FROM newf n
-		LEFT JOIN newf_roles nr ON n.email = nr.email
-		LEFT JOIN roles r ON nr.id_roles = r.id_roles
 		LEFT JOIN languages l ON n.language = l.id_languages
 		WHERE n.email = $1;
 	`
-	err := h.DB.QueryRow(query, strings.ToLower(candidate.Email)).Scan(
+	err := h.DB.QueryRow(userQuery, strings.ToLower(candidate.Email)).Scan(
 		&storedNewf.Email,
 		&storedNewf.Password,
-		&role,
 		&languageCode,
 	)
 
@@ -304,6 +300,52 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
 
+	// Now fetch all roles for this user
+	rolesQuery := `
+		SELECT COALESCE(r.name, 'UNKNOWN') as role_name
+		FROM newf_roles nr
+		JOIN roles r ON nr.id_roles = r.id_roles
+		WHERE nr.email = $1;
+	`
+	rows, err := h.DB.Query(rolesQuery, strings.ToLower(candidate.Email))
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch user roles during login")
+		utils.LogLineKeyValue(utils.LevelError, "Email", candidate.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
+	}
+	defer rows.Close()
+
+	var roles []string
+	for rows.Next() {
+		var roleName string
+		if err := rows.Scan(&roleName); err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan role during login")
+			utils.LogLineKeyValue(utils.LevelError, "Email", candidate.Email)
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+		roles = append(roles, roleName)
+	}
+
+	// Check for errors during row iteration
+	if err := rows.Err(); err != nil {
+		utils.LogMessage(utils.LevelError, "Error during role iteration")
+		utils.LogLineKeyValue(utils.LevelError, "Email", candidate.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
+	}
+
+	// If no roles found, this might indicate a data integrity issue
+	if len(roles) == 0 {
+		utils.LogMessage(utils.LevelError, "Login failed: User has no roles assigned")
+		utils.LogLineKeyValue(utils.LevelError, "Email", candidate.Email)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Account configuration error"})
+	}
+
 	// Compare hashed password
 	err = bcrypt.CompareHashAndPassword([]byte(storedNewf.Password), []byte(candidate.Password))
 	if err != nil {
@@ -313,23 +355,34 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
 
-	// Check if account is validated
-	if role == "VERIFYING" {
+	// Check if account is validated - if any role is VERIFYING, account needs verification
+	hasVerifyingRole := false
+	hasUnknownRole := false
+	for _, userRole := range roles {
+		if userRole == "VERIFYING" {
+			hasVerifyingRole = true
+		}
+		if userRole == "UNKNOWN" {
+			hasUnknownRole = true
+		}
+	}
+
+	if hasVerifyingRole {
 		utils.LogMessage(utils.LevelWarn, "Login attempt failed: Account not verified")
 		utils.LogLineKeyValue(utils.LevelWarn, "Email", candidate.Email)
 		utils.LogFooter()
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Validate your account first"})
 	}
-	if role == "UNKNOWN" {
+	if hasUnknownRole {
 		// This shouldn't happen if DB constraints are set up correctly
-		utils.LogMessage(utils.LevelError, "Login failed: User role is unknown")
+		utils.LogMessage(utils.LevelError, "Login failed: User has unknown role")
 		utils.LogLineKeyValue(utils.LevelError, "Email", candidate.Email)
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Account configuration error"})
 	}
 
-	// Generate JWT
-	token, err := utils.GenerateJWT(storedNewf.Email, role, "") // Use device fingerprint or empty string if not available
+	// Generate JWT with all roles
+	token, err := utils.GenerateJWT(storedNewf.Email, roles, "") // Use device fingerprint or empty string if not available
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to generate JWT")
 		utils.LogLineKeyValue(utils.LevelError, "Email", storedNewf.Email)
@@ -506,9 +559,49 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong saving verification"})
 	}
 
-	// Generate JWT for immediate login
+	// Generate JWT for immediate login - fetch user's roles first
+	rolesQuery := `
+		SELECT COALESCE(r.name, 'UNKNOWN') as role_name
+		FROM newf_roles nr
+		JOIN roles r ON nr.id_roles = r.id_roles
+		WHERE nr.email = $1;
+	`
+	rows, err := h.DB.Query(rolesQuery, strings.ToLower(req.Email))
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch user roles after verification")
+		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Account verified successfully. Please log in."})
+	}
+	defer rows.Close()
+
+	var userRoles []string
+	for rows.Next() {
+		var roleName string
+		if err := rows.Scan(&roleName); err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan role after verification")
+			utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+		userRoles = append(userRoles, roleName)
+	}
+
+	if err := rows.Err(); err != nil {
+		utils.LogMessage(utils.LevelError, "Error during role iteration after verification")
+		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Account verified successfully. Please log in."})
+	}
+
+	if len(userRoles) == 0 {
+		userRoles = []string{"NEWF"}
+	}
+
 	var token string
-	token, err = utils.GenerateJWT(req.Email, "NEWF", "") // Empty fingerprint for now
+	token, err = utils.GenerateJWT(req.Email, userRoles, "") // Empty fingerprint for now
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to generate JWT after verification")
 		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
