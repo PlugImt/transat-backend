@@ -537,15 +537,28 @@ func (h *UserHandler) SendNotification(c *fiber.Ctx) error {
 	// 1. Check user permissions (is the logged-in user allowed to send?). Usually requires admin role.
 	// 2. Call the NotificationService's SendNotification method to handle the actual logic.
 
-	// --- Permission Check Placeholder ---
-	// role := c.Locals("role").(string) // Get role from JWT
-	// if role != "ADMIN" { // Example role check
+	// --- Permission Check Example (Updated for new role system) ---
+	// // Example 1: Check if user has ADMIN role
+	// if !utils.HasRoleInContext(c, "ADMIN") {
 	//    utils.LogMessage(utils.LevelWarn, "Unauthorized attempt to send notification")
 	//    utils.LogLineKeyValue(utils.LevelWarn, "User", c.Locals("email"))
 	// 	  utils.LogFooter()
 	// 	  return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Permission denied"})
 	// }
-	// --- End Permission Check ---
+	//
+	// // Example 2: Check if user has any admin-like roles
+	// adminRoles := []string{"ADMIN", "MODERATOR", "SUPER_USER"}
+	// if !utils.HasAnyRoleInContext(c, adminRoles) {
+	//    utils.LogMessage(utils.LevelWarn, "Unauthorized attempt to send notification")
+	//    utils.LogLineKeyValue(utils.LevelWarn, "User", c.Locals("email"))
+	// 	  utils.LogFooter()
+	// 	  return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Permission denied"})
+	// }
+	//
+	// // Example 3: Get all user roles for more complex logic
+	// userRoles := utils.GetRolesFromContext(c)
+	// utils.LogLineKeyValue(utils.LevelInfo, "User roles", userRoles)
+	// --- End Permission Check Examples ---
 
 	if h.NotifService == nil {
 		utils.LogMessage(utils.LevelError, "NotificationService is not available in UserHandler")

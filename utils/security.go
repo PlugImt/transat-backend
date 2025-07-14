@@ -12,14 +12,15 @@ var jwtSecret []byte
 
 // JWTClaims represents the claims in a JWT token with enhanced security fields
 type JWTClaims struct {
-	Email       string `json:"email"`
-	Role        string `json:"role,omitempty"`
-	Fingerprint string `json:"fingerprint,omitempty"` // For device fingerprinting
+	Email       string   `json:"email"`
+	Role        string   `json:"role,omitempty"`        // Deprecated: kept for backward compatibility
+	Roles       []string `json:"roles,omitempty"`       // New: array of all user roles
+	Fingerprint string   `json:"fingerprint,omitempty"` // For device fingerprinting
 	jwt.RegisteredClaims
 }
 
 // GenerateJWT creates a secure JWT token with enhanced claims
-func GenerateJWT(email, role string, fingerprint string) (string, error) {
+func GenerateJWT(email string, roles []string, fingerprint string) (string, error) {
 	if jwtSecret == nil {
 		jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 		if len(jwtSecret) == 0 {
@@ -40,10 +41,17 @@ func GenerateJWT(email, role string, fingerprint string) (string, error) {
 	now := Now()
 	expirationTime := AddInParis(now, time.Duration(expirationHours)*time.Hour)
 
+	// For backward compatibility, set Role to the first role if any exist
+	var primaryRole string
+	if len(roles) > 0 {
+		primaryRole = roles[0]
+	}
+
 	// Create enhanced claims
 	claims := &JWTClaims{
 		Email:       email,
-		Role:        role,
+		Role:        primaryRole, // Deprecated field for backward compatibility
+		Roles:       roles,       // New field with all roles
 		Fingerprint: fingerprint,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
@@ -145,4 +153,97 @@ func ValidateTokenFingerprint(token *jwt.Token, fingerprint string) bool {
 	}
 
 	return tokenFingerprint == fingerprint
+}
+
+func GetRolesFromToken(token *jwt.Token) ([]string, error) {
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid claims")
+	}
+
+	// Try to get roles array first (new format)
+	if rolesInterface, exists := claims["roles"]; exists {
+		if rolesArray, ok := rolesInterface.([]interface{}); ok {
+			roles := make([]string, len(rolesArray))
+			for i, role := range rolesArray {
+				if roleStr, ok := role.(string); ok {
+					roles[i] = roleStr
+				} else {
+					return nil, fmt.Errorf("invalid role type in roles array")
+				}
+			}
+			return roles, nil
+		}
+	}
+
+	// Fallback to single role field for backward compatibility
+	if roleInterface, exists := claims["role"]; exists {
+		if role, ok := roleInterface.(string); ok && role != "" {
+			return []string{role}, nil
+		}
+	}
+
+	return []string{}, nil
+}
+
+func HasRole(token *jwt.Token, targetRole string) bool {
+	roles, err := GetRolesFromToken(token)
+	if err != nil {
+		return false
+	}
+
+	for _, role := range roles {
+		if role == targetRole {
+			return true
+		}
+	}
+	return false
+}
+
+func HasAnyRole(token *jwt.Token, targetRoles []string) bool {
+	roles, err := GetRolesFromToken(token)
+	if err != nil {
+		return false
+	}
+
+	for _, userRole := range roles {
+		for _, targetRole := range targetRoles {
+			if userRole == targetRole {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func GetRolesFromContext(c interface{}) []string {
+	if ctx, ok := c.(interface{ Locals(key string) interface{} }); ok {
+		if roles, exists := ctx.Locals("roles").([]string); exists {
+			return roles
+		}
+	}
+	return []string{}
+}
+
+func HasRoleInContext(c interface{}, targetRole string) bool {
+	roles := GetRolesFromContext(c)
+	for _, role := range roles {
+		if role == targetRole {
+			return true
+		}
+	}
+	return false
+}
+
+// HasAnyRoleInContext checks if user has any of the specified roles using fiber context
+func HasAnyRoleInContext(c interface{}, targetRoles []string) bool {
+	userRoles := GetRolesFromContext(c)
+	for _, userRole := range userRoles {
+		for _, targetRole := range targetRoles {
+			if userRole == targetRole {
+				return true
+			}
+		}
+	}
+	return false
 }

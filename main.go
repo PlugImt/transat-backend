@@ -178,13 +178,10 @@ func main() {
 		return c.SendString("API is up and running")
 	})
 
-	// API Group
-	api := app.Group("/")
-
-	// Setup Routes using the new structure
-	// Pass necessary dependencies (db, jwtSecret, services) to setup functions
+	// TODO: API Group --- LEGACY CODE TO BE REMOVED IN A FUTURE RELEASE
+	api := app.Group("/api")
 	routes.SetupAuthRoutes(api, db, jwtSecret, notificationService, emailService)
-	routes.SetupUserRoutes(api, db, notificationService) // Pass notificationService if needed by user handlers
+	routes.SetupUserRoutes(api, db, notificationService)
 	routes.SetupTraqRoutes(api, db)
 	routes.SetupFileRoutes(api, db, r2Service)
 	routes.SetupRestaurantRoutes(api, restHandler)
