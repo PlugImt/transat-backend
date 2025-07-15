@@ -20,7 +20,14 @@ const (
 
 var logger sentry.Logger
 
+func init() {
+	InitLogger()
+}
+
 func InitLogger() {
+	if logger != nil {
+		return // Already initialized
+	}
 	ctx := context.Background()
 	logger = sentry.NewLogger(ctx)
 }
@@ -32,15 +39,19 @@ func _log(level LogLevel, msg string) {
 		return
 	}
 	log.Printf("║ %s: %s\n", level, msg)
-	switch level {
-	case LevelInfo:
-		logger.Info(ctx, msg)
-	case LevelError:
-		logger.Error(ctx, msg)
-	case LevelWarn:
-		logger.Warn(ctx, msg)
-	case LevelDebug:
-		logger.Debug(ctx, msg)
+
+	// Safety check: only use sentry logger if it's initialized
+	if logger != nil {
+		switch level {
+		case LevelInfo:
+			logger.Info(ctx, msg)
+		case LevelError:
+			logger.Error(ctx, msg)
+		case LevelWarn:
+			logger.Warn(ctx, msg)
+		case LevelDebug:
+			logger.Debug(ctx, msg)
+		}
 	}
 }
 
