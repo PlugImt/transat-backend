@@ -22,6 +22,17 @@ func XSSProtectionMiddleware() fiber.Handler {
 			return c.Next()
 		}
 
+		// Skip for routes that don't require a body
+		path := c.Path()
+		if strings.HasSuffix(path, "/join") || strings.HasSuffix(path, "/leave") {
+			return c.Next()
+		}
+
+		// If body is empty, skip validation
+		if len(c.Body()) == 0 {
+			return c.Next()
+		}
+
 		// XSS attack patterns to check for
 		xssPatterns := []*regexp.Regexp{
 			regexp.MustCompile(`(?i)<script.*?>.*?</script.*?>`),

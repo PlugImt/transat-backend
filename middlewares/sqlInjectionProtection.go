@@ -16,6 +16,17 @@ func SQLInjectionProtectionMiddleware() fiber.Handler {
 			return c.Next()
 		}
 
+		// Skip for routes that don't require a body
+		path := c.Path()
+		if strings.HasSuffix(path, "/join") || strings.HasSuffix(path, "/leave") {
+			return c.Next()
+		}
+
+		// If body is empty, skip validation
+		if len(c.Body()) == 0 {
+			return c.Next()
+		}
+
 		// List of SQL injection patterns to check for
 		sqlInjectionPatterns := []*regexp.Regexp{
 			regexp.MustCompile(`(?i)(\s|^)(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|UNION|JOIN|WHERE|AND|OR|LIKE|HAVING|GROUP\s+BY|ORDER\s+BY)(\s|$)`),
