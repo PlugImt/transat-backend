@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"github.com/plugimt/transat-backend/handlers/club"
 	"log"
 	"os"
 	"time"
@@ -122,6 +123,8 @@ func main() {
 		log.Fatalf("💥 Failed to create R2 Service: %v", err)
 	}
 
+	clubsHandler := club.NewclubHandler(db)
+
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
@@ -176,19 +179,20 @@ func main() {
 		return c.SendString("API is up and running")
 	})
 
-	// TODO: API Group --- LEGACY CODE TO BE REMOVED IN A FUTURE RELEASE
-	api := app.Group("/api")
-	routes.SetupAuthRoutes(api, db, jwtSecret, notificationService, emailService)
-	routes.SetupUserRoutes(api, db, notificationService)
-	routes.SetupTraqRoutes(api, db)
-	routes.SetupFileRoutes(api, db, r2Service)
-	routes.SetupRestaurantRoutes(api, restHandler)
-	routes.SetupRealCampusRoutes(api, db)
-	routes.SetupPlanningRoutes(api, db)
-	routes.SetupStatisticsRoutes(api, db, statisticsService)     // Setup statistics routes
-	routes.SetupWashingMachineRoutes(api)                        // Setup washing machine routes
-	routes.SetupWeatherRoutes(api, weatherHandler)               // Setup weather routes
-	routes.SetupNotificationRoutes(api, db, notificationService) // Setup notification test routes
+	// API Group --- NEW ROUTES
+	routes.SetupAuthRoutes(app, db, jwtSecret, notificationService, emailService)
+	routes.SetupUserRoutes(app, db, notificationService)
+	routes.SetupTraqRoutes(app, db)
+	routes.SetupFileRoutes(app, db, r2Service)
+	routes.SetupRestaurantRoutes(app, restHandler)
+	routes.SetupClubRoutes(app, clubsHandler)
+	routes.SetupRealCampusRoutes(app, db)
+	routes.SetupPlanningRoutes(app, db)
+	routes.SetupNotificationRoutes(app, db, notificationService)
+	routes.SetupStatisticsRoutes(app, db, statisticsService)
+	routes.SetupWashingMachineRoutes(app)
+	routes.SetupWeatherRoutes(app, weatherHandler)
+	routes.SetupNotificationRoutes(app, db, notificationService)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
