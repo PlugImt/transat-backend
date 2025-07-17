@@ -12,7 +12,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 	"github.com/plugimt/transat-backend/handlers"
-	"github.com/plugimt/transat-backend/handlers/clubs"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/middlewares"
@@ -111,7 +110,6 @@ func main() {
 	statisticsService := services.NewStatisticsService(db)
 
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
-	clubsHandlerInstance := clubs.NewClubsHandler(db)
 
 	weatherService, err := services.NewWeatherService()
 	if err != nil {
@@ -185,35 +183,12 @@ func main() {
 	routes.SetupTraqRoutes(api, db)
 	routes.SetupFileRoutes(api, db, r2Service)
 	routes.SetupRestaurantRoutes(api, restHandler)
-	routes.SetupClubsRoutes(api, clubsHandlerInstance)
 	routes.SetupRealCampusRoutes(api, db)
 	routes.SetupPlanningRoutes(api, db)
 	routes.SetupStatisticsRoutes(api, db, statisticsService)     // Setup statistics routes
 	routes.SetupWashingMachineRoutes(api)                        // Setup washing machine routes
 	routes.SetupWeatherRoutes(api, weatherHandler)               // Setup weather routes
 	routes.SetupNotificationRoutes(api, db, notificationService) // Setup notification test routes
-	routes.SetupStatisticsRoutes(api, db, statisticsService)
-	routes.SetupWashingMachineRoutes(api)
-	routes.SetupWeatherRoutes(api, weatherHandler)
-	routes.SetupNotificationRoutes(api, db, notificationService)
-
-	// API Group --- NEW ROUTES
-	routes.SetupAuthRoutes(app, db, jwtSecret, notificationService, emailService)
-	routes.SetupUserRoutes(app, db, notificationService) // Pass notificationService if needed by user handlers
-	routes.SetupTraqRoutes(app, db)
-	routes.SetupFileRoutes(app, db, r2Service)
-	routes.SetupRestaurantRoutes(app, restHandler)
-	routes.SetupClubsRoutes(app, clubsHandlerInstance)
-	routes.SetupRealCampusRoutes(app, db)
-	routes.SetupPlanningRoutes(app, db)
-	routes.SetupStatisticsRoutes(app, db, statisticsService)     // Setup statistics routes
-	routes.SetupWashingMachineRoutes(app)                        // Setup washing machine routes
-	routes.SetupWeatherRoutes(app, weatherHandler)               // Setup weather routes
-	routes.SetupNotificationRoutes(app, db, notificationService) // Setup notification test routes
-	routes.SetupStatisticsRoutes(app, db, statisticsService)
-	routes.SetupWashingMachineRoutes(app)
-	routes.SetupWeatherRoutes(app, weatherHandler)
-	routes.SetupNotificationRoutes(app, db, notificationService)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
