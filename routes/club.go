@@ -1,8 +1,6 @@
 package routes
 
 import (
-	"database/sql"
-
 	"github.com/plugimt/transat-backend/handlers/club" // Import the club handlers
 	"github.com/plugimt/transat-backend/middlewares"
 	"github.com/plugimt/transat-backend/utils"
@@ -10,8 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func SetupClubRoutes(router fiber.Router, db *sql.DB) {
-	clubHandler := club.NewclubHandler(db)
+func SetupClubRoutes(router fiber.Router, clubHandler *club.ClubHandler) {
 
 	clubGroup := router.Group("/club", middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail)
 
@@ -24,7 +21,6 @@ func SetupClubRoutes(router fiber.Router, db *sql.DB) {
 	clubGroup.Patch("/:id", clubHandler.UpdateClub)
 	clubGroup.Post("/:id/respo", clubHandler.AddClubRespo)
 
-	clubGroup.Get("/my", clubHandler.GetMyClub)
 	clubGroup.Post("/:id/join", clubHandler.JoinClub)
 	clubGroup.Post("/:id/leave", clubHandler.LeaveClub)
 

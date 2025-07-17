@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/plugimt/transat-backend/handlers/club"
 	"log"
 	"os"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 	"github.com/plugimt/transat-backend/handlers"
+	"github.com/plugimt/transat-backend/handlers/club"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/middlewares"
