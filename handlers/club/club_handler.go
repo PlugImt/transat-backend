@@ -663,11 +663,7 @@ func (h *ClubHandler) AddClubRespo(c *fiber.Ctx) error {
 	utils.LogLineKeyValue(utils.LevelInfo, "Club ID", clubID)
 	utils.LogLineKeyValue(utils.LevelInfo, "Current User", userEmail)
 
-	// Check if user has ADMIN role or is current responsible
-	userRoles := utils.GetRolesFromContext(c)
-	isAdmin := utils.HasRoleInContext(c, "ADMIN")
-
-	// Get club name and check if user is current responsible
+	// Get club name first
 	var clubName string
 	err = h.db.QueryRow("SELECT name FROM clubs WHERE id_clubs = $1", clubID).Scan(&clubName)
 	if err != nil {
@@ -685,32 +681,59 @@ func (h *ClubHandler) AddClubRespo(c *fiber.Ctx) error {
 		})
 	}
 
+	// Check permissions directly from database - more secure!
 	roleName := fmt.Sprintf("%s_respo", strings.ToLower(strings.ReplaceAll(clubName, " ", "")))
-	isCurrentRespo := false
-	for _, role := range userRoles {
-		if role == roleName {
-			isCurrentRespo = true
-			break
-		}
+	utils.LogLineKeyValue(utils.LevelInfo, "Expected Role Name", roleName)
+
+	// Check if user has permission (ADMIN or current responsible) in one efficient query
+	var hasPermission bool
+	permissionQuery := `
+		SELECT EXISTS(
+			SELECT 1 FROM newf n
+			JOIN newf_roles nr ON n.email = nr.email
+			JOIN roles r ON nr.id_roles = r.id_roles
+			WHERE n.email = $1 AND (r.name = 'ADMIN' OR r.name = $2)
+		)`
+	err = h.db.QueryRow(permissionQuery, userEmail, roleName).Scan(&hasPermission)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check permissions")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check permissions",
+		})
 	}
 
-	if !isAdmin && !isCurrentRespo {
+	utils.LogLineKeyValue(utils.LevelInfo, "Has Permission (ADMIN or Respo)", hasPermission)
+
+	if !hasPermission {
 		utils.LogMessage(utils.LevelWarn, "User not authorized to change responsible")
+		utils.LogLineKeyValue(utils.LevelWarn, "Has Permission", hasPermission)
+		utils.LogLineKeyValue(utils.LevelWarn, "Expected Role", roleName)
 		utils.LogFooter()
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"error": "Only admins or current responsibles can change club responsible",
 		})
 	}
 
+	// Debug: Log the raw body content
+	bodyBytes := c.Body()
+	utils.LogLineKeyValue(utils.LevelInfo, "Raw Body", string(bodyBytes))
+	utils.LogLineKeyValue(utils.LevelInfo, "Content-Type", c.Get("Content-Type"))
+
 	var req models.AddRespoRequest
 	if err := c.BodyParser(&req); err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to parse request body")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogLineKeyValue(utils.LevelError, "Raw Body", string(bodyBytes))
+		utils.LogLineKeyValue(utils.LevelError, "Content-Type", c.Get("Content-Type"))
 		utils.LogFooter()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
+
+	utils.LogLineKeyValue(utils.LevelInfo, "Parsed Request", req)
 
 	if req.Email == "" {
 		utils.LogMessage(utils.LevelWarn, "Email is required")
@@ -758,6 +781,8 @@ func (h *ClubHandler) AddClubRespo(c *fiber.Ctx) error {
 	err = tx.QueryRow("SELECT id_roles FROM roles WHERE name = $1", roleName).Scan(&roleID)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to get role ID")
+		utils.LogLineKeyValue(utils.LevelError, "Role Name", roleName)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to get role information",

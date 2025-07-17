@@ -215,35 +215,3 @@ func HasAnyRole(token *jwt.Token, targetRoles []string) bool {
 	}
 	return false
 }
-
-func GetRolesFromContext(c interface{}) []string {
-	if ctx, ok := c.(interface{ Locals(key string) interface{} }); ok {
-		if roles, exists := ctx.Locals("roles").([]string); exists {
-			return roles
-		}
-	}
-	return []string{}
-}
-
-func HasRoleInContext(c interface{}, targetRole string) bool {
-	roles := GetRolesFromContext(c)
-	for _, role := range roles {
-		if role == targetRole {
-			return true
-		}
-	}
-	return false
-}
-
-// HasAnyRoleInContext checks if user has any of the specified roles using fiber context
-func HasAnyRoleInContext(c interface{}, targetRoles []string) bool {
-	userRoles := GetRolesFromContext(c)
-	for _, userRole := range userRoles {
-		for _, targetRole := range targetRoles {
-			if userRole == targetRole {
-				return true
-			}
-		}
-	}
-	return false
-}
