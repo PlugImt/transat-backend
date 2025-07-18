@@ -47,6 +47,8 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse your data"})
 	}
 
+	newf.Email = strings.ToLower(newf.Email)
+	
 	// Validate required fields
 	if newf.Email == "" || newf.Password == "" {
 		utils.LogMessage(utils.LevelWarn, "Registration request missing email or password")
@@ -273,6 +275,22 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var storedNewf models.Newf // Data fetched from DB
 	var languageCode string
 
+	candidate.Email = strings.ToLower(candidate.Email)
+
+	emailValid, err := utils.CheckEmail(candidate.Email) // Use helper from utils
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check email validity")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "There is an error checking your email"})
+	}
+	if !emailValid {
+		utils.LogMessage(utils.LevelError, "Invalid email format")
+		utils.LogLineKeyValue(utils.LevelError, "Email", candidate.Email)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid email format"})
+	}
+
 	// First, fetch user info and language
 	userQuery := `
 		SELECT n.email, n.password, COALESCE(l.code, 'fr') as lang_code
@@ -280,7 +298,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		LEFT JOIN languages l ON n.language = l.id_languages
 		WHERE n.email = $1;
 	`
-	err := h.DB.QueryRow(userQuery, strings.ToLower(candidate.Email)).Scan(
+	err = h.DB.QueryRow(userQuery, strings.ToLower(candidate.Email)).Scan(
 		&storedNewf.Email,
 		&storedNewf.Password,
 		&languageCode,
