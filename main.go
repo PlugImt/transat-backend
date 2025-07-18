@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 	"github.com/plugimt/transat-backend/handlers"
+	"github.com/plugimt/transat-backend/handlers/club"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/middlewares"
@@ -121,6 +122,8 @@ func main() {
 		log.Fatalf("💥 Failed to create R2 Service: %v", err)
 	}
 
+	clubsHandler := club.NewclubHandler(db)
+
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
@@ -175,28 +178,16 @@ func main() {
 		return c.SendString("API is up and running")
 	})
 
-	// TODO: API Group --- LEGACY CODE TO BE REMOVED IN A FUTURE RELEASE
-	api := app.Group("/api")
-	routes.SetupAuthRoutes(api, db, jwtSecret, notificationService, emailService)
-	routes.SetupUserRoutes(api, db, notificationService)
-	routes.SetupTraqRoutes(api, db)
-	routes.SetupFileRoutes(api, db, r2Service)
-	routes.SetupRestaurantRoutes(api, restHandler)
-	routes.SetupRealCampusRoutes(api, db)
-	routes.SetupPlanningRoutes(api, db)
-	routes.SetupStatisticsRoutes(api, db, statisticsService)
-	routes.SetupWashingMachineRoutes(api)
-	routes.SetupWeatherRoutes(api, weatherHandler)
-	routes.SetupNotificationRoutes(api, db, notificationService)
-
 	// API Group --- NEW ROUTES
 	routes.SetupAuthRoutes(app, db, jwtSecret, notificationService, emailService)
 	routes.SetupUserRoutes(app, db, notificationService)
 	routes.SetupTraqRoutes(app, db)
 	routes.SetupFileRoutes(app, db, r2Service)
 	routes.SetupRestaurantRoutes(app, restHandler)
+	routes.SetupClubRoutes(app, clubsHandler)
 	routes.SetupRealCampusRoutes(app, db)
 	routes.SetupPlanningRoutes(app, db)
+	routes.SetupNotificationRoutes(app, db, notificationService)
 	routes.SetupStatisticsRoutes(app, db, statisticsService)
 	routes.SetupWashingMachineRoutes(app)
 	routes.SetupWeatherRoutes(app, weatherHandler)

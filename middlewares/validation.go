@@ -48,6 +48,17 @@ func ValidationMiddleware() fiber.Handler {
 			return c.Next()
 		}
 
+		// Skip validation for routes that don't require a body
+		path := c.Path()
+		if strings.HasSuffix(path, "/join") || strings.HasSuffix(path, "/leave") {
+			return c.Next()
+		}
+
+		// If body is empty, skip validation
+		if len(c.Body()) == 0 {
+			return c.Next()
+		}
+
 		// Parse the request body into a map
 		var requestBody map[string]interface{}
 		if err := json.Unmarshal(c.Body(), &requestBody); err != nil {

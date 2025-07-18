@@ -45,6 +45,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 			COALESCE(n.profile_picture, '') AS profile_picture,
 			COALESCE(n.phone_number, '') AS phone_number,
 			COALESCE(n.graduation_year, 0) AS graduation_year,
+			COALESCE(n.formation_name, '') AS formation_name,
 			COALESCE(n.campus, '') AS campus,
 			-- COALESCE(n.notification_token, '') AS notification_token, -- Maybe don't expose token?
 			n.password_updated_date, -- Consider format or omitting
@@ -78,6 +79,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 		&newf.ProfilePicture,
 		&newf.PhoneNumber,
 		&newf.GraduationYear,
+		&newf.FormationName,
 		&newf.Campus,
 		// &newf.NotificationToken, // Omitted
 		&passwordUpdated,
@@ -127,6 +129,9 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 	}
 	if newf.GraduationYear != 0 {
 		response["graduation_year"] = newf.GraduationYear
+	}
+	if newf.FormationName != "" {
+		response["formation_name"] = newf.FormationName
 	}
 	if newf.Campus != "" {
 		response["campus"] = newf.Campus
@@ -178,6 +183,17 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid graduation year"})
 		}
 		updateFields["graduation_year"] = req.GraduationYear
+	}
+	if req.FormationName != "" {
+		req.FormationName = strings.ToUpper(req.FormationName)
+
+		// Validate formation name against known values if needed
+		if !utils.IsValidFormationName(req.FormationName) {
+			utils.LogMessage(utils.LevelWarn, "Invalid formation name")
+			utils.LogFooter()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid formation name"})
+		}
+		updateFields["formation_name"] = req.FormationName
 	}
 	if req.Campus != "" {
 		updateFields["campus"] = req.Campus
