@@ -140,3 +140,15 @@ func GetLanguageCode(db *sql.DB, email string) (string, error) {
 	}
 	return languageCode, nil
 }
+
+func IsValidFormationName(formationName string) bool {
+	validFormations := map[string]bool{
+		"FIL":  true,
+		"FISE": true,
+		"FIT":  true,
+		"FIP":  true,
+		"FID":  true,
+	}
+
+	return validFormations[formationName]
+}

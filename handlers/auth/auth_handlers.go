@@ -48,7 +48,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	newf.Email = strings.ToLower(newf.Email)
-	
+
 	// Validate required fields
 	if newf.Email == "" || newf.Password == "" {
 		utils.LogMessage(utils.LevelWarn, "Registration request missing email or password")
