@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"github.com/plugimt/transat-backend/handlers/event"
 	"log"
 	"os"
 	"time"
@@ -124,6 +125,8 @@ func main() {
 
 	clubsHandler := club.NewclubHandler(db)
 
+	eventHandler := event.NeweventHandler(db)
+
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
@@ -192,6 +195,7 @@ func main() {
 	routes.SetupWashingMachineRoutes(app)
 	routes.SetupWeatherRoutes(app, weatherHandler)
 	routes.SetupNotificationRoutes(app, db, notificationService)
+	routes.SetupEventRoutes(app, eventHandler)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
