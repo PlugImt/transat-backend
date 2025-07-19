@@ -3,9 +3,10 @@ package restaurant
 import (
 	"database/sql"
 	"fmt"
-	"github.com/plugimt/transat-backend/models"
 	"strconv"
 	"time"
+
+	"github.com/plugimt/transat-backend/models"
 
 	"github.com/plugimt/transat-backend/handlers/restaurant/repository"
 	"github.com/plugimt/transat-backend/handlers/restaurant/service"
@@ -211,7 +212,7 @@ func (h *RestaurantHandler) GetRestaurantTestMenu(c *fiber.Ctx) error {
 			{ID: 103, Name: "haricots beurre persillées", AverageRating: 4.1},
 			{ID: 50, Name: "lentilles vertes bio", AverageRating: 4.0},
 		},
-		UpdatedDate: utils.FormatParis(utils.Now(), time.RFC3339),
+		UpdatedDate: utils.FormatParis(h.MenuRepository.GetLastMenuUpdateTime(), time.RFC3339),
 	})
 }
 

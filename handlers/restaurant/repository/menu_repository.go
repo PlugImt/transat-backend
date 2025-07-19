@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -18,13 +19,70 @@ import (
 type MenuRepository struct {
 	DB           *sql.DB
 	NotifService *services.NotificationService
+	// Cache for menu update tracking
+	menuUpdateCache struct {
+		lastUpdateTime time.Time
+		mutex          sync.RWMutex
+	}
 }
 
 func NewMenuRepository(db *sql.DB, notifService *services.NotificationService) *MenuRepository {
-	return &MenuRepository{
+	repo := &MenuRepository{
 		DB:           db,
 		NotifService: notifService,
 	}
+
+	// Initialize cache with current time
+	repo.menuUpdateCache.lastUpdateTime = utils.Now()
+
+	// Try to recover last update time from database
+	repo.initializeMenuUpdateCache()
+
+	return repo
+}
+
+// initializeMenuUpdateCache tries to recover the last menu update time from the database
+func (r *MenuRepository) initializeMenuUpdateCache() {
+	// Get the most recent menu update by looking at the latest restaurant_meals entry
+	var lastUpdate sql.NullTime
+	err := r.DB.QueryRow(`
+		SELECT MAX(date_served) 
+		FROM restaurant_meals
+	`).Scan(&lastUpdate)
+
+	if err != nil {
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to recover menu update time from database: %v", err))
+		return
+	}
+
+	if lastUpdate.Valid {
+		r.menuUpdateCache.mutex.Lock()
+		r.menuUpdateCache.lastUpdateTime = lastUpdate.Time
+		r.menuUpdateCache.mutex.Unlock()
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Recovered menu update time from database: %s", lastUpdate.Time.Format(time.RFC3339)))
+	}
+}
+
+// GetLastMenuUpdateTime returns the cached last menu update time
+func (r *MenuRepository) GetLastMenuUpdateTime() time.Time {
+	r.menuUpdateCache.mutex.RLock()
+	defer r.menuUpdateCache.mutex.RUnlock()
+	return r.menuUpdateCache.lastUpdateTime
+}
+
+// UpdateMenuUpdateTime updates the cached menu update time
+func (r *MenuRepository) UpdateMenuUpdateTime() {
+	r.menuUpdateCache.mutex.Lock()
+	defer r.menuUpdateCache.mutex.Unlock()
+	r.menuUpdateCache.lastUpdateTime = utils.Now()
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Menu update cache updated: %s", r.menuUpdateCache.lastUpdateTime.Format(time.RFC3339)))
+}
+
+// GetMenuUpdateCacheStatus returns the current cache status for debugging
+func (r *MenuRepository) GetMenuUpdateCacheStatus() time.Time {
+	r.menuUpdateCache.mutex.RLock()
+	defer r.menuUpdateCache.mutex.RUnlock()
+	return r.menuUpdateCache.lastUpdateTime
 }
 
 // GetDishDetails retrieves detailed information about a specific dish
@@ -431,6 +489,12 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Successfully synchronized menu with %d items", len(processedArticleIDs)))
 
+	// Update the menu update cache if items were processed
+	if len(processedArticleIDs) > 0 {
+		r.UpdateMenuUpdateTime()
+		utils.LogMessage(utils.LevelInfo, "Updated menu update cache timestamp")
+	}
+
 	// Check if we should send a notification (similarity < 80% and no notification sent today and time allowed)
 	if similarity < 0.8 && len(processedArticleIDs) > 0 && internal.IsNotificationTimeAllowed(utils.Now()) {
 		shouldSendNotification, err := r.shouldSendMenuNotification(today)
@@ -516,7 +580,7 @@ func (r *MenuRepository) GetTodaysMenuCategorized() (*models.CategorizedMenuResp
 		AccompMidi:    []models.MenuItemWithRating{},
 		GrilladesSoir: []models.MenuItemWithRating{},
 		AccompSoir:    []models.MenuItemWithRating{},
-		UpdatedDate:   utils.FormatParis(utils.Now(), time.RFC3339),
+		UpdatedDate:   utils.FormatParis(r.GetLastMenuUpdateTime(), time.RFC3339),
 	}
 
 	if menuCount == 0 {
