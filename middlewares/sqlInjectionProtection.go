@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -30,12 +31,12 @@ func SQLInjectionProtectionMiddleware() fiber.Handler {
 		// List of SQL injection patterns to check for
 		sqlInjectionPatterns := []*regexp.Regexp{
 			regexp.MustCompile(`(?i)(\s|^)(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|UNION|JOIN|WHERE|AND|OR|LIKE|HAVING|GROUP\s+BY|ORDER\s+BY)(\s|$)`),
-			regexp.MustCompile(`(?i)'(''|[^'])*'`),                              // SQL strings
-			regexp.MustCompile(`(?i);`),                                         // SQL statement terminator
-			regexp.MustCompile(`(?i)--`),                                        // SQL comment
-			regexp.MustCompile(`(?i)\/\*.*?\*\/`),                               // SQL block comment
+			regexp.MustCompile(`(?i)'(''|[^'])*'`),                                // SQL strings
+			regexp.MustCompile(`(?i);`),                                           // SQL statement terminator
+			regexp.MustCompile(`(?i)--`),                                          // SQL comment
+			regexp.MustCompile(`(?i)\/\*.*?\*\/`),                                 // SQL block comment
 			regexp.MustCompile(`(?i)(\s|^)(EXEC|EXECUTE|EXEC\(|EXECUTE\()(\s|$)`), // SQL execution commands
-			regexp.MustCompile(`(?i)xp_`),                                       // SQL Server extended stored procedures
+			regexp.MustCompile(`(?i)xp_`),                                         // SQL Server extended stored procedures
 		}
 
 		// Parse the request body into a map
@@ -90,4 +91,4 @@ func SQLInjectionProtectionMiddleware() fiber.Handler {
 
 		return c.Next()
 	}
-} 
+}

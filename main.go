@@ -3,10 +3,11 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/plugimt/transat-backend/handlers/event"
 	"log"
 	"os"
 	"time"
+
+	"github.com/plugimt/transat-backend/handlers/event"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -125,7 +126,7 @@ func main() {
 
 	clubsHandler := club.NewclubHandler(db)
 
-	eventHandler := event.NeweventHandler(db)
+	eventHandler := event.NewEventHandler(db)
 
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
