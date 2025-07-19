@@ -9,8 +9,15 @@ import (
 
 func SetupRestaurantRoutes(router fiber.Router, h *restaurantHandler.RestaurantHandler) {
 	// Public routes (no authentication required)
-	router.Get("/restaurant", h.GetRestaurantMenu)
-	router.Get("/restaurant/:id", h.GetDishDetails)
 
-	router.Post("/restaurant/:id", middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail, h.PostDishReview)
+	restaurant := router.Group("/restaurant")
+
+	restaurant.Get("/", h.GetRestaurantMenu)
+	restaurant.Get("", h.GetRestaurantMenu)
+
+	restaurant.Get("/test", h.GetRestaurantTestMenu)
+
+	restaurant.Get("/:id", h.GetDishDetails)
+
+	restaurant.Post("/:id", middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail, h.PostDishReview)
 }

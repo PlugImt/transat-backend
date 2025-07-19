@@ -3,7 +3,9 @@ package restaurant
 import (
 	"database/sql"
 	"fmt"
+	"github.com/plugimt/transat-backend/models"
 	"strconv"
+	"time"
 
 	"github.com/plugimt/transat-backend/handlers/restaurant/repository"
 	"github.com/plugimt/transat-backend/handlers/restaurant/service"
@@ -56,7 +58,7 @@ func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 	if totalItems == 0 {
 		utils.LogMessage(utils.LevelInfo, "No menu found for today")
 		utils.LogFooter()
-		return c.Status(fiber.StatusNoContent).JSON(menuResponse)
+		return c.Status(fiber.StatusOK).JSON(menuResponse)
 	}
 
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved categorized menu with %d total items", totalItems))
@@ -174,6 +176,43 @@ func (h *RestaurantHandler) PostDishReview(c *fiber.Ctx) error {
 	utils.LogFooter()
 
 	return c.JSON(result)
+}
+
+func (h *RestaurantHandler) GetRestaurantTestMenu(c *fiber.Ctx) error {
+	utils.LogHeader("🍽️ Get Restaurant Test Menu")
+
+	utils.LogMessage(utils.LevelInfo, "Returning test menu data")
+	utils.LogFooter()
+	
+	return c.JSON(&models.CategorizedMenuResponse{
+		GrilladesMidi: []models.MenuItemWithRating{
+			{ID: 20, Name: "poulet rôti", AverageRating: 4.5},
+			{ID: 84, Name: "spaghetti à la bolognaise", AverageRating: 4.7},
+			{ID: 68, Name: "vol au vent de colin", AverageRating: 4.2},
+		},
+		Migrateurs: []models.MenuItemWithRating{
+			{ID: 165, Name: "estouffade de calamars à la nazaré", AverageRating: 4.8},
+			{ID: 164, Name: "boulette de boeuf à la crème de champignons", AverageRating: 4.3},
+		},
+		Cibo: []models.MenuItemWithRating{
+			{ID: 52, Name: "risotto aux champignons et courgettes", AverageRating: 4.6},
+			{ID: 67, Name: "pizza végétarienne", AverageRating: 4.4},
+		},
+		AccompMidi: []models.MenuItemWithRating{
+			{ID: 12, Name: "gâteau de choux fleurs noix et mimolette", AverageRating: 4.1},
+			{ID: 15, Name: "fenouil rôti", AverageRating: 4.0},
+		},
+		GrilladesSoir: []models.MenuItemWithRating{
+			{ID: 66, Name: "filet deiglegin croûte dolives", AverageRating: 4.5},
+			{ID: 59, Name: "filet de poulet tandoori", AverageRating: 4.7},
+			{ID: 86, Name: "pizza au chèvre", AverageRating: 4.2},
+		},
+		AccompSoir: []models.MenuItemWithRating{
+			{ID: 103, Name: "haricots beurre persillées", AverageRating: 4.1},
+			{ID: 50, Name: "lentilles vertes bio", AverageRating: 4.0},
+		},
+		UpdatedDate: utils.FormatParis(utils.Now(), time.RFC3339),
+	})
 }
 
 // CheckAndUpdateMenuCron is the cron endpoint
