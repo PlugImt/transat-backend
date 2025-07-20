@@ -44,7 +44,7 @@ func (h *RestaurantHandler) GetRestaurantMenu(c *fiber.Ctx) error {
 		language = "fr"
 	}
 
-	menuResponse, err := h.MenuRepository.GetTodaysMenuCategorized()
+	menuResponse, err := h.MenuRepository.GetTodaysMenuCategorized(c.Locals("email").(string))
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get today's menu: %v", err))
 		utils.LogFooter()
@@ -184,7 +184,7 @@ func (h *RestaurantHandler) GetRestaurantTestMenu(c *fiber.Ctx) error {
 
 	utils.LogMessage(utils.LevelInfo, "Returning test menu data")
 	utils.LogFooter()
-	
+
 	return c.JSON(&models.CategorizedMenuResponse{
 		GrilladesMidi: []models.MenuItemWithRating{
 			{ID: 20, Name: "poulet rôti", AverageRating: 4.5},
