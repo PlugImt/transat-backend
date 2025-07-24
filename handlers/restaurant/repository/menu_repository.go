@@ -88,19 +88,29 @@ func (r *MenuRepository) GetMenuUpdateCacheStatus() time.Time {
 // GetDishDetails retrieves detailed information about a specific dish
 func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 	query := `
-		SELECT 
-			ra.id_restaurant_articles,
-			ra.name,
-			ra.first_time_served,
-			ra.last_time_served,
-			COALESCE(AVG(ran.note), 0) as average_rating,
-			COUNT(ran.note) as total_ratings,
-			COUNT(DISTINCT rm.date_served) as times_served
+		SELECT
+		    ra.id_restaurant_articles,
+		    ra.name,
+		    ra.first_time_served,
+		    ra.last_time_served,
+		    COALESCE(ratings.average_rating, 0) AS average_rating,
+		    COALESCE(ratings.total_ratings, 0) AS total_ratings,
+		    COALESCE(meals.times_served, 0) AS times_served
 		FROM restaurant_articles ra
-		LEFT JOIN restaurant_articles_notes ran ON ra.id_restaurant_articles = ran.id_restaurant_articles
-		LEFT JOIN restaurant_meals rm ON ra.id_restaurant_articles = rm.id_restaurant_articles
-		WHERE ra.id_restaurant_articles = $1
-		GROUP BY ra.id_restaurant_articles, ra.name, ra.first_time_served, ra.last_time_served
+		         LEFT JOIN (
+		    SELECT id_restaurant_articles,
+		           AVG(note) AS average_rating,
+		           COUNT(note) AS total_ratings
+		    FROM restaurant_articles_notes
+		    GROUP BY id_restaurant_articles
+		) ratings ON ra.id_restaurant_articles = ratings.id_restaurant_articles
+		         LEFT JOIN (
+		    SELECT id_restaurant_articles,
+		           COUNT(DISTINCT date_served) AS times_served
+		    FROM restaurant_meals
+		    GROUP BY id_restaurant_articles
+		) meals ON ra.id_restaurant_articles = meals.id_restaurant_articles
+		WHERE ra.id_restaurant_articles = $1;
 	`
 
 	var dishDetails struct {
