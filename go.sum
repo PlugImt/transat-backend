@@ -56,12 +56,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
-github.com/getsentry/sentry-go v0.32.0 h1:YKs+//QmwE3DcYtfKRH8/KyOOF/I6Qnx7qYGNHCGmCY=
-github.com/getsentry/sentry-go v0.32.0/go.mod h1:CYNcMMz73YigoHljQRG+qPF+eMq8gG72XcGN/p71BAY=
 github.com/getsentry/sentry-go v0.33.0 h1:YWyDii0KGVov3xOaamOnF0mjOrqSjBqwv48UEzn7QFg=
 github.com/getsentry/sentry-go v0.33.0/go.mod h1:C55omcY9ChRQIUcVcGcs+Zdy4ZpQGvNJ7JYHIoSWOtE=
-github.com/getsentry/sentry-go/fiber v0.32.0 h1:014tNjwzIBGQ+uysFAgW4q+mgp0CYCuebFsRnnQBFRE=
-github.com/getsentry/sentry-go/fiber v0.32.0/go.mod h1:XqWJMOOINb3xLPqceyuHJPR67DDt63fV89VKvBu+XFM=
 github.com/getsentry/sentry-go/fiber v0.33.0 h1:+ZH0f5BQ2wLf1CqOBTC9M9pIQefK27krlwTLPygVQJk=
 github.com/getsentry/sentry-go/fiber v0.33.0/go.mod h1:uns9vZ6lDoO2fvCsxGS2yNKeX0IC4FM4QGAktDTfHNA=
 github.com/go-errors/errors v1.4.2 h1:J6MZopCL4uSllY1OfXM374weqZFFItUbrImctkmUxIA=

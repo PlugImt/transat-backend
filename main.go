@@ -197,6 +197,7 @@ func main() {
 	routes.SetupWeatherRoutes(app, weatherHandler)
 	routes.SetupNotificationRoutes(app, db, notificationService)
 	routes.SetupEventRoutes(app, eventHandler)
+	routes.SetupReservationRoutes(app, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
