@@ -187,30 +187,30 @@ func (h *RestaurantHandler) GetRestaurantTestMenu(c *fiber.Ctx) error {
 
 	return c.JSON(&models.CategorizedMenuResponse{
 		GrilladesMidi: []models.MenuItemWithRating{
-			{ID: 20, Name: "poulet rôti", AverageRating: 4.5},
-			{ID: 84, Name: "spaghetti à la bolognaise", AverageRating: 4.7},
-			{ID: 68, Name: "vol au vent de colin", AverageRating: 4.2},
+			{ID: 20, Name: "poulet rôti", AverageRating: 4.5, Rated: false},
+			{ID: 84, Name: "spaghetti à la bolognaise", AverageRating: 4.7, Rated: true},
+			{ID: 68, Name: "vol au vent de colin", AverageRating: 4.2, Rated: false},
 		},
 		Migrateurs: []models.MenuItemWithRating{
-			{ID: 165, Name: "estouffade de calamars à la nazaré", AverageRating: 4.8},
-			{ID: 164, Name: "boulette de boeuf à la crème de champignons", AverageRating: 4.3},
+			{ID: 165, Name: "estouffade de calamars à la nazaré", AverageRating: 4.8, Rated: true},
+			{ID: 164, Name: "boulette de boeuf à la crème de champignons", AverageRating: 4.3, Rated: false},
 		},
 		Cibo: []models.MenuItemWithRating{
-			{ID: 52, Name: "risotto aux champignons et courgettes", AverageRating: 4.6},
-			{ID: 67, Name: "pizza végétarienne", AverageRating: 4.4},
+			{ID: 52, Name: "risotto aux champignons et courgettes", AverageRating: 4.6, Rated: false},
+			{ID: 67, Name: "pizza végétarienne", AverageRating: 4.4, Rated: false},
 		},
 		AccompMidi: []models.MenuItemWithRating{
-			{ID: 12, Name: "gâteau de choux fleurs noix et mimolette", AverageRating: 4.1},
-			{ID: 15, Name: "fenouil rôti", AverageRating: 4.0},
+			{ID: 12, Name: "gâteau de choux fleurs noix et mimolette", AverageRating: 4.1, Rated: true},
+			{ID: 15, Name: "fenouil rôti", AverageRating: 4.0, Rated: false},
 		},
 		GrilladesSoir: []models.MenuItemWithRating{
-			{ID: 66, Name: "filet deiglegin croûte dolives", AverageRating: 4.5},
-			{ID: 59, Name: "filet de poulet tandoori", AverageRating: 4.7},
-			{ID: 86, Name: "pizza au chèvre", AverageRating: 4.2},
+			{ID: 66, Name: "filet deiglegin croûte dolives", AverageRating: 4.5, Rated: true},
+			{ID: 59, Name: "filet de poulet tandoori", AverageRating: 4.7, Rated: false},
+			{ID: 86, Name: "pizza au chèvre", AverageRating: 4.2, Rated: false},
 		},
 		AccompSoir: []models.MenuItemWithRating{
-			{ID: 103, Name: "haricots beurre persillées", AverageRating: 4.1},
-			{ID: 50, Name: "lentilles vertes bio", AverageRating: 4.0},
+			{ID: 103, Name: "haricots beurre persillées", AverageRating: 4.1, Rated: false},
+			{ID: 50, Name: "lentilles vertes bio", AverageRating: 4.0, Rated: true},
 		},
 		UpdatedDate: utils.FormatParis(h.MenuRepository.GetLastMenuUpdateTime(), time.RFC3339),
 	})
