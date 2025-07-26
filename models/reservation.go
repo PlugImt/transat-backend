@@ -30,9 +30,15 @@ type ReservationOverviewResponse struct {
 
 // ReservationCreateCategoryRequest is the body for POST /reservation/category/
 type ReservationCreateCategoryRequest struct {
-	Name         string `json:"name"`
-	IDClubParent int    `json:"id_club,omitempty"`  // Optional if category is defined
-	Category     *int   `json:"category,omitempty"` // Optional parent category
+	Name             string `json:"name"`
+	IDClubParent     *int   `json:"id_club_parent,omitempty"`     // Optional if category is defined
+	IDCategoryParent *int   `json:"id_category_parent,omitempty"` // Optional parent category
+}
+
+// ReservationCategoryComplete represents a complete reservation category with items
+type ReservationCategoryComplete struct {
+	ID int `json:"id"`
+	ReservationCreateCategoryRequest
 }
 
 // ReservationSlotDetail represents one reservation slot for an item

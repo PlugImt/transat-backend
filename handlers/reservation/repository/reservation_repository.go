@@ -66,32 +66,44 @@ func (r *ReservationRepository) CheckCategoryExists(IDCategory int) (bool, error
 	return false, nil
 }
 
-func (r *ReservationRepository) CreateCategory(category models.ReservationCreateCategoryRequest) (bool, error) {
+func (r *ReservationRepository) GetIDClubParent(IDCategory int) (int, error) {
+	query := "SELECT id_clubs FROM reservation_category WHERE id_reservation_category = $1"
+	row := r.DB.QueryRow(query, IDCategory)
+	var idClub int
+	if err := row.Scan(&idClub); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("No club found for category ID %d", IDCategory))
+			return 0, nil
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get club parent: %v", err))
+		return 0, err
+	}
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Found club ID %d for category ID %d", idClub, IDCategory))
+	return idClub, nil
+}
+
+func (r *ReservationRepository) CreateCategory(category models.ReservationCreateCategoryRequest) (models.ReservationCategoryComplete, error) {
+	var res models.ReservationCategoryComplete
 	if category.Name == "" {
 		utils.LogMessage(utils.LevelError, "Category name is required")
-		return false, fmt.Errorf("category name is required")
+		return res, fmt.Errorf("category name is required")
 	}
 
-	query := "INSERT INTO reservation_category (name, id_clubs, id_parent_category) VALUES ($1, $2, $3)"
-	result, err := r.DB.Exec(query, category.Name, category.IDClubParent, category.Category)
-	if err != nil {
+	query := "INSERT INTO reservation_category (name, id_clubs, id_parent_category) VALUES ($1, $2, $3) RETURNING id_reservation_category"
+	row := r.DB.QueryRow(query, category.Name, category.IDClubParent, category.IDCategoryParent)
+
+	var createdID int
+	if err := row.Scan(&createdID); err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create category: %v", err))
-		return false, err
+		return res, err
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get rows affected: %v", err))
-		return false, err
-	}
-
-	if rowsAffected > 0 {
-		utils.LogMessage(utils.LevelInfo, "Category created successfully")
-		return true, nil
-	}
-
-	utils.LogMessage(utils.LevelWarn, "No rows affected while creating category")
-	return false, nil
+	utils.LogMessage(utils.LevelInfo, "Category created successfully")
+	res.ID = createdID
+	res.Name = category.Name
+	res.IDClubParent = category.IDClubParent
+	res.IDCategoryParent = category.IDCategoryParent
+	return res, nil
 }
 
 func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequest) (bool, error) {
