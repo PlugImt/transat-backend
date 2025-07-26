@@ -15,13 +15,12 @@ func SetupReservationRoutes(router fiber.Router, db *sql.DB) {
 	reservationGroup := router.Group("/reservation", middlewares.JWTMiddleware)
 
 	// Root reservation routes
-	//reservationGroup.Get("", reservationHandler.GetReservationItems)  // Returns root categories and items
-	//reservationGroup.Get("/", reservationHandler.GetReservationItems) // Returns root categories and items
+	reservationGroup.Get("", reservationHandler.GetReservationItems)  // Returns root categories and items
+	reservationGroup.Get("/", reservationHandler.GetReservationItems) // Returns root categories and items
 
 	// Category routes
-	//reservationGroup.Get("/category", reservationHandler.GetReservationCategories)            // Returns all the categories
 	reservationGroup.Post("/category", reservationHandler.CreateReservationCategory) // Creates a new category
-	//reservationGroup.Get("/category/:id", reservationHandler.GetReservationCategoryItemsByID) // Returns all the items in a specific category by ID
+	reservationGroup.Get("/category/:id", reservationHandler.GetReservationItems)    // Returns all the items in a specific category by ID
 	//reservationGroup.Delete("/category/:id", reservationHandler.DeleteReservationCategory)    // Deletes a specific category by ID, if no items are associated with it
 
 	// Item routes - these need to come after category routes to avoid conflicts

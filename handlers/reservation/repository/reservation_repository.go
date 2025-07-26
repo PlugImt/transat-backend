@@ -36,7 +36,7 @@ func (r *ReservationRepository) CheckClubExists(IDClub int) (bool, error) {
 	} else {
 		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Club with ID %d does not exist", IDClub))
 	}
-	// If no rows found, the club does not exist
+
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Club with ID %d does not exist", IDClub))
 
 	return false, nil
@@ -60,7 +60,6 @@ func (r *ReservationRepository) CheckCategoryExists(IDCategory int) (bool, error
 	} else {
 		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Category with ID %d does not exist", IDCategory))
 	}
-	// If no rows found, the category does not exist
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Category with ID %d does not exist", IDCategory))
 
 	return false, nil
@@ -130,12 +129,12 @@ func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequ
 	}
 
 	query := `
-	INSERT INTO reservation_element 
-		(name, slot, id_clubs%s) 
-	VALUES 
-		($1, $2, $3%s)
-	RETURNING id_reservation_element
-`
+		INSERT INTO reservation_element 
+			(name, slot, id_clubs%s) 
+		VALUES 
+			($1, $2, $3%s)
+		RETURNING id_reservation_element
+	`
 
 	args := []interface{}{item.Name, item.Slot, *item.IDClubParent}
 	extraCols, extraVals := "", ""
@@ -175,4 +174,94 @@ func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequ
 	res.IDClubParent = item.IDClubParent
 	res.IDCategoryParent = item.IDCategoryParent
 	return res, nil
+}
+
+func (r *ReservationRepository) GetCategoryList(IDCategoryParent *int) ([]models.ReservationCategory, error) {
+	var categories []models.ReservationCategory
+
+	query := "SELECT id_reservation_category, name FROM reservation_category"
+	args := []interface{}{}
+
+	if IDCategoryParent != nil {
+		query += " WHERE id_parent_category = $1;"
+		args = append(args, *IDCategoryParent)
+	} else {
+		query += " WHERE id_parent_category IS NULL;"
+	}
+
+	rows, err := r.DB.Query(query, args...)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get categories: %v", err))
+		return nil, err
+	}
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to close rows: %v", err))
+		} else {
+			utils.LogMessage(utils.LevelInfo, "Rows closed successfully")
+		}
+	}(rows)
+
+	for rows.Next() {
+		var category models.ReservationCategory
+		if err := rows.Scan(&category.ID, &category.Name); err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan category: %v", err))
+			return nil, err
+		}
+		categories = append(categories, category)
+	}
+
+	if err := rows.Err(); err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Row error: %v", err))
+		return nil, err
+	}
+
+	return categories, nil
+}
+
+func (r *ReservationRepository) GetItemList(IDCategoryParent *int) ([]models.ReservationItem, error) {
+	var items []models.ReservationItem
+
+	query := "SELECT id_reservation_element, name, slot FROM reservation_element"
+	args := []interface{}{}
+
+	if IDCategoryParent != nil {
+		query += " WHERE id_reservation_category = $1;"
+		args = append(args, *IDCategoryParent)
+	} else {
+		query += " WHERE id_reservation_category IS NULL;"
+	}
+
+	rows, err := r.DB.Query(query, args...)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get items: %v", err))
+		return nil, err
+	}
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to close rows: %v", err))
+		} else {
+			utils.LogMessage(utils.LevelInfo, "Rows closed successfully")
+		}
+	}(rows)
+
+	for rows.Next() {
+		var item models.ReservationItem
+		if err := rows.Scan(&item.ID, &item.Name, &item.Slot); err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan item: %v", err))
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Row error: %v", err))
+		return nil, err
+	}
+
+	// TODO; add user details if item is reserved
+
+	return items, nil
 }

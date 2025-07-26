@@ -7,6 +7,7 @@ import (
 	"github.com/plugimt/transat-backend/handlers/reservation/repository"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
+	"strconv"
 )
 
 type ReservationHandler struct {
@@ -22,7 +23,64 @@ func NewReservationHandler(db *sql.DB) *ReservationHandler {
 // GetReservationItems handles GET /reservation - returns root categories and items
 func (h *ReservationHandler) GetReservationItems(c *fiber.Ctx) error {
 	utils.LogHeader("📅 Get Root Reservation Items")
-	return c.JSON(fiber.Map{})
+
+	var res models.ReservationOverviewResponse
+	var categoryIDInt *int
+
+	categoryID := c.Params("id")
+	if categoryID != "" {
+		parsedID, err := strconv.Atoi(categoryID)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid category ID: %v", err))
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid category ID",
+			})
+		}
+		categoryIDInt = &parsedID
+	} else {
+		categoryIDQuery := c.Query("category")
+		if categoryIDQuery != "" {
+			parsedID, err := strconv.Atoi(categoryIDQuery)
+			if err != nil {
+				utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid category ID: %v", err))
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "Invalid category ID",
+				})
+			}
+			categoryIDInt = &parsedID
+		}
+	}
+
+	categoryList, err := h.ReservationRepository.GetCategoryList(categoryIDInt)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get category list: %v", err))
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve categories",
+		})
+	}
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved %d categories", len(categoryList)))
+
+	itemList, err := h.ReservationRepository.GetItemList(categoryIDInt)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get item list: %v", err))
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve items",
+		})
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved %d items", len(itemList)))
+	if len(categoryList) == 0 && len(itemList) == 0 {
+		utils.LogMessage(utils.LevelInfo, "No categories or items found")
+		utils.LogFooter()
+		return c.JSON(res)
+	}
+
+	res.Categories = categoryList
+	res.Items = itemList
+
+	utils.LogMessage(utils.LevelInfo, "Successfully retrieved root reservation items")
+	utils.LogFooter()
+	return c.JSON(res)
 }
 
 // GetReservationCategoryItemsByID handles GET /reservation/category/{id}
