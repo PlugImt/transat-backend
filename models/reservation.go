@@ -71,10 +71,16 @@ type ReservationEndRequest struct {
 
 // ReservationCreateItemRequest is the body for POST /reservation/item/
 type ReservationCreateItemRequest struct {
-	Name           string `json:"name"`
-	Slot           bool   `json:"slot"`
-	Description    string `json:"description,omitempty"`
-	Location       string `json:"location,omitempty"`
-	IDClub         *int   `json:"id_club,omitempty"`
-	CategoryParent *int   `json:"category_parent,omitempty"`
+	Name             string `json:"name"`
+	Slot             bool   `json:"slot"`
+	Description      string `json:"description,omitempty"`
+	Location         string `json:"location,omitempty"`
+	IDClubParent     *int   `json:"id_club_parent,omitempty"`
+	IDCategoryParent *int   `json:"id_category_parent,omitempty"`
+}
+
+// ReservationItemComplete represents a complete reservation item with category
+type ReservationItemComplete struct {
+	ID int `json:"id"`
+	ReservationCreateItemRequest
 }

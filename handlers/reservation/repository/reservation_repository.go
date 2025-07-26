@@ -92,44 +92,57 @@ func (r *ReservationRepository) CreateCategory(category models.ReservationCreate
 	query := "INSERT INTO reservation_category (name, id_clubs, id_parent_category) VALUES ($1, $2, $3) RETURNING id_reservation_category"
 	row := r.DB.QueryRow(query, category.Name, category.IDClubParent, category.IDCategoryParent)
 
-	var createdID int
-	if err := row.Scan(&createdID); err != nil {
+	if err := row.Scan(&res.ID); err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create category: %v", err))
 		return res, err
 	}
 
 	utils.LogMessage(utils.LevelInfo, "Category created successfully")
-	res.ID = createdID
 	res.Name = category.Name
 	res.IDClubParent = category.IDClubParent
 	res.IDCategoryParent = category.IDCategoryParent
 	return res, nil
 }
 
-func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequest) (bool, error) {
+func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequest) (models.ReservationItemComplete, error) {
+	var res models.ReservationItemComplete
+
 	if item.Name == "" {
 		utils.LogMessage(utils.LevelError, "Item name is required")
-		return false, fmt.Errorf("item name is required")
+		return res, fmt.Errorf("item name is required")
 	}
 
-	query := "INSERT INTO reservation_element (name, slot, description, location, id_clubs, id_reservation_category) VALUES ($1, $2, $3, $4, $5, $6)"
-	result, err := r.DB.Exec(query, item.Name, item.Slot, item.Description, item.Location, item.IDClub, item.CategoryParent)
-	if err != nil {
+	query := `
+	INSERT INTO reservation_element 
+		(name, slot, description, location, id_clubs%s) 
+	VALUES 
+		($1, $2, $3, $4, $5%s)
+	RETURNING id_reservation_element
+`
+
+	args := []interface{}{item.Name, item.Slot, item.Description, item.Location, *item.IDClubParent}
+	extraCols, extraVals := "", ""
+
+	if item.IDCategoryParent != nil {
+		extraCols = ", id_reservation_category"
+		extraVals = ", $6"
+		args = append(args, *item.IDCategoryParent)
+	}
+
+	finalQuery := fmt.Sprintf(query, extraCols, extraVals)
+	row := r.DB.QueryRow(finalQuery, args...)
+
+	if err := row.Scan(&res.ID); err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create item: %v", err))
-		return false, err
+		return res, err
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get rows affected: %v", err))
-		return false, err
-	}
-
-	if rowsAffected > 0 {
-		utils.LogMessage(utils.LevelInfo, "Item created successfully")
-		return true, nil
-	}
-
-	utils.LogMessage(utils.LevelWarn, "No rows affected while creating item")
-	return false, nil
+	utils.LogMessage(utils.LevelInfo, "Item created successfully")
+	res.Name = item.Name
+	res.Slot = item.Slot
+	res.Description = item.Description
+	res.Location = item.Location
+	res.IDClubParent = item.IDClubParent
+	res.IDCategoryParent = item.IDCategoryParent
+	return res, nil
 }

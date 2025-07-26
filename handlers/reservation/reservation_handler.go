@@ -166,15 +166,15 @@ func (h *ReservationHandler) CreateReservationItem(c *fiber.Ctx) error {
 			"error": "Item name is required",
 		})
 	}
-	if itemRequest.IDClub == nil && itemRequest.CategoryParent == nil {
+	if itemRequest.IDClubParent == nil && itemRequest.IDCategoryParent == nil {
 		utils.LogMessage(utils.LevelError, "Either Club ID or Category Parent is required")
 		utils.LogFooter()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Either Club ID or Category Parent is required",
 		})
 	}
-	if itemRequest.IDClub != nil {
-		clubExists, err := h.ReservationRepository.CheckClubExists(*itemRequest.IDClub)
+	if itemRequest.IDClubParent != nil {
+		clubExists, err := h.ReservationRepository.CheckClubExists(*itemRequest.IDClubParent)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check club existence: %v", err))
 			utils.LogFooter()
@@ -184,15 +184,15 @@ func (h *ReservationHandler) CreateReservationItem(c *fiber.Ctx) error {
 		}
 
 		if !clubExists {
-			utils.LogMessage(utils.LevelError, fmt.Sprintf("Club with ID %d does not exist", *itemRequest.IDClub))
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Club with ID %d does not exist", *itemRequest.IDClubParent))
 			utils.LogFooter()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": fmt.Sprintf("Club with ID %d does not exist", *itemRequest.IDClub),
+				"error": fmt.Sprintf("Club with ID %d does not exist", *itemRequest.IDClubParent),
 			})
 		}
 	}
-	if itemRequest.CategoryParent != nil {
-		categoryExists, err := h.ReservationRepository.CheckCategoryExists(*itemRequest.CategoryParent)
+	if itemRequest.IDCategoryParent != nil {
+		categoryExists, err := h.ReservationRepository.CheckCategoryExists(*itemRequest.IDCategoryParent)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check category existence: %v", err))
 			utils.LogFooter()
@@ -202,23 +202,32 @@ func (h *ReservationHandler) CreateReservationItem(c *fiber.Ctx) error {
 		}
 
 		if !categoryExists {
-			utils.LogMessage(utils.LevelError, fmt.Sprintf("Category with ID %d does not exist", *itemRequest.CategoryParent))
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Category with ID %d does not exist", *itemRequest.IDCategoryParent))
 			utils.LogFooter()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": fmt.Sprintf("Category with ID %d does not exist", *itemRequest.CategoryParent),
+				"error": fmt.Sprintf("Category with ID %d does not exist", *itemRequest.IDCategoryParent),
 			})
 		}
 	}
 
-	if itemRequest.IDClub != nil && itemRequest.CategoryParent == nil {
-		itemRequest.CategoryParent = new(int)
-	}
-	if itemRequest.CategoryParent != nil && itemRequest.IDClub == nil {
-		itemRequest.IDClub = new(int)
+	//if itemRequest.IDCategoryParent == nil {
+	//	itemRequest.IDCategoryParent = new(int)
+	//}
+
+	if itemRequest.IDClubParent == nil {
+		IDClubParent, err := h.ReservationRepository.GetIDClubParent(*itemRequest.IDCategoryParent)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get parent club ID: %v", err))
+			utils.LogFooter()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to get parent club ID",
+			})
+		}
+		itemRequest.IDClubParent = &IDClubParent
 	}
 
-	created, err := h.ReservationRepository.CreateItem(itemRequest)
-	if err != nil || !created {
+	createdItem, err := h.ReservationRepository.CreateItem(itemRequest)
+	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create item: %v", err))
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -230,7 +239,7 @@ func (h *ReservationHandler) CreateReservationItem(c *fiber.Ctx) error {
 	utils.LogFooter()
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Item created successfully",
-		"item":    itemRequest, // TODO : return what's actually created with ID
+		"item":    createdItem,
 	})
 }
 
