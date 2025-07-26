@@ -98,10 +98,6 @@ func (h *ReservationHandler) CreateReservationCategory(c *fiber.Ctx) error {
 		}
 	}
 
-	if categoryRequest.IDCategoryParent == nil {
-		categoryRequest.IDCategoryParent = new(int)
-	}
-
 	if categoryRequest.IDClubParent == nil {
 		IDClubParent, err := h.ReservationRepository.GetIDClubParent(*categoryRequest.IDCategoryParent)
 		if err != nil {
@@ -209,10 +205,6 @@ func (h *ReservationHandler) CreateReservationItem(c *fiber.Ctx) error {
 			})
 		}
 	}
-
-	//if itemRequest.IDCategoryParent == nil {
-	//	itemRequest.IDCategoryParent = new(int)
-	//}
 
 	if itemRequest.IDClubParent == nil {
 		IDClubParent, err := h.ReservationRepository.GetIDClubParent(*itemRequest.IDCategoryParent)

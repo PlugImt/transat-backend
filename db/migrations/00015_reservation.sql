@@ -6,7 +6,7 @@ CREATE TABLE reservation_category
 (
     id_reservation_category SERIAL,
     name                    VARCHAR(100),
-    id_parent_category      INTEGER NOT NULL,
+    id_parent_category      INTEGER,
     id_clubs                INTEGER NOT NULL,
     PRIMARY KEY (id_reservation_category),
     FOREIGN KEY (id_clubs) REFERENCES clubs (id_clubs)
@@ -32,7 +32,7 @@ CREATE TABLE reservation
     id_reservation_element INTEGER,
     start_date             TIMESTAMP,
     end_date               TIMESTAMP,
-    PRIMARY KEY (email, id_reservation_element),
+    PRIMARY KEY (email, id_reservation_element, start_date),
     FOREIGN KEY (email) REFERENCES newf (email),
     FOREIGN KEY (id_reservation_element) REFERENCES reservation_element (id_reservation_element)
 );

@@ -89,8 +89,25 @@ func (r *ReservationRepository) CreateCategory(category models.ReservationCreate
 		return res, fmt.Errorf("category name is required")
 	}
 
-	query := "INSERT INTO reservation_category (name, id_clubs, id_parent_category) VALUES ($1, $2, $3) RETURNING id_reservation_category"
-	row := r.DB.QueryRow(query, category.Name, category.IDClubParent, category.IDCategoryParent)
+	query := `
+		INSERT INTO reservation_category 
+			(name, id_clubs%s)
+		VALUES 
+			($1, $2%s)
+		RETURNING id_reservation_category
+	`
+
+	args := []interface{}{category.Name, category.IDClubParent}
+	extraCols, extraVals := "", ""
+
+	if category.IDCategoryParent != nil {
+		extraCols = ", id_parent_category"
+		extraVals = ", $3"
+		args = append(args, *category.IDCategoryParent)
+	}
+
+	finalQuery := fmt.Sprintf(query, extraCols, extraVals)
+	row := r.DB.QueryRow(finalQuery, args...)
 
 	if err := row.Scan(&res.ID); err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create category: %v", err))
@@ -114,22 +131,35 @@ func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequ
 
 	query := `
 	INSERT INTO reservation_element 
-		(name, slot, description, location, id_clubs%s) 
+		(name, slot, id_clubs%s) 
 	VALUES 
-		($1, $2, $3, $4, $5%s)
+		($1, $2, $3%s)
 	RETURNING id_reservation_element
 `
 
-	args := []interface{}{item.Name, item.Slot, item.Description, item.Location, *item.IDClubParent}
+	args := []interface{}{item.Name, item.Slot, *item.IDClubParent}
 	extraCols, extraVals := "", ""
 
 	if item.IDCategoryParent != nil {
 		extraCols = ", id_reservation_category"
-		extraVals = ", $6"
+		extraVals = ", $4"
 		args = append(args, *item.IDCategoryParent)
 	}
+	if item.Description != nil {
+		extraCols += ", description"
+		extraVals += ", $5"
+		args = append(args, *item.Description)
+	}
+	if item.Location != nil {
+		extraCols += ", location"
+		extraVals += ", $6"
+		args = append(args, *item.Location)
+	}
 
-	finalQuery := fmt.Sprintf(query, extraCols, extraVals)
+	finalQuery := fmt.Sprintf(fmt.Sprintf(query, extraCols, extraVals) + ";")
+
+	fmt.Printf("Executing query: %s with args: %v\n", finalQuery, args)
+
 	row := r.DB.QueryRow(finalQuery, args...)
 
 	if err := row.Scan(&res.ID); err != nil {
