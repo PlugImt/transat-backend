@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
+	"time"
 )
 
 type ReservationRepository struct {
@@ -61,6 +62,29 @@ func (r *ReservationRepository) CheckCategoryExists(IDCategory int) (bool, error
 		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Category with ID %d does not exist", IDCategory))
 	}
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Category with ID %d does not exist", IDCategory))
+
+	return false, nil
+}
+
+func (r *ReservationRepository) CheckItemExists(IDItem int) (bool, error) {
+	query := "SELECT COUNT(*) FROM reservation_element WHERE id_reservation_element = $1"
+	row := r.DB.QueryRow(query, IDItem)
+	var count int
+	if err := row.Scan(&count); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Item with ID %d does not exist", IDItem))
+			return false, nil
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check item existence: %v", err))
+		return false, err
+	}
+	if count > 0 {
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Item with ID %d exists", IDItem))
+		return true, nil
+	} else {
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Item with ID %d does not exist", IDItem))
+	}
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Item with ID %d does not exist", IDItem))
 
 	return false, nil
 }
@@ -264,4 +288,243 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int) ([]models.Res
 	// TODO; add user details if item is reserved
 
 	return items, nil
+}
+
+func (r *ReservationRepository) IsItemAvailable(IDItem int, TimeStamp time.Time) (bool, error) {
+	query := `
+		WITH element_slot AS (
+		    SELECT slot
+		    FROM reservation_element
+		    WHERE id_reservation_element = $1
+		),
+		     availability_check AS (
+		         SELECT
+		             CASE
+		                 WHEN slot = false THEN (
+		                     SELECT COUNT(*) = 0
+		                     FROM reservation
+		                     WHERE id_reservation_element = $1
+		                       AND end_date IS NULL
+		                 )
+		                 WHEN slot = true THEN (
+		                     SELECT COUNT(*) = 0
+		                     FROM reservation
+		                     WHERE id_reservation_element = $1
+		                       AND start_date = $2
+		                 )
+		                 ELSE true
+		                 END AS is_available
+		         FROM element_slot
+		     )
+		SELECT is_available FROM availability_check;
+	`
+	row := r.DB.QueryRow(query, IDItem, TimeStamp)
+	var isAvailable bool
+	if err := row.Scan(&isAvailable); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("No availability check found for item ID %d at time %s", IDItem, TimeStamp))
+			return false, nil
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check item availability: %v", err))
+		return false, err
+	}
+
+	if isAvailable {
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Item ID %d is available at time %s", IDItem, TimeStamp))
+	} else {
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Item ID %d is not available at time %s", IDItem, TimeStamp))
+	}
+
+	return isAvailable, nil
+}
+
+func (r *ReservationRepository) IsItemPerSlot(IDItem int) (bool, error) {
+	query := "SELECT slot FROM reservation_element WHERE id_reservation_element = $1"
+	row := r.DB.QueryRow(query, IDItem)
+	var isSlot bool
+	if err := row.Scan(&isSlot); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("No item found with ID %d", IDItem))
+			return false, nil
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check if item is per slot: %v", err))
+		return false, err
+	}
+
+	if isSlot {
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Item ID %d is a slot-based item", IDItem))
+	} else {
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Item ID %d is not a slot-based item", IDItem))
+	}
+
+	return isSlot, nil
+}
+
+func (r *ReservationRepository) DoesReservationCanBeEnded(ItemID int, UserEmail string) (bool, error) {
+	query := `
+		SELECT COUNT(*) > 0
+		FROM reservation
+		WHERE id_reservation_element = $1 AND email = $2 AND end_date IS NULL;
+	`
+	row := r.DB.QueryRow(query, ItemID, UserEmail)
+	var canBeEnded bool
+	if err := row.Scan(&canBeEnded); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("No reservation found for item ID %d by user %s", ItemID, UserEmail))
+			return false, nil
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check if reservation can be ended: %v", err))
+		return false, err
+	}
+
+	if canBeEnded {
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Reservation for item ID %d by user %s can be ended", ItemID, UserEmail))
+	} else {
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Reservation for item ID %d by user %s cannot be ended", ItemID, UserEmail))
+	}
+
+	return canBeEnded, nil
+}
+
+func (r *ReservationRepository) CreateReservation(item models.ReservationManagementRequestTime, IDItem int, ItemPerSlot bool, UserEmail string) (models.ReservationItem, error) {
+	var res models.ReservationItem
+
+	isAvailable, err := r.IsItemAvailable(IDItem, *item.StartDate)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Error checking item availability: %v", err))
+		return res, err
+	}
+	if !isAvailable {
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Item ID %d is not available at %s", IDItem, *item.StartDate))
+		return res, fmt.Errorf("item is not available")
+	}
+
+	columns := "email, id_reservation_element, start_date"
+	values := "$1, $2, $3"
+	args := []interface{}{UserEmail, IDItem, *item.StartDate}
+
+	if ItemPerSlot {
+		endDate := item.StartDate.Add(time.Hour)
+		item.EndDate = &endDate
+		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("End date set to %s for item ID %d", endDate, IDItem))
+
+		columns += ", end_date"
+		values += ", $4"
+		args = append(args, *item.EndDate)
+	}
+
+	query := fmt.Sprintf(`
+		WITH inserted AS (
+			INSERT INTO reservation (%s)
+			VALUES (%s)
+			RETURNING email
+		)
+		SELECT i.email, n.first_name, n.last_name, n.profile_picture
+		FROM inserted i
+		JOIN newf n ON i.email = n.email;
+	`, columns, values)
+
+	res.User = &models.ReservationUser{}
+
+	row := r.DB.QueryRow(query, args...)
+	if err := row.Scan(&res.User.Email, &res.User.FirstName, &res.User.LastName, &res.User.ProfilePicture); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("No reservation created for item ID %d at %s", IDItem, *item.StartDate))
+			return res, nil
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create reservation: %v", err))
+		return res, err
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Reservation created for item ID %d at %s", IDItem, *item.StartDate))
+
+	res.ID = IDItem
+	res.Name = "" // Optional
+	res.Slot = ItemPerSlot
+
+	return res, nil
+}
+
+func (r *ReservationRepository) EndReservation(item models.ReservationManagementRequestTime, IDItem int, ItemPerSlot bool, UserEmail string) (models.ReservationItem, error) {
+	var res models.ReservationItem
+
+	canBeEnded, err := r.DoesReservationCanBeEnded(IDItem, UserEmail)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Error checking if reservation can be ended: %v", err))
+		return res, err
+	}
+	if !canBeEnded {
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Reservation for item ID %d by user %s cannot be ended", IDItem, UserEmail))
+		return res, fmt.Errorf("reservation cannot be ended")
+	}
+	if item.EndDate == nil {
+		utils.LogMessage(utils.LevelError, "End date is required to end a reservation")
+		return res, fmt.Errorf("end date is required")
+	}
+	if ItemPerSlot {
+		utils.LogMessage(utils.LevelError, "Item is not per slot, cannot end reservation")
+		return res, fmt.Errorf("item is not per slot, cannot end reservation")
+	}
+
+	query := `
+		WITH updated AS (
+			UPDATE reservation
+			SET end_date = $1
+			WHERE id_reservation_element = $2 AND email = $3 AND end_date IS NULL
+			RETURNING email
+		)
+		SELECT i.email, n.first_name, n.last_name, n.profile_picture
+		FROM updated i
+		JOIN newf n ON i.email = n.email;
+	`
+
+	row := r.DB.QueryRow(query, *item.EndDate, IDItem, UserEmail)
+	res.User = &models.ReservationUser{}
+
+	if err := row.Scan(&res.User.Email, &res.User.FirstName, &res.User.LastName, &res.User.ProfilePicture); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("No reservation ended for item ID %d at %s", IDItem, *item.EndDate))
+			return res, nil
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to end reservation: %v", err))
+		return res, err
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Reservation ended for item ID %d at %s", IDItem, *item.EndDate))
+
+	res.ID = IDItem
+	res.Name = "" // Optional
+	res.Slot = ItemPerSlot
+
+	return res, nil
+}
+
+func (r *ReservationRepository) DeleteReservation(item models.ReservationManagementRequestTime, IDItem int, ItemPerSlot bool, UserEmail string) (bool, error) {
+	if !ItemPerSlot {
+		utils.LogMessage(utils.LevelError, "Item is not per slot, cannot delete reservation")
+		return false, fmt.Errorf("item is not per slot, cannot delete reservation")
+	}
+
+	query := `
+		DELETE FROM reservation
+		WHERE id_reservation_element = $1 AND email = $2 AND start_date = $3
+	`
+
+	args := []interface{}{IDItem, UserEmail, *item.StartDate}
+	result, err := r.DB.Exec(query, args...)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to delete reservation: %v", err))
+		return false, err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get rows affected: %v", err))
+		return false, err
+	}
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("No reservation found for item ID %d by user %s at %s", IDItem, UserEmail, *item.StartDate))
+		return false, nil
+	}
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Reservation deleted for item ID %d by user %s at %s", IDItem, UserEmail, *item.StartDate))
+	return true, nil
 }

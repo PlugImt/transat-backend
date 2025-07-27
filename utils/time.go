@@ -113,3 +113,11 @@ func SinceInParis(t time.Time) time.Duration {
 func AddInParis(t time.Time, d time.Duration) time.Time {
 	return t.In(ParisLocation).Add(d)
 }
+
+func ParseDateTimeInParis(layout, value string) (time.Time, error) {
+	t, err := time.ParseInLocation(layout, value, ParisLocation)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return t.In(ParisLocation), nil
+}

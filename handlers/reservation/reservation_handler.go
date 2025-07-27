@@ -8,6 +8,7 @@ import (
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
 	"strconv"
+	"time"
 )
 
 type ReservationHandler struct {
@@ -196,7 +197,154 @@ func (h *ReservationHandler) GetItemDetails(c *fiber.Ctx) error {
 // UpdateReservationItem handles PATCH /reservation/{id} - make or end reservations
 func (h *ReservationHandler) UpdateReservationItem(c *fiber.Ctx) error {
 	utils.LogHeader("📅 Update Reservation Item")
-	return c.JSON(fiber.Map{})
+	var res models.ReservationItem
+
+	var StartDateDate time.Time
+	var EndDateDate time.Time
+
+	id := c.Params("id")
+	if id == "" {
+		utils.LogMessage(utils.LevelError, "Item ID is required")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Item ID is required",
+		})
+	}
+	itemID, err := strconv.Atoi(id)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid item ID: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid item ID",
+		})
+	}
+
+	var reservationRequest models.ReservationManagementRequest
+	if err := c.BodyParser(&reservationRequest); err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse request body: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request format",
+		})
+	}
+
+	if reservationRequest.StartDate == nil && reservationRequest.EndDate == nil {
+		utils.LogMessage(utils.LevelError, "At least one of StartDate or EndDate is required")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "At least one of StartDate or EndDate is required",
+		})
+	}
+
+	if reservationRequest.StartDate != nil && reservationRequest.EndDate != nil {
+		utils.LogMessage(utils.LevelError, "Both StartDate and EndDate cannot be provided at the same time")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Both StartDate and EndDate cannot be provided at the same time",
+		})
+
+	}
+
+	if reservationRequest.StartDate != nil {
+		StartDateDate, err = time.Parse("2006-01-02 15:04:05", *reservationRequest.StartDate)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse StartDate: %v", err))
+			utils.LogFooter()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid StartDate format",
+			})
+		}
+	}
+	if reservationRequest.EndDate != nil {
+		EndDateDate, err = time.Parse("2006-01-02 15:04:05", *reservationRequest.EndDate)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse EndDate: %v", err))
+			utils.LogFooter()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid EndDate format",
+			})
+		}
+	}
+
+	ItemExists, err := h.ReservationRepository.CheckItemExists(itemID)
+	if err != nil || !ItemExists {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check item existence: %v ", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "The item does not exist",
+		})
+	}
+
+	ItemPerSlot, err := h.ReservationRepository.IsItemPerSlot(itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check if item is per slot: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check if item is per slot",
+		})
+	}
+
+	if ItemPerSlot && (StartDateDate.Minute() != 0 || StartDateDate.Second() != 0) {
+		utils.LogMessage(utils.LevelError, "StartDate for per slot items must be on plain hours (e.g., 2023-10-01 14:00:00)")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "StartDate for per slot items must be on plain hours (e.g., 2023-10-01 14:00:00)",
+		})
+	}
+	if ItemPerSlot && reservationRequest.EndDate != nil {
+		utils.LogMessage(utils.LevelError, "EndDate cannot be provided for per slot items")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "EndDate cannot be provided for per slot items",
+		})
+	}
+
+	reservationItemTime := models.ReservationManagementRequestTime{
+		StartDate: &StartDateDate,
+		EndDate:   &EndDateDate,
+	}
+
+	if reservationRequest.StartDate != nil {
+		res, err = h.ReservationRepository.CreateReservation(reservationItemTime, itemID, ItemPerSlot, c.Locals("email").(string))
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create reservation: %v", err))
+			utils.LogFooter()
+
+			if err.Error() == "item is not available" {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+					"error": "Item is not available for the requested time",
+				})
+			}
+
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to create reservation",
+			})
+		}
+	} else if reservationRequest.EndDate != nil {
+		res, err = h.ReservationRepository.EndReservation(reservationItemTime, itemID, ItemPerSlot, c.Locals("email").(string))
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to end reservation: %v", err))
+			utils.LogFooter()
+
+			if err.Error() == "item is not reserved" {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+					"error": "Item is not reserved for the requested time",
+				})
+			}
+
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to end reservation",
+			})
+		}
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Reservation updated successfully")
+	utils.LogFooter()
+
+	return c.JSON(fiber.Map{
+		"message":     "Reservation updated successfully",
+		"reservation": res,
+	})
 }
 
 // CreateReservationItem handles POST /reservation/item/
@@ -302,5 +450,98 @@ func (h *ReservationHandler) GetReservationCategories(c *fiber.Ctx) error {
 // DeleteReservationItem handles DELETE /reservation/{id}
 func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 	utils.LogHeader("📅 Delete Reservation Item")
-	return c.JSON(fiber.Map{})
+
+	var StartDateDate time.Time
+
+	id := c.Params("id")
+	if id == "" {
+		utils.LogMessage(utils.LevelError, "Item ID is required")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Item ID is required",
+		})
+	}
+
+	itemID, err := strconv.Atoi(id)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid item ID: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid item ID",
+		})
+	}
+
+	var reservationRequest models.ReservationManagementRequest
+	if err := c.BodyParser(&reservationRequest); err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse request body: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request format",
+		})
+	}
+
+	itemExists, err := h.ReservationRepository.CheckItemExists(itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check item existence: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check item existence",
+		})
+	}
+
+	if !itemExists {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Item with ID %d does not exist", itemID))
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": fmt.Sprintf("Item with ID %d does not exist", itemID),
+		})
+	}
+
+	if reservationRequest.StartDate != nil {
+		StartDateDate, err = time.Parse("2006-01-02 15:04:05", *reservationRequest.StartDate)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse StartDate: %v", err))
+			utils.LogFooter()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid StartDate format",
+			})
+		}
+	}
+
+	ItemPerSlot, err := h.ReservationRepository.IsItemPerSlot(itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check if item is per slot: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check if item is per slot",
+		})
+	}
+
+	if !ItemPerSlot {
+		utils.LogMessage(utils.LevelError, "Item is not a per slot item, cannot delete reservation")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Item is not a per slot item, cannot delete reservation",
+		})
+	}
+
+	reservationItemTime := models.ReservationManagementRequestTime{
+		StartDate: &StartDateDate,
+	}
+
+	deleted, err := h.ReservationRepository.DeleteReservation(reservationItemTime, itemID, ItemPerSlot, c.Locals("email").(string))
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to delete reservation: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to delete reservation",
+		})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Reservation deleted successfully")
+	utils.LogFooter()
+	return c.JSON(fiber.Map{
+		"message":     "Reservation deleted successfully",
+		"reservation": deleted,
+	})
 }

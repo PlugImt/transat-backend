@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 // ReservationUser is used in multiple places for user info
 type ReservationUser struct {
 	Email          string `json:"email"`
@@ -59,14 +61,15 @@ type ReservationItemDetailResponse struct {
 	ReservationAfter  []ReservationSlotDetail `json:"reservation_after"`
 }
 
-// ReservationStartRequest is used to start a reservation
-type ReservationStartRequest struct {
-	StartDate string `json:"start_date"`
+// ReservationManagementRequest is used to start a reservation
+type ReservationManagementRequest struct {
+	StartDate *string `json:"start_date,omitempty"`
+	EndDate   *string `json:"end_date,omitempty"`
 }
 
-// ReservationEndRequest is used to end a reservation (non-slot-based)
-type ReservationEndRequest struct {
-	EndDate string `json:"end_date"`
+type ReservationManagementRequestTime struct {
+	StartDate *time.Time `json:"start_date,omitempty"`
+	EndDate   *time.Time `json:"end_date,omitempty"`
 }
 
 // ReservationCreateItemRequest is the body for POST /reservation/item/
