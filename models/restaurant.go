@@ -71,6 +71,7 @@ type MenuEntry struct {
 	Name          string  `json:"name" db:"name"`
 	MenuTypeID    int     `json:"menu_type_id" db:"id_restaurant"`
 	AverageRating float64 `json:"average_rating" db:"average_rating"`
+	Rated         bool    `json:"rated"` // Indicates if the user has rated this item
 }
 
 // MenuItemWithRating represents a menu item with its rating
@@ -78,6 +79,7 @@ type MenuItemWithRating struct {
 	ID            int     `json:"id"`
 	Name          string  `json:"name"`
 	AverageRating float64 `json:"average_rating"`
+	Rated         bool    `json:"rated"` // Indicates if the user has rated this item
 }
 
 // MenuResponse represents the complete response for today's menu

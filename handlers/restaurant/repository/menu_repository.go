@@ -88,19 +88,29 @@ func (r *MenuRepository) GetMenuUpdateCacheStatus() time.Time {
 // GetDishDetails retrieves detailed information about a specific dish
 func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 	query := `
-		SELECT 
-			ra.id_restaurant_articles,
-			ra.name,
-			ra.first_time_served,
-			ra.last_time_served,
-			COALESCE(AVG(ran.note), 0) as average_rating,
-			COUNT(ran.note) as total_ratings,
-			COUNT(DISTINCT rm.date_served) as times_served
+		SELECT
+		    ra.id_restaurant_articles,
+		    ra.name,
+		    ra.first_time_served,
+		    ra.last_time_served,
+		    COALESCE(ratings.average_rating, 0) AS average_rating,
+		    COALESCE(ratings.total_ratings, 0) AS total_ratings,
+		    COALESCE(meals.times_served, 0) AS times_served
 		FROM restaurant_articles ra
-		LEFT JOIN restaurant_articles_notes ran ON ra.id_restaurant_articles = ran.id_restaurant_articles
-		LEFT JOIN restaurant_meals rm ON ra.id_restaurant_articles = rm.id_restaurant_articles
-		WHERE ra.id_restaurant_articles = $1
-		GROUP BY ra.id_restaurant_articles, ra.name, ra.first_time_served, ra.last_time_served
+		         LEFT JOIN (
+		    SELECT id_restaurant_articles,
+		           AVG(note) AS average_rating,
+		           COUNT(note) AS total_ratings
+		    FROM restaurant_articles_notes
+		    GROUP BY id_restaurant_articles
+		) ratings ON ra.id_restaurant_articles = ratings.id_restaurant_articles
+		         LEFT JOIN (
+		    SELECT id_restaurant_articles,
+		           COUNT(DISTINCT date_served) AS times_served
+		    FROM restaurant_meals
+		    GROUP BY id_restaurant_articles
+		) meals ON ra.id_restaurant_articles = meals.id_restaurant_articles
+		WHERE ra.id_restaurant_articles = $1;
 	`
 
 	var dishDetails struct {
@@ -563,7 +573,7 @@ func (r *MenuRepository) GetTodaysMenuWithRatings() (*models.MenuResponse, error
 }
 
 // GetTodaysMenuCategorized retrieves today's menu categorized by menu type
-func (r *MenuRepository) GetTodaysMenuCategorized() (*models.CategorizedMenuResponse, error) {
+func (r *MenuRepository) GetTodaysMenuCategorized(email string) (*models.CategorizedMenuResponse, error) {
 	today := utils.FormatParis(utils.Now(), "2006-01-02")
 
 	var menuCount int
@@ -588,24 +598,32 @@ func (r *MenuRepository) GetTodaysMenuCategorized() (*models.CategorizedMenuResp
 	}
 
 	query := `
-		SELECT 
-			rm.id_restaurant_articles,
-			ra.name,
-			rm.id_restaurant,
-			COALESCE(AVG(ran.note), 0) as average_rating
+		SELECT rm.id_restaurant_articles,
+		       ra.name,
+		       rm.id_restaurant,
+		       COALESCE(AVG(ran.note), 0)                                       as average_rating,
+		       EXISTS (SELECT 1
+		               FROM restaurant_articles_notes ran2
+		               WHERE ran2.id_restaurant_articles = rm.id_restaurant_articles
+		                 AND ran2.email = $2) AS rated
 		FROM restaurant_meals rm
-		JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles
-		LEFT JOIN restaurant_articles_notes ran ON ra.id_restaurant_articles = ran.id_restaurant_articles
+		         JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles
+		         LEFT JOIN restaurant_articles_notes ran ON rm.id_restaurant_articles = ran.id_restaurant_articles
 		WHERE rm.date_served = $1
 		GROUP BY rm.id_restaurant_articles, ra.name, rm.id_restaurant
 		ORDER BY rm.id_restaurant, ra.name
-	`
+		`
 
-	rows, err := r.DB.Query(query, today)
+	rows, err := r.DB.Query(query, today, email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query today's menu: %w", err)
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to close rows: %v", err))
+		}
+	}(rows)
 
 	menuTypeMap := map[int]string{
 		1: "grilladesMidi",
@@ -618,7 +636,7 @@ func (r *MenuRepository) GetTodaysMenuCategorized() (*models.CategorizedMenuResp
 
 	for rows.Next() {
 		var entry models.MenuEntry
-		err := rows.Scan(&entry.ArticleID, &entry.Name, &entry.MenuTypeID, &entry.AverageRating)
+		err := rows.Scan(&entry.ArticleID, &entry.Name, &entry.MenuTypeID, &entry.AverageRating, &entry.Rated)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan menu entry: %w", err)
 		}
@@ -627,6 +645,7 @@ func (r *MenuRepository) GetTodaysMenuCategorized() (*models.CategorizedMenuResp
 			ID:            entry.ArticleID,
 			Name:          internal.CapitalizeItemName(entry.Name),
 			AverageRating: entry.AverageRating,
+			Rated:         entry.Rated,
 		}
 
 		switch menuTypeMap[entry.MenuTypeID] {
