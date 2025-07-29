@@ -290,6 +290,93 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int) ([]models.Res
 	return items, nil
 }
 
+func (r *ReservationRepository) GetItemDetails(itemID int, date time.Time) (models.ReservationItemDetailResponse, error) {
+
+	res := models.ReservationItemDetailResponse{
+		ID:                itemID,
+		Name:              "",    // WIll be filled later
+		Slot:              false, // Will be filled later
+		Reservation:       []models.ReservationSlotDetail{},
+		ReservationBefore: []models.ReservationSlotDetail{},
+		ReservationAfter:  []models.ReservationSlotDetail{},
+	}
+
+	dateBefore := date.AddDate(0, 0, -1)
+	dateAfter := date.AddDate(0, 0, 1)
+	dateBeforeStr := dateBefore.Format("2006-01-02")
+	dateAfterStr := dateAfter.Format("2006-01-02")
+	dateStr := date.Format("2006-01-02")
+
+	query := `
+		SELECT re.name,
+		       re.slot,
+		       n.email,
+		       n.first_name,
+		       n.last_name,
+		       n.profile_picture,
+		       r.id_reservation_element,
+		       r.start_date,
+		       r.end_date
+		FROM reservation r
+		         JOIN newf n ON r.email = n.email
+		         JOIN reservation_element re on r.id_reservation_element = re.id_reservation_element
+		WHERE r.id_reservation_element = $1
+		  AND DATE(r.start_date) IN (CAST($2 AS DATE), CAST($3 AS DATE), CAST($4 AS DATE));
+	`
+
+	args := []interface{}{itemID, dateBeforeStr, dateStr, dateAfterStr}
+
+	rows, err := r.DB.Query(query, args...)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get item details: %v", err))
+		return res, err
+	}
+
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to close rows: %v", err))
+		} else {
+			utils.LogMessage(utils.LevelInfo, "Rows closed successfully")
+		}
+	}(rows)
+
+	for rows.Next() {
+		var item models.ReservationSlotDetail
+		var user models.ReservationUser
+		if err := rows.Scan(&res.Name, &res.Slot, &user.Email, &user.FirstName, &user.LastName, &user.ProfilePicture, &item.ID, &item.StartDate, &item.EndDate); err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan item details: %v", err))
+			return res, err
+		}
+		item.User = user
+
+		parsedStartDate, err := time.Parse(time.RFC3339, item.StartDate)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse start date: %v", err))
+			continue // skip invalid row
+		}
+
+		itemDateStr := parsedStartDate.Format("2006-01-02")
+
+		if itemDateStr == dateStr {
+			res.Reservation = append(res.Reservation, item)
+		} else if itemDateStr < dateStr {
+			res.ReservationBefore = append(res.ReservationBefore, item)
+		} else {
+			res.ReservationAfter = append(res.ReservationAfter, item)
+		}
+
+	}
+
+	if err := rows.Err(); err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Row error: %v", err))
+		return res, err
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Item details retrieved for item ID %d on date %s", itemID, dateStr))
+	return res, nil
+}
+
 func (r *ReservationRepository) IsItemAvailable(IDItem int, TimeStamp time.Time) (bool, error) {
 	query := `
 		WITH element_slot AS (

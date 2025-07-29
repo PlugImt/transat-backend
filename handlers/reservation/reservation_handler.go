@@ -191,7 +191,74 @@ func (h *ReservationHandler) CreateReservationCategory(c *fiber.Ctx) error {
 // GetItemDetails handles GET /reservation/items/{id}
 func (h *ReservationHandler) GetItemDetails(c *fiber.Ctx) error {
 	utils.LogHeader("📅 Get Item Details")
-	return c.JSON(fiber.Map{})
+
+	var res models.ReservationItemDetailResponse
+	var date time.Time
+
+	id := c.Params("id")
+	if id == "" {
+		utils.LogMessage(utils.LevelError, "Item ID is required")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Item ID is required",
+		})
+	}
+
+	itemID, err := strconv.Atoi(id)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid item ID: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid item ID",
+		})
+	}
+
+	parsedDate := c.Query("date")
+	if parsedDate != "" {
+		date, err = time.Parse("2006-01-02", parsedDate)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid date format: %v", err))
+			utils.LogFooter()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid date format",
+			})
+		}
+	} else {
+		date = time.Now()
+	}
+
+	itemExists, err := h.ReservationRepository.CheckItemExists(itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check item existence: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check item existence",
+		})
+	}
+	if !itemExists {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Item with ID %d does not exist", itemID))
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": fmt.Sprintf("Item with ID %d does not exist", itemID),
+		})
+	}
+
+	res, err = h.ReservationRepository.GetItemDetails(itemID, date)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get item details: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve item details",
+		})
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved details for item ID %d", itemID))
+	utils.LogFooter()
+
+	return c.JSON(fiber.Map{
+		"message": "Item details retrieved successfully",
+		"item":    res,
+	})
 }
 
 // UpdateReservationItem handles PATCH /reservation/{id} - make or end reservations
