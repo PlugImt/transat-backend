@@ -619,15 +619,19 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 		})
 	}
 
-	if reservationRequest.StartDate != nil {
-		StartDateDate, err = time.Parse("2006-01-02 15:04:05", *reservationRequest.StartDate)
-		if err != nil {
-			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse StartDate: %v", err))
-			utils.LogFooter()
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Invalid StartDate format",
-			})
-		}
+	if reservationRequest.StartDate == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "StartDate is required to delete a reservation",
+		})
+	}
+
+	StartDateDate, err = time.Parse("2006-01-02 15:04:05", *reservationRequest.StartDate)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse StartDate: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid StartDate format",
+		})
 	}
 
 	ItemPerSlot, err := h.ReservationRepository.IsItemPerSlot(itemID)
@@ -651,12 +655,20 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 		StartDate: &StartDateDate,
 	}
 
-	deleted, err := h.ReservationRepository.DeleteReservation(reservationItemTime, itemID, ItemPerSlot, c.Locals("email").(string))
+	deleted, err := h.ReservationRepository.DeleteReservation(reservationItemTime, itemID, c.Locals("email").(string))
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to delete reservation: %v", err))
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to delete reservation",
+		})
+	}
+
+	if !deleted {
+		utils.LogMessage(utils.LevelError, "No reservation found to delete")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "No reservation found to delete or you are not the owner of the reservation",
 		})
 	}
 

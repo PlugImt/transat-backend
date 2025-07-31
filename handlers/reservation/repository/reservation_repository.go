@@ -617,12 +617,7 @@ func (r *ReservationRepository) EndReservation(item models.ReservationManagement
 	return res, nil
 }
 
-func (r *ReservationRepository) DeleteReservation(item models.ReservationManagementRequestTime, IDItem int, ItemPerSlot bool, UserEmail string) (bool, error) {
-	if !ItemPerSlot {
-		utils.LogMessage(utils.LevelError, "Item is not per slot, cannot delete reservation")
-		return false, fmt.Errorf("item is not per slot, cannot delete reservation")
-	}
-
+func (r *ReservationRepository) DeleteReservation(item models.ReservationManagementRequestTime, IDItem int, UserEmail string) (bool, error) {
 	query := `
 		DELETE FROM reservation
 		WHERE id_reservation_element = $1 AND email = $2 AND start_date = $3
