@@ -1,0 +1,3459 @@
+{
+	"info": {
+		"_postman_id": "23128218-53374e94-02a7-4224-86dd-dfdde866eb99",
+		"name": "Transat 2.0",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "User (newf) routes",
+			"item": [
+				{
+					"name": "Create User",
+					"id": "23128218-68ef743e-3100-4388-825b-cb953dadd331",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"thomas.mellouet@imt-atlantique.net\",\n    \"password\": \"T0mT0m@tlantique\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/newf/",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"newf",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Account",
+					"id": "23128218-06c21cae-cabb-420d-936e-57b176fae411",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"yohann.chavanel@imt-atlantique.net\",\n    \"verification_code\": \"393461\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/auth/verify-account",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"verify-account"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Verification Code",
+					"id": "23128218-14022010-285b-4924-a172-17cdb493b719",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"thomas.mellouet@imt-atlantique.net\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/auth/verification-code",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"verification-code"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Password",
+					"id": "23128218-00faee1c-db40-4aaa-b2b3-bfd5ba5e8acc",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@imt-atlantique.net\",\n    \"verification_code\": \"881401\",\n    \"new_password\": \"T0mT0m@tlantique\",\n    \"new_password_confirmation\": \"T0mT0m@tlantique\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/auth/change-password",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"change-password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Change Password",
+					"id": "23128218-2854ee23-db1a-4f72-b579-73f6a0f3fb06",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"new_password_confirmation\": \"Mineenzoa2!\",\n    \"email\": \"enzo.morvan@imt-atlantique.net\",\n    \"new_password\": \"Mineenzoa2!\",\n    \"password\": \"Mineenzoa2!\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/auth/change-password",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"change-password"
+							]
+						},
+						"description": "### Change Password\n\nThis endpoint allows the user to change their password by providing the current password, new password, and confirmation.\n\n#### Request\n\n- Method: POST\n    \n- Base URL: {{base_api_url}}\n    \n- Endpoint: /api/auth/change-password\n    \n- Headers:\n    \n    - Content-Type: application/json\n        \n- Body:\n    \n    - new_password_confirmation (string): The new password confirmation.\n        \n    - email (string): The user's email address.\n        \n    - new_password (string): The new password.\n        \n    - password (string): The current password.\n        \n\n#### Response\n\nThe response for this request is in plain text format with a status code of 200.\n\n#### Response JSON Schema\n\n``` json\n{\n    \"type\": \"object\",\n    \"properties\": {\n        \"status\": {\n            \"type\": \"number\",\n            \"description\": \"The status code of the response.\"\n        },\n        \"message\": {\n            \"type\": \"string\",\n            \"description\": \"A message indicating the result of the password change request.\"\n        }\n    }\n}\n\n ```"
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"id": "2cdfa7c8-63e2-417f-8544-7b96975763e7",
+								"exec": [
+									"// Stores the token from the response in an environment variable.",
+									"var token = pm.response.json().token;",
+									"pm.environment.set(\"token\", token);",
+									"",
+									"// Tests",
+									"pm.test(\"Response status code is 200\", function () {",
+									"    pm.expect(pm.response.code).to.equal(200);",
+									"});",
+									"",
+									"",
+									"pm.test(\"Response has the required fields\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.token).to.exist;",
+									"});",
+									"",
+									"",
+									"pm.test(\"Content-Type header is application/json\", function () {",
+									"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+									"});",
+									"",
+									"",
+									"pm.test(\"Token is a non-empty string\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData.token).to.be.a('string').and.to.have.lengthOf.at.least(1, \"Token should not be empty\");",
+									"});",
+									"",
+									"",
+									"pm.test(\"Response time is less than 500ms\", function () {",
+									"  pm.expect(pm.response.responseTime).to.be.below(3000);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"id": "23128218-10170d3a-ad32-4430-ae14-e0d2c1cbe067",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@imt-atlantique.net\",\n    \"password\": \"Yohann1\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/auth/login",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						},
+						"description": "This endpoint allows users to authenticate and obtain a token by providing their email and password through a POST request to the specified URL.\n\n### Request Body\n\n- email (text, required): The email address of the user.\n    \n- password (text, required): The password of the user.\n    \n\n### Response\n\nThe response of this request is a JSON object with the following schema:\n\n``` json\n{\n  \"token\": \"string\"\n}\n\n ```"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Personal Info",
+					"id": "23128218-22fbfd7e-33db-4483-976d-bb8399ee19f0",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/newf/me",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"newf",
+								"me"
+							]
+						},
+						"description": "This API endpoint makes an HTTP GET request to retrieve information about a user from the specified base API URL. The request does not require any specific request parameters.\n\n### Request Body\n\nThis request does not include a request body.\n\n### Response\n\nUpon a successful execution, the API returns a JSON object with the following structure:\n\n- `campus`: (string) The campus of the user.\n    \n- `email`: (string) The email address of the user.\n    \n- `first_name`: (string) The first name of the user.\n    \n- `graduation_year`: (integer) The graduation year of the user.\n    \n- `id_newf`: (integer) The unique identifier for the user.\n    \n- `last_name`: (string) The last name of the user.\n    \n- `password_updated_date`: (string) The date when the user's password was last updated.\n    \n- `phone_number`: (string) The phone number of the user.\n    \n- `profile_picture`: (string) The URL of the user's profile picture.\n    \n- `total_newf`: (integer) The total number of newf.\n    \n\nThe response status for a successful execution is 200, and the content type is `application/json`."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Personal Info",
+					"id": "23128218-31cec60b-73a9-47ff-b304-fb5ae3ff7471",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InRlc3RAaW10LWF0bGFudGlxdWUubmV0IiwiZXhwIjoxNzc1MTIxMTYwLCJyb2xlIjoiTkVXRiJ9.9k0vjRZ_w3UoKSCS48nHRbfAWNuD2c94cpdU7QCBmCY",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/newf/me",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"newf",
+								"me"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🚧 [In Progress] Delete Account",
+					"id": "23128218-d8ae5d8a-d028-4cf7-aaff-d8366d63cdbd",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"password\": \"T0mT0m@tlantique\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/newf/",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"newf",
+								""
+							]
+						},
+						"description": "Not working for now due to all foreign keys"
+					},
+					"response": []
+				},
+				{
+					"name": "🚧 [In Progress] Request data",
+					"id": "23128218-3867fbea-564b-4ba9-bbed-d5eb47e28874",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/newf/request-data",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"newf",
+								"request-data"
+							]
+						},
+						"description": "Mandatory to be RGPD friendly"
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-3cae8516-cce7-474d-a904-d5b240c7f174"
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "Send notification to group",
+					"id": "23128218-2f339827-7ccd-4a37-9d44-fa4f29876823",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "     {\n        \"serviceName\": \"RESTAURANT\",\n        \"title\": \"Group Notification\",\n        \"message\": \"This is a group notification\",\n        \"data\": {\n           \"screen\": \"Restaurant\",\n           \"otherData\": \"value\"\n        }\n     }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/test/notifications/send-to-group",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"test",
+								"notifications",
+								"send-to-group"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Broken - Send Notification",
+					"id": "23128218-5a6c6c4d-a6d1-4b09-a969-fd92466ed088",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n   // \"userEmails\": [\"yohann.chavanel@imt-atlantique.net\", \"test@imt-atlantique.net\"],\n  \"groups\": [\"RESTAURANT\"],\n\n    \"body\": \"MESSAGEBODY\",\n    \"data\": {\n        \"json\": \"data\",\n        \"example\": \"toto\",\n        \"screen\": \"Restaurant\"\n    },\n    \"sound\": \"default\",\n    \"title\": \"MESSAGETITLE\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/newf/send-notification",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"newf",
+								"send-notification"
+							]
+						},
+						"description": "### Send Notification\n\nThis endpoint allows you to send a notification to specific groups.\n\n#### Request Body\n\n- `userEmails` (array of strings, required is groups is empty): Specify the list of email to which the notification should be sent.\n    \n- `groups` (array of strings, required if userEmails is empty): Specify the groups to which the notification should be sent.\n    \n- `body` (string, required): The main content of the notification.\n    \n- `data` (object): Additional data to be included in the notification.\n    \n    - `screen` (string): Specify the screen to redirect to when the user clicks on the notification.\n        \n- `sound` (string): Specify the sound for the notification.\n    \n- `title` (string): The title of the notification.\n    \n\n#### Response\n\nThe response is in JSON format and follows the schema below:\n\n``` json\n{\n    \"type\": \"object\",\n    \"properties\": {\n        \"failedTargets\": {\n            \"type\": [\"null\", \"array\"],\n            \"description\": \"List of targets that failed to receive the notification.\"\n        },\n        \"success\": {\n            \"type\": \"boolean\",\n            \"description\": \"Indicates if the notification was successfully sent.\"\n        },\n        \"totalTargets\": {\n            \"type\": \"integer\",\n            \"description\": \"Total number of targets to which the notification was sent.\"\n        }\n    }\n}\n\n ```"
+					},
+					"response": []
+				},
+				{
+					"name": "Enable/disable notifications",
+					"id": "23128218-8a849449-780d-456d-b7bc-3d56d7c106e2",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"service\": \"RESTAURANT\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/newf/notification",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"newf",
+								"notification"
+							]
+						},
+						"description": "### Send Notification\n\nThis endpoint allows you to subscribe or unsubscribe to a notification service\n\n#### Request Body\n\n- `service` (string): The name of the service to subscribe or unsubscribe.\n    \n\n#### Response\n\nThe response is in JSON format and follows the schema below:\n\nmessage: false if the user is not subscribed to notifications anymore\n\nmessage: true if the user is subscribe to notifications after the request has been executed"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Notification Status",
+					"id": "23128218-50e303fc-4f7b-4f3a-a623-66d6a25a68a5",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    //\"services\": [\"RESTAURANT\", \"TRAQ\"]\n    \"service\": \"TRAQ\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/newf/notification",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"newf",
+								"notification"
+							]
+						},
+						"description": "### Get Notification\n\nThis endpoint retrieves the notification status for a specific service.\n\n#### Request Body\n\n- `service` (string, optionnal): The name of the service for which the notification status is being retrieved.\n    \n- `services` (array of strings, optionnal): The names of the service for which the notification status is being retrieved.\n    \n- `nothing` (empty, optionnal): To get the names of all subscribed services\n    \n\nExample:\n\n``` json\n{\n  \"service\": \"TRAQ\"\n}\n\n ```\n\n#### Response\n\nThe response is in JSON format and contains the following key:\n\n- `message` (boolean): Indicates whether the user is subscribed to notifications after the request has been executed. It returns `true` if the user is subscribed and `false` if the user is not subscribed.\n    \n- `messages` (array of strings): list of all services subscribed by the user"
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-de7d7f04-cbb6-40b5-9d42-d16f73d5dba9"
+		},
+		{
+			"name": "Traq",
+			"item": [
+				{
+					"name": "Create Traq Type",
+					"id": "23128218-3bbc5448-e698-4029-a59f-510eea19877c",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Food\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/traq/types",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"traq",
+								"types"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Traq Type",
+					"id": "23128218-6ea0f009-4d65-4874-844e-88afce95fee0",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/traq/types",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"traq",
+								"types"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Traq Article",
+					"id": "23128218-05dc0850-dd7c-40ce-9786-f650ac2eb641",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Filou\",\n    \"description\": \"Bière blonde belge aux notes maltées et épicées. Son équilibre entre douceur et amertume séduit les amateurs de caractère.\",\n    \"picture\": \"https://vignette.wikia.nocookie.net/logopedia/images/4/40/Sprite_logo_2019.svg/revision/latest/scale-to-width-down/2000?cb=20180312044311\",\n    \"alcohol\": 8.5,\n    \"price\": 3,\n    \"traq_type\": \"Alcohol\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/traq/",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"traq",
+								""
+							]
+						},
+						"description": "### Create a new traq\n\nThis endpoint allows you to create a new traq article.\n\n#### Request Body\n\n- name (string, required): The name of the traq.\n    \n- description (string, required): Description of the traq.\n    \n- picture (string, required): URL of the picture for the traq.\n    \n- traq_type (string, required): Type of the traq article.\n    \n- alcohol (number): Alcohol content of the traq.\n    \n- price (number): Price of the traq.\n    \n- disabled (boolean): Wether the article should be returnd in the API call\n    \n- limited (boolean): Limited quantity (a special badge is displayed)\n    \n- out_of_stock (boolean): no more left (a special badge is displayed)\n    \n\n#### Response\n\nThe response is a JSON object with the following schema:\n\n``` json\n{\n    \"type\": \"object\",\n    \"properties\": {\n        \"message\": {\n            \"type\": \"string\"\n        }\n    }\n}\n\n ```"
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Traq Article",
+					"id": "23128218-642c51d6-2c73-4819-990a-8baa26a09a20",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/traq/",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"traq",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-f41b78a6-9c14-443b-9be7-79fdc60da899"
+		},
+		{
+			"name": "Restaurant",
+			"item": [
+				{
+					"name": "Get Restaurant",
+					"id": "23128218-05ff3bfa-96af-47cc-8c0b-5f2897d39408",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/restaurant",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"restaurant"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "2",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Restaurant Test",
+					"id": "23128218-a6b5d515-af95-4a08-8cf8-7f5cb3b79de1",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/restaurant/test",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"restaurant",
+								"test"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "2",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Restaurant Article",
+					"id": "23128218-2d01aa46-bfe1-4c2e-bc8b-ae99d6e0daaa",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/restaurant/7",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"restaurant",
+								"7"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "2",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Rate Restaurant Article",
+					"id": "23128218-8956f562-4328-4665-a424-ba2dff6288ee",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InlvaGFubi5jaGF2YW5lbEBpbXQtYXRsYW50aXF1ZS5uZXQiLCJyb2xlIjoiQURNSU4iLCJpc3MiOiJ0cmFuc2F0LWJhY2tlbmQiLCJzdWIiOiJ5b2hhbm4uY2hhdmFuZWxAaW10LWF0bGFudGlxdWUubmV0IiwiZXhwIjo3OTk1NzM5OTgyLCJuYmYiOjE3NTEyNjM2OTMsImlhdCI6MTc1MTI2MzY5MywianRpIjoiTmN3Q0VrNFVpZVo1UDlYdyJ9.kEJyvO9oxIi9DNVAPAO1RdlbpOGnGcQZh3O7pExHeKo",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"comment\": \"LE POULETTTTTT 😍!!!!\",\n    \"rating\": 3\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/restaurant/52",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"restaurant",
+								"52"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "2",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-7457e423-2720-4a73-9e0f-cd0404ed4f0d"
+		},
+		{
+			"name": "Washing Machines",
+			"item": [
+				{
+					"name": "Get Washing Machines",
+					"id": "23128218-e415bb54-309e-4565-93bf-1f8bb396b7dd",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/washingmachines",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"washingmachines"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "2",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-2f7a7475-614b-48e1-94ff-22e31725b2fa"
+		},
+		{
+			"name": "File Upload",
+			"item": [
+				{
+					"name": "Upload Image",
+					"id": "23128218-26a55ab2-2d7b-4c86-8d84-20339719a1d7",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"type": "file",
+									"uuid": "77b60294-0fa2-4f39-a66f-1e287f6ac9a7",
+									"src": "/Users/yohannchavanel/Desktop/chavanel.png"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/upload",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"upload"
+							]
+						},
+						"description": "### Upload Image\n\nThis endpoint allows users to upload an image.\n\n#### Request\n\n- Method: POST\n    \n- URL: `{{base_api_url}}/api/upload`\n    \n- Body:\n    \n    - `image` (file): The image file to be uploaded.\n        \n\n#### Response\n\nThe response is in JSON format and has the following schema:\n\n``` json\n{\n    \"type\": \"object\",\n    \"properties\": {\n        \"success\": {\n            \"type\": \"boolean\"\n        },\n        \"url\": {\n            \"type\": \"string\"\n        }\n    }\n}\n\n ```"
+					},
+					"response": []
+				},
+				{
+					"name": "Get all uploaded images",
+					"id": "23128218-bdf87fca-672d-4ba4-b0d7-24d7027a2896",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/files",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"files"
+							]
+						},
+						"description": "### Get Files\n\nThis endpoint retrieves a list of files uploaded by the autenticaed user.\n\n#### Request\n\n- Method: GET\n    \n- URL: `{{base_api_url}}/api/files`\n    \n\n#### Response\n\nThe response is in JSON format and has the following schema:\n\n``` json\n{\n    \"files\": [\n        {\n            \"created\": \"string\",\n            \"id\": 0,\n            \"last_accessed\": \"string\",\n            \"name\": \"string\",\n            \"url\": \"string\"\n        }\n    ],\n    \"success\": {\n        \"type\": \"boolean\"\n    }\n}\n\n ```"
+					},
+					"response": []
+				},
+				{
+					"name": "Get all images",
+					"id": "23128218-5418e29d-f857-470f-a7fe-afaebc24f170",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/all-files",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"all-files"
+							]
+						},
+						"description": "### Get Files\n\nThis endpoint retrieves a list of files uploaded by the autenticaed user.\n\n#### Request\n\n- Method: GET\n    \n- URL: `{{base_api_url}}/api/files`\n    \n\n#### Response\n\nThe response is in JSON format and has the following schema:\n\n``` json\n{\n    \"files\": [\n        {\n            \"created\": \"string\",\n            \"id\": 0,\n            \"last_accessed\": \"string\",\n            \"name\": \"string\",\n            \"url\": \"string\"\n        }\n    ],\n    \"success\": {\n        \"type\": \"boolean\"\n    }\n}\n\n ```"
+					},
+					"response": []
+				},
+				{
+					"name": "Get an image",
+					"id": "23128218-560f1c10-5662-4888-abb8-ed4e18f95ac4",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/data/chavanel.png",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"data",
+								"chavanel.png"
+							]
+						},
+						"description": "### Get File by Name\n\nThis endpoint retrieves a specific file by name for the authenticated user.\n\n#### Request\n\n- Method: GET\n    \n- URL: `{{base_api_url}}/api/data/{{imagename}}`\n    \n\n#### Response\n\nThe image"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete file",
+					"id": "23128218-5c78fefd-7100-4730-95f6-c53f92451b59",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/files/15",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"files",
+								"15"
+							]
+						},
+						"description": "### Delete File\n\nThis endpoint is used to delete a specific file by its ID.\n\n#### Request Body\n\nThis request does not require a request body.\n\n#### Response\n\n- `message` (string, optional): A message indicating the result of the operation.\n    \n- `success` (boolean, optional): Indicates whether the operation was successful.\n    \n\n#### Response Status\n\n- 200 - OK: The request was successful, and the file was deleted.\n    \n- 404 - Not found: The file doesn't exists or you don't have the permission do delete it"
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-fda045b5-c9f6-4e36-9f57-071ab3ccb634"
+		},
+		{
+			"name": "Statistics",
+			"item": [
+				{
+					"name": "Global stats",
+					"id": "23128218-eba6c385-5944-43ae-a950-d42b3cc4a161",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/statistics/global",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"statistics",
+								"global"
+							]
+						},
+						"description": "### Get Files\n\nThis endpoint retrieves a list of files uploaded by the autenticaed user.\n\n#### Request\n\n- Method: GET\n    \n- URL: `{{base_api_url}}/api/files`\n    \n\n#### Response\n\nThe response is in JSON format and has the following schema:\n\n``` json\n{\n    \"files\": [\n        {\n            \"created\": \"string\",\n            \"id\": 0,\n            \"last_accessed\": \"string\",\n            \"name\": \"string\",\n            \"url\": \"string\"\n        }\n    ],\n    \"success\": {\n        \"type\": \"boolean\"\n    }\n}\n\n ```"
+					},
+					"response": []
+				},
+				{
+					"name": "Endpoints stats",
+					"id": "23128218-9b71263c-212d-44e5-ac2b-0b60ad2a69e3",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/statistics/endpoints",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"statistics",
+								"endpoints"
+							]
+						},
+						"description": "### Get File by Name\n\nThis endpoint retrieves a specific file by name for the authenticated user.\n\n#### Request\n\n- Method: GET\n    \n- URL: `{{base_api_url}}/api/data/{{imagename}}`\n    \n\n#### Response\n\nThe image"
+					},
+					"response": []
+				},
+				{
+					"name": "Top users Stats",
+					"id": "23128218-c355ddcc-98ff-45a1-9661-293b973381dd",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/statistics/top-users",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"statistics",
+								"top-users"
+							]
+						},
+						"description": "### Get File by Name\n\nThis endpoint retrieves a specific file by name for the authenticated user.\n\n#### Request\n\n- Method: GET\n    \n- URL: `{{base_api_url}}/api/data/{{imagename}}`\n    \n\n#### Response\n\nThe image"
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-5fd10c16-aaf5-4ca6-8038-179b70f7674e"
+		},
+		{
+			"name": "RealCampus",
+			"item": [
+				{
+					"name": "friendships",
+					"item": [
+						{
+							"name": "GetUserFriendships",
+							"id": "23128218-a5cc4e67-b46a-4261-9dc5-811b7335b378",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_api_url}}/api/realcampus/friendships/",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"api",
+										"realcampus",
+										"friendships",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "SendFriendRequest",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "2e0b3e67-6394-4751-af8a-051820a057c4",
+										"exec": [
+											"pm.test(\"Response status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 1000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(1000);",
+											"});",
+											"",
+											"pm.test(\"Response body should have the correct schema\", function () {",
+											"    const responseData = pm.response.json();",
+											"",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData).to.have.property('success');",
+											"    pm.expect(responseData.success).to.be.a('boolean');",
+											"    pm.expect(responseData).to.have.property('message');",
+											"    pm.expect(responseData.message).to.be.a('string');",
+											"});",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"id": "23128218-2da4e2f5-825a-43cc-92f2-dd9cdf5ea650",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"friend_email\": \"lucie.delestre@imt-atlantique.net\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/api/realcampus/friendships/send",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"api",
+										"realcampus",
+										"friendships",
+										"send"
+									]
+								},
+								"description": "### Send Friendship Request\n\nThis endpoint is used to send a friendship request to a user on RealCampus.\n\n#### Request Body\n\n- `friend_email` (string, required): The email of the user to whom the friendship request is being sent.\n    \n\n#### Response\n\nThe response will include the status of the friendship request, along with any relevant details.\n\n``` json\n{    \n\"message\": \"Friend request sent!\",\n\"success\": true\n}\n\n ```"
+							},
+							"response": []
+						},
+						{
+							"name": "CancelFriendRequest",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "99ea6c7b-36a4-4d68-a6c6-aa684a58363c",
+										"exec": [
+											"pm.test(\"Response status code is 200\", function () {",
+											"    pm.expect(pm.response.code).to.equal(200);",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response has the required fields\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData).to.have.property('message').that.is.a('string');",
+											"    pm.expect(responseData).to.have.property('success').that.is.a('boolean');",
+											"});",
+											"",
+											"",
+											"pm.test(\"Message is a non-empty string\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData.message).to.be.a('string').and.to.have.lengthOf.at.least(1, \"Message should not be empty\");",
+											"});",
+											"",
+											"",
+											"pm.test(\"Success is a boolean value\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData.success).to.be.a('boolean');",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response time is less than 200ms\", function () {",
+											"  pm.expect(pm.response.responseTime).to.be.below(200);",
+											"});",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"id": "23128218-a2f62a38-e234-4390-afeb-adf20259b62e",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"friendship_id\": 3\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/api/realcampus/friendships/cancel",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"api",
+										"realcampus",
+										"friendships",
+										"cancel"
+									]
+								},
+								"description": "### Cancel Friendship\n\nThis endpoint is used to cancel a friendship.\n\n#### Request Body\n\n- `friendship_id`: The ID of the friendship to be removed.\n    \n\nExample:\n\n``` json\n{\n    \"friendship_id\": 3\n}\n\n ```\n\n#### Response\n\nThe response will be in JSON format with the following schema:\n\n``` json\n{\n    \"type\": \"object\",\n    \"properties\": {\n        \"message\": {\n            \"type\": \"string\"\n        },\n        \"success\": {\n            \"type\": \"boolean\"\n        }\n    }\n}\n\n ```"
+							},
+							"response": []
+						},
+						{
+							"name": "RejectFriendRequest",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "e764c27f-99f9-4f0b-9888-0836d8e4cde5",
+										"exec": [
+											"pm.test(\"Response status code is 200\", function () {",
+											"  pm.response.to.have.status(200);",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response has the required fields - message and success\", function () {",
+											"    const responseData = pm.response.json();",
+											"",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData.message).to.exist;",
+											"    pm.expect(responseData.success).to.exist;",
+											"});",
+											"",
+											"",
+											"pm.test(\"Content-Type header is application/json\", function () {",
+											"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+											"});",
+											"",
+											"",
+											"pm.test(\"Message is a non-empty string\", function () {",
+											"  const responseData = pm.response.json();",
+											"  ",
+											"  pm.expect(responseData.message).to.be.a('string').and.to.have.lengthOf.at.least(1, \"Message should not be empty\");",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response time is less than 1000ms\", function () {",
+											"  pm.expect(pm.response.responseTime).to.be.below(1000);",
+											"});",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"id": "23128218-76d572c3-9fc6-46ea-9bc2-08444430f6cd",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"friendship_id\": 1\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/api/realcampus/friendships/reject",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"api",
+										"realcampus",
+										"friendships",
+										"reject"
+									]
+								},
+								"description": "The API endpoint `{{base_api_url}}/api/realcampus/friendships/reject` is a POST request that is used to reject a friendship request.\n\n### Request Body\n\n- `friendship_id` (number) - The ID of the friendship to be rejected.\n    \n\n### Response\n\nThe response is in JSON format and has the following schema:\n\n``` json\n{\n    \"type\": \"object\",\n    \"properties\": {\n        \"message\": {\n            \"type\": \"string\"\n        },\n        \"success\": {\n            \"type\": \"boolean\"\n        }\n    }\n}\n\n ```"
+							},
+							"response": []
+						},
+						{
+							"name": "AcceptFriendRequest",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "99ea6c7b-36a4-4d68-a6c6-aa684a58363c",
+										"exec": [
+											"pm.test(\"Response status code is 200\", function () {",
+											"  pm.response.to.have.status(200);",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response has the required fields - message and success\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData).to.have.property('message');",
+											"    pm.expect(responseData).to.have.property('success');",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response time is within an acceptable range\", function () {",
+											"  pm.expect(pm.response.responseTime).to.be.below(300);",
+											"});",
+											"",
+											"",
+											"pm.test(\"Content-Type is application/json\", function () {",
+											"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+											"});",
+											"",
+											"",
+											"pm.test(\"Message is a non-empty string\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData.message).to.be.a('string').and.to.have.lengthOf.at.least(1, \"Message should not be empty\");",
+											"});",
+											"",
+											"pm.test(\"Success is a boolean value\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData.success).to.be.a('boolean');",
+											"});",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"id": "23128218-cfcb0e10-03d4-4da1-809c-33d7cbf0dc88",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"friendship_id\": 2\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/api/realcampus/friendships/accept",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"api",
+										"realcampus",
+										"friendships",
+										"accept"
+									]
+								},
+								"description": "### Add Friendship Acceptance\n\nThis endpoint is used to accept a friendship request.\n\n#### Request Body\n\n- `friendship_id`: The ID of the friendship request to be accepted.\n    \n\n#### Response\n\n- `message`: A message indicating the result of the acceptance.\n    \n- `success`: A boolean value indicating the success of the acceptance.\n    \n\nExample:\n\n``` json\n{\n    \"friendship_id\": 2\n}\n\n ```\n\nThe response will be in JSON format with a `message` and `success` field."
+							},
+							"response": []
+						},
+						{
+							"name": "RemoveFriend",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "99ea6c7b-36a4-4d68-a6c6-aa684a58363c",
+										"exec": [
+											"pm.test(\"Response status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response time is less than 200ms\", function () {",
+											"  pm.expect(pm.response.responseTime).to.be.below(200);",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response has the required fields - message and success\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData.message).to.exist;",
+											"    pm.expect(responseData.success).to.exist;",
+											"});",
+											"",
+											"",
+											"pm.test(\"Message is a non-empty string\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData.message).to.be.a('string').and.to.have.lengthOf.at.least(1, \"Message should not be empty\");",
+											"});",
+											"",
+											"",
+											"pm.test(\"Success is a boolean value\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData).to.have.property('success').that.is.a('boolean');",
+											"});",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"id": "23128218-c30ade20-2ba8-41d0-a500-4595559ba204",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"friendship_id\": 2\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/api/realcampus/friendships/remove",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"api",
+										"realcampus",
+										"friendships",
+										"remove"
+									]
+								},
+								"description": "### Remove Friendship\n\nThis endpoint is used to remove a friendship.\n\n#### Request Body\n\n- `friendship_id`: The ID of the friendship to be removed.\n    \n\nExample:\n\n``` json\n{\n    \"friendship_id\": 2\n}\n\n ```\n\n#### Response\n\nThe response will be in JSON format with the following schema:\n\n``` json\n{\n    \"type\": \"object\",\n    \"properties\": {\n        \"message\": {\n            \"type\": \"string\"\n        },\n        \"success\": {\n            \"type\": \"boolean\"\n        }\n    }\n}\n\n ```"
+							},
+							"response": []
+						}
+					],
+					"id": "23128218-ac2c8479-688d-42d9-84fa-d4673fb6b081"
+				},
+				{
+					"name": "posts",
+					"item": [
+						{
+							"name": "CreatePost",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "b2e51c0a-286a-4414-9739-a0931af293ad",
+										"exec": [
+											"pm.test(\"Response time is less than 1000ms\", function () {",
+											"  pm.expect(pm.response.responseTime).to.be.below(1000);",
+											"});",
+											"",
+											"pm.test(\"Response status code is 201\", function () {",
+											"  pm.response.to.have.status(201);",
+											"});",
+											"",
+											"",
+											"pm.test(\"Message field should exist and be a non-empty string\", function () {",
+											"  const responseData = pm.response.json();",
+											"  ",
+											"  pm.expect(responseData).to.be.an('object');",
+											"  pm.expect(responseData.message).to.be.a('string').and.to.have.lengthOf.at.least(1, \"Message should not be empty\");",
+											"});",
+											"",
+											"",
+											"pm.test(\"Post ID is a non-negative integer\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData.post_id).to.be.a('number');",
+											"    pm.expect(responseData.post_id).to.be.at.least(0, \"Post ID should be a non-negative integer\");",
+											"});",
+											"",
+											"",
+											"pm.test(\"Success field is present and has a boolean value\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData).to.have.property('success').that.is.a('boolean');",
+											"});",
+											"",
+											"",
+											"pm.test(\"Content-Type header is present and set to application/json\", function () {",
+											"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.exist;",
+											"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+											"});",
+											"",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"id": "23128218-fdb092a1-a9ec-450f-843d-72df74ce0550",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"file_id_1\": 14,\n    \"file_id_2\": 16,\n    \"location\": \"New York\",\n    \"privacy\": \"PUBLIC\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/api/realcampus/posts",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"api",
+										"realcampus",
+										"posts"
+									]
+								},
+								"description": "### POST /api/realcampus/posts\n\nThis endpoint is used to create a new post on RealCampus.\n\n#### Request Body\n\n- `file_id_1` (number): The ID of the first file attached to the post.\n    \n- `file_id_2` (number): The ID of the second file attached to the post.\n    \n- `location` (string): The location associated with the post.\n    \n- `privacy` (string): The privacy setting for the post, e.g., \"PUBLIC\", \"PRIVATE\".\n    \n\n#### Response\n\nThe response is in JSON format and follows the schema below:\n\n``` json\n{\n    \"type\": \"object\",\n    \"properties\": {\n        \"message\": {\n            \"type\": \"string\"\n        },\n        \"post_id\": {\n            \"type\": \"number\"\n        },\n        \"success\": {\n            \"type\": \"boolean\"\n        }\n    }\n}\n\n ```\n\n- `message` (string): A message related to the response.\n    \n- `post_id` (number): The ID of the newly created post.\n    \n- `success` (boolean): Indicates if the request was successful.\n    \n\nExample Response:\n\n``` json\n{\n    \"message\": \"Post created successfully\",\n    \"post_id\": 5,\n    \"success\": true\n}\n\n ```"
+							},
+							"response": []
+						},
+						{
+							"name": "GetUserTodayPosts",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "6fbc7066-cfaf-4451-869d-b34baea21edd",
+										"exec": [
+											"pm.test(\"Response status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response has the required fields - count, posts, and success\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData).to.have.property('count');",
+											"    pm.expect(responseData).to.have.property('posts');",
+											"    pm.expect(responseData).to.have.property('success');",
+											"});",
+											"",
+											"",
+											"pm.test(\"Each post's created date has a valid date format\", function () {",
+											"    const responseData = pm.response.json().posts;",
+											"    ",
+											"    responseData.forEach(post => {",
+											"        pm.expect(post.created).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{5,}Z$/);",
+											"    });",
+											"});",
+											"",
+											"",
+											"pm.test(\"File1 and file2 objects have id, name, and url fields\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData.posts).to.be.an('array');",
+											"    responseData.posts.forEach(post => {",
+											"        pm.expect(post.file1).to.be.an('object');",
+											"        pm.expect(post.file1.id).to.exist;",
+											"        pm.expect(post.file1.name).to.exist;",
+											"        pm.expect(post.file1.url).to.exist;",
+											"",
+											"        pm.expect(post.file2).to.be.an('object');",
+											"        pm.expect(post.file2.id).to.exist;",
+											"        pm.expect(post.file2.name).to.exist;",
+											"        pm.expect(post.file2.url).to.exist;",
+											"    });",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response time is less than 200ms\", function () {",
+											"  pm.expect(pm.response.responseTime).to.be.below(1000);",
+											"});",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"id": "23128218-0867ac66-dcf7-47b7-993a-7ccd52a3bbe6",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_api_url}}/api/realcampus/posts/today",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"api",
+										"realcampus",
+										"posts",
+										"today"
+									]
+								},
+								"description": "This endpoint retrieves the posts created today by the logged user from the API.\n\nThe response for this request can be documented as a JSON schema:\n\n``` json\n{\n    \"type\": \"object\",\n    \"properties\": {\n        \"count\": {\n            \"type\": \"integer\"\n        },\n        \"posts\": {\n            \"type\": \"array\",\n            \"items\": {\n                \"type\": \"object\",\n                \"properties\": {\n                    \"created\": {\n                        \"type\": \"string\"\n                    },\n                    \"file1\": {\n                        \"type\": \"object\",\n                        \"properties\": {\n                            \"id\": {\n                                \"type\": \"integer\"\n                            },\n                            \"name\": {\n                                \"type\": \"string\"\n                            },\n                            \"url\": {\n                                \"type\": \"string\"\n                            }\n                        }\n                    },\n                    \"file2\": {\n                        \"type\": \"object\",\n                        \"properties\": {\n                            \"id\": {\n                                \"type\": \"integer\"\n                            },\n                            \"name\": {\n                                \"type\": \"string\"\n                            },\n                            \"url\": {\n                                \"type\": \"string\"\n                            }\n                        }\n                    },\n                    \"id\": {\n                        \"type\": \"integer\"\n                    },\n                    \"location\": {\n                        \"type\": \"string\"\n                    },\n                    \"privacy\": {\n                        \"type\": \"string\"\n                    }\n                }\n            }\n        },\n        \"success\": {\n            \"type\": \"boolean\"\n        }\n    }\n}\n\n ```"
+							},
+							"response": []
+						}
+					],
+					"id": "23128218-ed861541-dc7a-4d8f-90d2-eb2a6450fa84"
+				},
+				{
+					"name": "users",
+					"item": [
+						{
+							"name": "SearchUsers",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "0289adcf-4d4d-424d-97e1-dce595f3776b",
+										"exec": [
+											"pm.test(\"Response status code is 200\", function () {",
+											"  pm.expect(pm.response.code).to.equal(200);",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response has the required fields - count, success, and users\", function () {",
+											"    const responseData = pm.response.json();",
+											"",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData).to.have.property('count');",
+											"    pm.expect(responseData).to.have.property('success');",
+											"    pm.expect(responseData).to.have.property('users');",
+											"});",
+											"",
+											"",
+											"pm.test(\"Verify the schema of the 'users' object\", function () {",
+											"    const responseData = pm.response.json();",
+											"    ",
+											"    pm.expect(responseData).to.be.an('object');",
+											"    pm.expect(responseData.users).to.exist.and.to.be.an('array');",
+											"",
+											"    responseData.users.forEach(function(user) {",
+											"        pm.expect(user).to.be.an('object');",
+											"        pm.expect(user.email).to.be.a('string');",
+											"        pm.expect(user.first_name).to.be.a('string');",
+											"        pm.expect(user.friendship).to.be.null;",
+											"        pm.expect(user.last_name).to.be.a('string');",
+											"        pm.expect(user.profile_picture).to.be.a('string');",
+											"    });",
+											"});",
+											"",
+											"",
+											"pm.test(\"Response time is within an acceptable range\", function () {",
+											"  pm.expect(pm.response.responseTime).to.be.below(1000);",
+											"});",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"id": "23128218-dec94b6a-6f0e-4ed9-bd8c-41acd1697cbb",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_api_url}}/api/users/search?q=enzo",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"api",
+										"users",
+										"search"
+									],
+									"query": [
+										{
+											"key": "q",
+											"value": "enzo"
+										}
+									]
+								},
+								"description": "The API endpoint performs an HTTP GET request to search for users based on the query parameter \"q\". The response returned a status code of 200 and a JSON content type.\n\n``` json\n{\n  \"type\": \"object\",\n  \"properties\": {\n    \"count\": {\n      \"type\": \"integer\"\n    },\n    \"success\": {\n      \"type\": \"boolean\"\n    },\n    \"users\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"email\": {\n            \"type\": \"string\"\n          },\n          \"first_name\": {\n            \"type\": \"string\"\n          },\n          \"friendship\": {\n            \"type\": [\"object\", \"null\"]\n          },\n          \"last_name\": {\n            \"type\": \"string\"\n          },\n          \"profile_picture\": {\n            \"type\": \"string\"\n          }\n        }\n      }\n    }\n  }\n}\n\n ```"
+							},
+							"response": []
+						}
+					],
+					"id": "23128218-5fde575e-afd6-43a8-8e67-b27c220661a8"
+				},
+				{
+					"name": "reactions",
+					"item": [],
+					"id": "23128218-57c5b6c0-ff4b-4f34-adb0-85977941405f"
+				}
+			],
+			"id": "23128218-7ebb407b-31a9-4f54-9f51-4cdc38c828ac"
+		},
+		{
+			"name": "Planning",
+			"item": [
+				{
+					"name": "Get Users PASS",
+					"id": "23128218-9766d1c4-d812-4ad0-a33e-bbe8c9c35024",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/planning/users",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"planning",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get user's courses for the current day",
+					"id": "23128218-c87e9f81-d32b-4792-a3e6-3e39fc161e8d",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/planning/users/:email/courses/today",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"planning",
+								"users",
+								":email",
+								"courses",
+								"today"
+							],
+							"variable": [
+								{
+									"key": "email",
+									"value": "maxime.bodin@imt-atlantique.net"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get user's courses between two dates",
+					"id": "23128218-f39c05f7-ba94-4ef1-be83-fb5ec6280bcc",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/api/planning/users/:email/courses?start=2025-06-04&end=2025-06-06",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"planning",
+								"users",
+								":email",
+								"courses"
+							],
+							"query": [
+								{
+									"key": "start",
+									"value": "2025-06-04"
+								},
+								{
+									"key": "end",
+									"value": "2025-06-06"
+								}
+							],
+							"variable": [
+								{
+									"key": "email",
+									"value": "maxime.bodin@imt-atlantique.net"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update PASS ID",
+					"id": "23128218-2ddb9fce-56e8-4169-b8e0-27ad6afbe30c",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"pass_id\": 37092\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/planning/users/:id_newf/passid",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"planning",
+								"users",
+								":id_newf",
+								"passid"
+							],
+							"variable": [
+								{
+									"key": "id_newf",
+									"value": "14"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Course",
+					"id": "23128218-48cca642-4e22-4dfb-975a-8776bc9bcdac",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"date\": \"2025-05-28\", \"title\": \"Programmation avancée - Cours1\", \"start_time\": \"2025-05-28T13:30:00\", \"end_time\": \"2025-05-28T17:45:00\", \"teacher\": \"OUALKADI ZAKARIA\", \"room\": \"NA-J144 (V-40)\", \"group\": \"FIL 1ÈRE ANNÉE\", \"user_email\": \"matis.byar@imt-atlantique.net\"}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/api/planning/courses",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"api",
+								"planning",
+								"courses"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-ed22bdab-91bf-4654-95a3-aee33dd95b23",
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{token}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "38c5c485-1716-49d6-8a36-0781b25503cb",
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "a9c63f85-253c-405d-81b4-6064af59da09",
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Clubs",
+			"item": [
+				{
+					"name": "1. Get All Clubs",
+					"id": "23128218-605cb4f8-d057-4abc-a506-a109d3b96086",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer YOUR_JWT_TOKEN_HERE",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/club",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"club"
+							]
+						},
+						"description": "Récupère la liste de tous les clubs avec nom, description, photo, triés par nombre de membres"
+					},
+					"response": []
+				},
+				{
+					"name": "2. Get Club by ID",
+					"id": "23128218-f304fa5a-9df9-4e8d-9f74-c354f420ff66",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer YOUR_JWT_TOKEN_HERE",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/club/1",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"club",
+								"1"
+							]
+						},
+						"description": "Récupère les détails complets d'un club : infos club, responsable, photos des 5 premiers membres, nombre total de membres"
+					},
+					"response": []
+				},
+				{
+					"name": "3. Get Club Members",
+					"id": "23128218-84c32740-dc5e-4981-b258-b0200495fbd6",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer YOUR_JWT_TOKEN_HERE",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/club/1/members",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"club",
+								"1",
+								"members"
+							]
+						},
+						"description": "Récupère la liste des membres d'un club avec nom, prénom, photo, graduation_year, email"
+					},
+					"response": []
+				},
+				{
+					"name": "4. Create Club",
+					"id": "23128218-41c6103a-f4e4-4123-b72f-f56354fb16ac",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer YOUR_JWT_TOKEN_HERE",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"BDA\",\n  \"picture\": \"https://em-content.zobj.net/source/apple/419/performing-arts_1f3ad.png\",\n  \"description\": \"Evènement et promotion de l'art sur le campis\",\n  \"location\": \"M214\",\n  \"link\": \"https://bda.example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_api_url}}/club",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"club"
+							]
+						},
+						"description": "Crée un nouveau club. Le créateur devient automatiquement responsable et reçoit le rôle 'clubname_respo'"
+					},
+					"response": []
+				},
+				{
+					"name": "5. Update Club",
+					"id": "23128218-1f759db9-6947-4474-a225-95bc5b862c01",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer YOUR_JWT_TOKEN_HERE",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"location\": \"M214\"\n}"
+						},
+						"url": {
+							"raw": "{{base_api_url}}/club/1",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"club",
+								"1"
+							]
+						},
+						"description": "Modifie les informations d'un club. Seuls les responsables du club peuvent faire cette action"
+					},
+					"response": []
+				},
+				{
+					"name": "6. Add Club Responsible",
+					"id": "23128218-febac8bd-0678-4aeb-8cdb-83c134eb6e11",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test@imt-atlantique.net\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_api_url}}/club/1/respo",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"club",
+								"1",
+								"respo"
+							]
+						},
+						"description": "Change le responsable d'un club. L'ancien responsable perd son rôle, le nouveau le reçoit. Seuls les admins ou responsables actuels peuvent faire cette action"
+					},
+					"response": []
+				},
+				{
+					"name": "8. Join Club",
+					"id": "23128218-2e7add5a-d2db-4e9b-b69b-1e1e4be6e88f",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/club/1/join",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"club",
+								"1",
+								"join"
+							]
+						},
+						"description": "Permet à l'utilisateur de rejoindre un club"
+					},
+					"response": []
+				},
+				{
+					"name": "9. Leave Club",
+					"id": "23128218-3a0426fa-efda-4a3f-aca1-63c8b3545752",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer YOUR_JWT_TOKEN_HERE",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/club/1/leave",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"club",
+								"1",
+								"leave"
+							]
+						},
+						"description": "Permet à l'utilisateur de quitter un club. Les responsables ne peuvent pas quitter sans nommer un successeur"
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-e03af102-2acc-4461-a08c-596e1e8db53f",
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{token}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "38c5c485-1716-49d6-8a36-0781b25503cb",
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "a9c63f85-253c-405d-81b4-6064af59da09",
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Events",
+			"item": [
+				{
+					"name": "Get All Events",
+					"id": "23128218-78913b21-1f66-4268-9ba4-ebcb67144fd3",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/event",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"event"
+							]
+						},
+						"description": "Get all upcoming events (default). Use ?time=past for past events or ?time=all for all events."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Past Events",
+					"id": "23128218-1bc3311e-f151-498f-86a9-116f067988b2",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/event?time=past",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"event"
+							],
+							"query": [
+								{
+									"key": "time",
+									"value": "past"
+								}
+							]
+						},
+						"description": "Get all past events sorted by most recent first."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Events (All Time)",
+					"id": "23128218-ed88069d-442c-41bc-94a2-d000e99fc15a",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/event?time=all",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"event"
+							],
+							"query": [
+								{
+									"key": "time",
+									"value": "all"
+								}
+							]
+						},
+						"description": "Get all events regardless of time."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Event by ID",
+					"id": "23128218-2919c76e-f076-4314-b248-6165ca9626da",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/event/1",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"event",
+								"1"
+							]
+						},
+						"description": "Get detailed information about a specific event including attendees, creator, and club details."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Event Members",
+					"id": "23128218-6afb8272-78de-46df-97c2-3fe1f38e6394",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/event/1/members",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"event",
+								"1",
+								"members"
+							]
+						},
+						"description": "Get all attendees of a specific event with detailed information."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Event",
+					"id": "23128218-b26b1701-27f5-4bc8-865a-81ba8cd2feaa",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"WEIIIIIII\",\n  \"description\": \"Le plus gros évenement de linté lincontournable de tout ingénieur\",\n  \"link\": \"https://example.com\",\n  \"start_date\": \"2025-09-05T18:00:00Z\",\n  \"end_date\": \"2025-09-07T21:00:00Z\",\n  \"location\": \"Secret\",\n  \"picture\": \"https://evenement-exterieur.fr/wp-content/uploads/2022/12/fond_wei.png\",\n  \"id_club\": 1\n}"
+						},
+						"url": {
+							"raw": "{{base_api_url}}/event",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"event"
+							]
+						},
+						"description": "Create a new event. The creator will automatically be added as an attendee."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Event",
+					"id": "23128218-ba224f48-7d86-426d-965d-5e4f67a75655",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated Tech Meetup 2024\",\n  \"description\": \"Updated description for the tech meetup\",\n  \"location\": \"Updated Location\",\n  \"picture\": \"https://example.com/updated-picture.jpg\"\n}"
+						},
+						"url": {
+							"raw": "{{base_api_url}}/event/1",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"event",
+								"1"
+							]
+						},
+						"description": "Update event information. Only the event creator can update the event."
+					},
+					"response": []
+				},
+				{
+					"name": "Join Event",
+					"id": "23128218-a66ca440-9da8-4287-ab71-caeb5afe8382",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/event/1/join",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"event",
+								"1",
+								"join"
+							]
+						},
+						"description": "Join an event as an attendee."
+					},
+					"response": []
+				},
+				{
+					"name": "Leave Event",
+					"id": "23128218-d052205b-c2f4-4da4-84f7-5ed4247523e2",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_api_url}}/event/1/leave",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"event",
+								"1",
+								"leave"
+							]
+						},
+						"description": "Leave an event. Event creators cannot leave their own events."
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-0e0ab520-6051-4898-8fbb-a3cf47197f12",
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{token}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "38c5c485-1716-49d6-8a36-0781b25503cb",
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "a9c63f85-253c-405d-81b4-6064af59da09",
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Reservation",
+			"item": [
+				{
+					"name": "Categories",
+					"item": [
+						{
+							"name": "Create Category w/o parent",
+							"id": "23128218-d1041eff-45ae-49c0-8f87-1cc7d3a1d8d6",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"category without parent\",\n    \"id_club_parent\": 2\n}\n",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/reservation/category",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"reservation",
+										"category"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Category with parent",
+							"id": "23128218-8c3ef667-237b-418e-b96c-0963f9bbc1c0",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"category with a parent\",\n    \"id_category_parent\": 11\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/reservation/category",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"reservation",
+										"category"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"id": "23128218-af849e35-41a8-4c9a-b637-47b7bc035cbe"
+				},
+				{
+					"name": "Items",
+					"item": [
+						{
+							"name": "Create Item w/o category",
+							"id": "23128218-fd010d18-f7e5-4197-baa2-ca255e46709d",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"ite2m\",\n    \"slot\": true,\n    \"id_club_parent\": 2\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/reservation/item",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"reservation",
+										"item"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Item with category",
+							"id": "23128218-4ffc7534-3150-4186-90c6-1db78bd0e517",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"item with parent category\",\n    \"id_category_parent\": 4\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/reservation/item",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"reservation",
+										"item"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "GetItem",
+							"id": "23128218-78ba959e-a05d-406b-8756-a4eaf7b0fb8a",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"ite2m\",\n    \"slot\": true,\n    \"id_club_parent\": 2\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/reservation/item/15?date=2025-07-29",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"reservation",
+										"item",
+										"15"
+									],
+									"query": [
+										{
+											"key": "date",
+											"value": "2025-07-29"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"id": "23128218-c25c3904-07e6-47fd-afca-40b4f9d8a94b"
+				},
+				{
+					"name": "Manage Reservation",
+					"item": [
+						{
+							"name": "Start Reservation",
+							"id": "23128218-65448499-9b2b-4d11-b2a7-69794e88bd4e",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"start_date\": \"2025-09-02 12:00:00.000000\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/reservation/item/19",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"reservation",
+										"item",
+										"19"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "End Reservation",
+							"id": "23128218-413f28e7-aca7-4f33-8c41-cf4e8be15ac9",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"start_date\": \"2025-09-02 12:00:00.000000\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/reservation/item/19",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"reservation",
+										"item",
+										"19"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Cancel Reservation",
+							"id": "23128218-44f11435-0180-44b8-a47c-a3918b43ea59",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"start_date\": \"2025-09-02 12:00:00.000000\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_api_url}}/reservation/item/19",
+									"host": [
+										"{{base_api_url}}"
+									],
+									"path": [
+										"reservation",
+										"item",
+										"19"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"id": "23128218-cfb9f79b-ae54-467b-a9b8-b90107b57132"
+				},
+				{
+					"name": "Get Reservation root",
+					"id": "23128218-ea90f376-9e92-4530-ad26-3e49bda505df",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/reservation/",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"reservation",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reservation Per Category",
+					"id": "23128218-28b94a7d-9bfc-4d88-b7b4-ec1af0cce8b5",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/reservation/category/1",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"reservation",
+								"category",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reservation Per Club",
+					"id": "23128218-9365e4e5-2509-40ba-b619-dc41b1644c8e",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_api_url}}/reservation/category/1",
+							"host": [
+								"{{base_api_url}}"
+							],
+							"path": [
+								"reservation",
+								"category",
+								"1"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"id": "23128218-f7a0a9b2-db16-4e98-bdbf-eef6de4b6836",
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{token}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "38c5c485-1716-49d6-8a36-0781b25503cb",
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "a9c63f85-253c-405d-81b4-6064af59da09",
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"id": "ba034821-120f-4239-aa58-391bff9de824",
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"id": "231ef59e-fddf-4e0d-a6d6-8c66dd1c18ec",
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}
