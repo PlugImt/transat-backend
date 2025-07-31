@@ -247,7 +247,24 @@ func (r *ReservationRepository) GetCategoryList(IDCategoryParent *int) ([]models
 func (r *ReservationRepository) GetItemList(IDCategoryParent *int) ([]models.ReservationItem, error) {
 	var items []models.ReservationItem
 
-	query := "SELECT id_reservation_element, name, slot FROM reservation_element"
+	query := `
+		SELECT
+		    re.id_reservation_element,
+		    re.name,
+		    re.slot,
+		    n.email,
+		    n.first_name,
+		    n.last_name,
+		    n.profile_picture
+		FROM reservation_element re
+		         LEFT JOIN reservation r
+		                   ON r.id_reservation_element = re.id_reservation_element
+		                       AND re.slot = TRUE
+		                       AND r.end_date IS NULL
+		         LEFT JOIN newf n
+		                   ON n.email = r.email
+		
+	`
 	args := []interface{}{}
 
 	if IDCategoryParent != nil {
@@ -273,19 +290,27 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int) ([]models.Res
 
 	for rows.Next() {
 		var item models.ReservationItem
-		if err := rows.Scan(&item.ID, &item.Name, &item.Slot); err != nil {
+
+		var email, firstName, lastName, profilePicture sql.NullString
+
+		if err := rows.Scan(&item.ID, &item.Name, &item.Slot, &email, &firstName, &lastName, &profilePicture); err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan item: %v", err))
 			return nil, err
 		}
+
+		if email.Valid {
+			item.User = &models.ReservationUser{
+				Email:          email.String,
+				FirstName:      firstName.String,
+				LastName:       lastName.String,
+				ProfilePicture: profilePicture.String,
+			}
+		} else {
+			item.User = nil
+		}
+
 		items = append(items, item)
 	}
-
-	if err := rows.Err(); err != nil {
-		utils.LogMessage(utils.LevelError, fmt.Sprintf("Row error: %v", err))
-		return nil, err
-	}
-
-	// TODO; add user details if item is reserved
 
 	return items, nil
 }
