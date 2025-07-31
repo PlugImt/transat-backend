@@ -181,8 +181,6 @@ func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequ
 
 	finalQuery := fmt.Sprintf(fmt.Sprintf(query, extraCols, extraVals) + ";")
 
-	fmt.Printf("Executing query: %s with args: %v\n", finalQuery, args)
-
 	row := r.DB.QueryRow(finalQuery, args...)
 
 	if err := row.Scan(&res.ID); err != nil {
@@ -580,8 +578,8 @@ func (r *ReservationRepository) EndReservation(item models.ReservationManagement
 		return res, fmt.Errorf("end date is required")
 	}
 	if ItemPerSlot {
-		utils.LogMessage(utils.LevelError, "Item is not per slot, cannot end reservation")
-		return res, fmt.Errorf("item is not per slot, cannot end reservation")
+		utils.LogMessage(utils.LevelError, "Item is per slot, cannot end reservation")
+		return res, fmt.Errorf("item is per slot, cannot end reservation")
 	}
 
 	query := `
