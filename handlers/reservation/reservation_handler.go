@@ -52,7 +52,7 @@ func (h *ReservationHandler) GetReservationItems(c *fiber.Ctx) error {
 		}
 	}
 
-	categoryList, err := h.ReservationRepository.GetCategoryList(categoryIDInt)
+	categoryList, err := h.ReservationRepository.GetCategoryList(categoryIDInt, nil)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get category list: %v", err))
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -61,7 +61,7 @@ func (h *ReservationHandler) GetReservationItems(c *fiber.Ctx) error {
 	}
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved %d categories", len(categoryList)))
 
-	itemList, err := h.ReservationRepository.GetItemList(categoryIDInt)
+	itemList, err := h.ReservationRepository.GetItemList(categoryIDInt, nil)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get item list: %v", err))
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -82,6 +82,61 @@ func (h *ReservationHandler) GetReservationItems(c *fiber.Ctx) error {
 	utils.LogMessage(utils.LevelInfo, "Successfully retrieved root reservation items")
 	utils.LogFooter()
 	return c.JSON(res)
+}
+
+func (h *ReservationHandler) GetReservationItemsForClub(c *fiber.Ctx) error {
+	utils.LogHeader("📅 Get Reservation Items for Club")
+
+	clubID := c.Params("id")
+	if clubID == "" {
+		utils.LogMessage(utils.LevelError, "Club ID is required")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Club ID is required",
+		})
+	}
+
+	clubIDInt, err := strconv.Atoi(clubID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid club ID: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid club ID",
+		})
+	}
+
+	itemList, err := h.ReservationRepository.GetItemList(nil, &clubIDInt)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get item list for club: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve items for club",
+		})
+	}
+
+	categoryList, err := h.ReservationRepository.GetCategoryList(nil, &clubIDInt)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get category list: %v", err))
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve categories",
+		})
+	}
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved %d categories and %d items for club ID %d", len(categoryList), len(itemList), clubIDInt))
+	if len(categoryList) == 0 && len(itemList) == 0 {
+		utils.LogMessage(utils.LevelInfo, "No categories or items found for club")
+		utils.LogFooter()
+		return c.JSON(fiber.Map{
+			"categories": categoryList,
+			"items":      itemList,
+		})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully retrieved reservation items for club")
+	utils.LogFooter()
+	return c.JSON(fiber.Map{
+		"categories": categoryList,
+		"items":      itemList,
+	})
 }
 
 // GetReservationCategoryItemsByID handles GET /reservation/category/{id}

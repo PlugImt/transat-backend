@@ -21,7 +21,7 @@ func SetupReservationRoutes(router fiber.Router, db *sql.DB) {
 	// Category routes
 	reservationGroup.Post("/category", reservationHandler.CreateReservationCategory) // Creates a new category
 	reservationGroup.Get("/category/:id", reservationHandler.GetReservationItems)    // Returns all the items in a specific category by ID
-	//reservationGroup.Delete("/category/:id", reservationHandler.DeleteReservationCategory)    // Deletes a specific category by ID, if no items are associated with it
+	reservationGroup.Get("/club/:id", reservationHandler.GetReservationItemsForClub) // Returns all the items in a specific category by ID
 
 	// Item routes - these need to come after category routes to avoid conflicts
 	reservationGroup.Get("/item/:id", reservationHandler.GetItemDetails)          // Returns the details of a specific item by ID

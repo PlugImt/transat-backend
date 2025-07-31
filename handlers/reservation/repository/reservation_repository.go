@@ -200,7 +200,7 @@ func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequ
 	return res, nil
 }
 
-func (r *ReservationRepository) GetCategoryList(IDCategoryParent *int) ([]models.ReservationCategory, error) {
+func (r *ReservationRepository) GetCategoryList(IDCategoryParent *int, ClubID *int) ([]models.ReservationCategory, error) {
 	var categories []models.ReservationCategory
 
 	query := "SELECT id_reservation_category, name FROM reservation_category"
@@ -209,6 +209,9 @@ func (r *ReservationRepository) GetCategoryList(IDCategoryParent *int) ([]models
 	if IDCategoryParent != nil {
 		query += " WHERE id_parent_category = $1;"
 		args = append(args, *IDCategoryParent)
+	} else if ClubID != nil {
+		query += " WHERE id_clubs = $1 AND id_parent_category IS NULL;"
+		args = append(args, *ClubID)
 	} else {
 		query += " WHERE id_parent_category IS NULL;"
 	}
@@ -244,7 +247,7 @@ func (r *ReservationRepository) GetCategoryList(IDCategoryParent *int) ([]models
 	return categories, nil
 }
 
-func (r *ReservationRepository) GetItemList(IDCategoryParent *int) ([]models.ReservationItem, error) {
+func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) ([]models.ReservationItem, error) {
 	var items []models.ReservationItem
 
 	query := `
@@ -270,6 +273,9 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int) ([]models.Res
 	if IDCategoryParent != nil {
 		query += " WHERE id_reservation_category = $1;"
 		args = append(args, *IDCategoryParent)
+	} else if ClubID != nil {
+		query += " WHERE re.id_clubs = $1 AND id_reservation_category IS NULL;"
+		args = append(args, *ClubID)
 	} else {
 		query += " WHERE id_reservation_category IS NULL;"
 	}
