@@ -187,9 +187,9 @@ func (h *RestaurantHandler) GetRestaurantTestMenu(c *fiber.Ctx) error {
 
 	return c.JSON(&models.CategorizedMenuResponse{
 		GrilladesMidi: []models.MenuItemWithRating{
-			{ID: 20, Name: "poulet rôti", AverageRating: 4.5, Rated: false, NumberOfServices: 1},
+			{ID: 20, Name: "poulet rôti", AverageRating: 0, Rated: false, NumberOfServices: 1},
 			{ID: 84, Name: "spaghetti à la bolognaise", AverageRating: 4.7, Rated: true, NumberOfServices: 2},
-			{ID: 68, Name: "vol au vent de colin", AverageRating: 4.2, Rated: false, NumberOfServices: 1},
+			{ID: 68, Name: "vol au vent de colin", AverageRating: 0, Rated: false, NumberOfServices: 1},
 		},
 		Migrateurs: []models.MenuItemWithRating{
 			{ID: 165, Name: "estouffade de calamars à la nazaré", AverageRating: 4.8, Rated: true, NumberOfServices: 5},
@@ -200,13 +200,13 @@ func (h *RestaurantHandler) GetRestaurantTestMenu(c *fiber.Ctx) error {
 			{ID: 67, Name: "pizza végétarienne", AverageRating: 4.4, Rated: false, NumberOfServices: 3},
 		},
 		AccompMidi: []models.MenuItemWithRating{
-			{ID: 12, Name: "gâteau de choux fleurs noix et mimolette", AverageRating: 4.1, Rated: true, NumberOfServices: 140},
-			{ID: 15, Name: "fenouil rôti", AverageRating: 4.0, Rated: false, NumberOfServices: 7},
+			{ID: 12, Name: "gâteau de choux fleurs noix et mimolette", AverageRating: 0, Rated: false, NumberOfServices: 140},
+			{ID: 15, Name: "fenouil rôti", AverageRating: 4.0, Rated: true, NumberOfServices: 7},
 		},
 		GrilladesSoir: []models.MenuItemWithRating{
-			{ID: 66, Name: "filet deiglegin croûte dolives", AverageRating: 4.5, Rated: true, NumberOfServices: 1},
+			{ID: 66, Name: "filet deiglegin croûte dolives", AverageRating: 0, Rated: false, NumberOfServices: 1},
 			{ID: 59, Name: "filet de poulet tandoori", AverageRating: 4.7, Rated: false, NumberOfServices: 4},
-			{ID: 86, Name: "pizza au chèvre", AverageRating: 4.2, Rated: false, NumberOfServices: 13590809362},
+			{ID: 86, Name: "pizza au chèvre", AverageRating: 0, Rated: false, NumberOfServices: 13590809362},
 		},
 		AccompSoir: []models.MenuItemWithRating{
 			{ID: 103, Name: "haricots beurre persillées", AverageRating: 4.1, Rated: false, NumberOfServices: 2},
