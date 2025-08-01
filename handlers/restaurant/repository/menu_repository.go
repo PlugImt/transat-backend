@@ -598,20 +598,23 @@ func (r *MenuRepository) GetTodaysMenuCategorized(email string) (*models.Categor
 	}
 
 	query := `
-		SELECT rm.id_restaurant_articles,
-		       ra.name,
-		       rm.id_restaurant,
-		       COALESCE(AVG(ran.note), 0)                                       as average_rating,
-		       EXISTS (SELECT 1
-		               FROM restaurant_articles_notes ran2
-		               WHERE ran2.id_restaurant_articles = rm.id_restaurant_articles
-		                 AND ran2.email = $2) AS rated
-		FROM restaurant_meals rm
-		         JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles
-		         LEFT JOIN restaurant_articles_notes ran ON rm.id_restaurant_articles = ran.id_restaurant_articles
-		WHERE rm.date_served = $1
-		GROUP BY rm.id_restaurant_articles, ra.name, rm.id_restaurant
-		ORDER BY rm.id_restaurant, ra.name
+			SELECT rm.id_restaurant_articles,
+			       ra.name,
+			       rm.id_restaurant,
+			       COALESCE(AVG(ran.note), 0)                                       AS average_rating,
+			       EXISTS (SELECT 1
+			               FROM restaurant_articles_notes ran2
+			               WHERE ran2.id_restaurant_articles = rm.id_restaurant_articles
+			                 AND ran2.email = $2) AS rated,
+			       (SELECT COUNT(*)
+			        FROM restaurant_meals rm2
+			        WHERE rm2.id_restaurant_articles = rm.id_restaurant_articles)   AS times_served
+			FROM restaurant_meals rm
+			         JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles
+			         LEFT JOIN restaurant_articles_notes ran ON rm.id_restaurant_articles = ran.id_restaurant_articles
+			WHERE rm.date_served = $1
+			GROUP BY rm.id_restaurant_articles, ra.name, rm.id_restaurant
+			ORDER BY rm.id_restaurant, ra.name;
 		`
 
 	rows, err := r.DB.Query(query, today, email)
@@ -636,16 +639,17 @@ func (r *MenuRepository) GetTodaysMenuCategorized(email string) (*models.Categor
 
 	for rows.Next() {
 		var entry models.MenuEntry
-		err := rows.Scan(&entry.ArticleID, &entry.Name, &entry.MenuTypeID, &entry.AverageRating, &entry.Rated)
+		err := rows.Scan(&entry.ArticleID, &entry.Name, &entry.MenuTypeID, &entry.AverageRating, &entry.Rated, &entry.NumberOfServices)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan menu entry: %w", err)
 		}
 
 		menuItem := models.MenuItemWithRating{
-			ID:            entry.ArticleID,
-			Name:          internal.CapitalizeItemName(entry.Name),
-			AverageRating: entry.AverageRating,
-			Rated:         entry.Rated,
+			ID:               entry.ArticleID,
+			Name:             internal.CapitalizeItemName(entry.Name),
+			AverageRating:    entry.AverageRating,
+			Rated:            entry.Rated,
+			NumberOfServices: entry.NumberOfServices,
 		}
 
 		switch menuTypeMap[entry.MenuTypeID] {

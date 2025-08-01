@@ -67,19 +67,21 @@ type FullMenuData struct {
 
 // MenuEntry represents a menu item with its average rating for API responses
 type MenuEntry struct {
-	ArticleID     int     `json:"article_id" db:"id_restaurant_articles"`
-	Name          string  `json:"name" db:"name"`
-	MenuTypeID    int     `json:"menu_type_id" db:"id_restaurant"`
-	AverageRating float64 `json:"average_rating" db:"average_rating"`
-	Rated         bool    `json:"rated"` // Indicates if the user has rated this item
+	ArticleID        int     `json:"article_id" db:"id_restaurant_articles"`
+	Name             string  `json:"name" db:"name"`
+	MenuTypeID       int     `json:"menu_type_id" db:"id_restaurant"`
+	AverageRating    float64 `json:"average_rating" db:"average_rating"`
+	Rated            bool    `json:"rated"`
+	NumberOfServices int     `json:"number_of_services"`
 }
 
 // MenuItemWithRating represents a menu item with its rating
 type MenuItemWithRating struct {
-	ID            int     `json:"id"`
-	Name          string  `json:"name"`
-	AverageRating float64 `json:"average_rating"`
-	Rated         bool    `json:"rated"` // Indicates if the user has rated this item
+	ID               int     `json:"id"`
+	Name             string  `json:"name"`
+	AverageRating    float64 `json:"average_rating"`
+	Rated            bool    `json:"rated"`
+	NumberOfServices int     `json:"number_of_services"`
 }
 
 // MenuResponse represents the complete response for today's menu
