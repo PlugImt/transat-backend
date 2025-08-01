@@ -92,14 +92,14 @@ func (h *WashingMachineHandler) GetWashingMachinesTest() fiber.Handler {
 			WashingMachines: []models.FormattedMachine{
 				{Number: 11, Available: true, TimeLeft: 30},
 				{Number: 12, Available: true, TimeLeft: 0},
-				{Number: 13, Available: true, TimeLeft: 69},
-				{Number: 14, Available: true, TimeLeft: 1},
+				{Number: 13, Available: true, TimeLeft: 934},
+				{Number: 14, Available: true, TimeLeft: 400},
 			},
 			Dryers: []models.FormattedMachine{
-				{Number: 15, Available: true, TimeLeft: 7},
+				{Number: 15, Available: true, TimeLeft: 953},
 				{Number: 16, Available: true, TimeLeft: 0},
-				{Number: 17, Available: true, TimeLeft: 234},
-				{Number: 18, Available: true, TimeLeft: 24},
+				{Number: 17, Available: true, TimeLeft: 5235},
+				{Number: 18, Available: true, TimeLeft: 2489},
 			},
 		}
 
