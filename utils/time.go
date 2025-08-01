@@ -94,6 +94,10 @@ func GetHourParis(t time.Time) int {
 	return t.In(ParisLocation).Hour()
 }
 
+func GetTimeInParis(t time.Time) time.Time {
+	return t.In(ParisLocation)
+}
+
 // GetWeekdayParis returns the weekday in Paris timezone
 func GetWeekdayParis(t time.Time) time.Weekday {
 	return t.In(ParisLocation).Weekday()
