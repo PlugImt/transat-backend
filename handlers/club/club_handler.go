@@ -238,6 +238,18 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 		}
 	}
 
+	isMemberQuery := `
+		SELECT EXISTS(SELECT 1 FROM clubs_members WHERE email = $1 AND id_clubs = $2)
+	`
+
+	var hasJoined bool
+	err = h.db.QueryRow(isMemberQuery, c.Locals("email").(string), clubID).Scan(&hasJoined)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check if user has joined club")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		hasJoined = false
+	}
+
 	// Build response
 	response := map[string]interface{}{
 		"id":            club.ID,
@@ -248,6 +260,7 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 		"link":          club.Link,
 		"member_count":  memberCount,
 		"member_photos": memberPhotos,
+		"has_joined":    hasJoined,
 	}
 
 	if responsible != nil {
