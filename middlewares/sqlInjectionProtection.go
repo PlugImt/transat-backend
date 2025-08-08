@@ -27,15 +27,12 @@ func SQLInjectionProtectionMiddleware() fiber.Handler {
 			return c.Next()
 		}
 
-		// List of SQL injection patterns to check for
+		// List of SQL injection patterns to check for (reduced to avoid false positives)
 		sqlInjectionPatterns := []*regexp.Regexp{
-			regexp.MustCompile(`(?i)(\s|^)(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|UNION|JOIN|WHERE|AND|OR|LIKE|HAVING|GROUP\s+BY|ORDER\s+BY)(\s|$)`),
-			regexp.MustCompile(`(?i)'(''|[^'])*'`),                                // SQL strings
-			regexp.MustCompile(`(?i);`),                                           // SQL statement terminator
-			regexp.MustCompile(`(?i)--`),                                          // SQL comment
-			regexp.MustCompile(`(?i)\/\*.*?\*\/`),                                 // SQL block comment
-			regexp.MustCompile(`(?i)(\s|^)(EXEC|EXECUTE|EXEC\(|EXECUTE\()(\s|$)`), // SQL execution commands
-			regexp.MustCompile(`(?i)xp_`),                                         // SQL Server extended stored procedures
+			regexp.MustCompile(`(?i)UNION\s+SELECT`), // classic union-based injection
+			regexp.MustCompile(`--`),                 // inline comment
+			regexp.MustCompile(`/\*.*?\*/`),          // block comment
+			regexp.MustCompile(`;\s*`),               // statement terminator
 		}
 
 		// Parse the request body into a map
@@ -55,18 +52,10 @@ func SQLInjectionProtectionMiddleware() fiber.Handler {
 			return false
 		}
 
-		// Function to sanitize input
-		sanitizeInput := func(input string) string {
 			// Replace single quotes with two single quotes (SQL escape)
-			input = strings.ReplaceAll(input, "'", "''")
-			// Remove comments and multiple spaces
-			input = regexp.MustCompile(`/\*.*?\*/`).ReplaceAllString(input, "")
-			input = regexp.MustCompile(`--.*`).ReplaceAllString(input, "")
-			input = regexp.MustCompile(`\s+`).ReplaceAllString(input, " ")
-			return input
-		}
+		// No sanitization: we rely on parameterized queries in handlers/repositories
 
-		// Check all string values for SQL injection
+		// Check all string values for SQL injection (do not mutate content)
 		for field, value := range requestBody {
 			strValue, ok := value.(string)
 			if !ok {
@@ -79,15 +68,9 @@ func SQLInjectionProtectionMiddleware() fiber.Handler {
 					"error": "Invalid input detected",
 				})
 			}
-
-			// Sanitize the input
-			requestBody[field] = sanitizeInput(strValue)
+			_ = field
 		}
-
-		// Replace the request body with the sanitized one
-		sanitizedBody, _ := json.Marshal(requestBody)
-		c.Request().SetBody(sanitizedBody)
-
+		// Do not modify the request body; pass through as-is
 		return c.Next()
 	}
 }
