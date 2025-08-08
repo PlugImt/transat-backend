@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"strings"
 	"time"
 	"unicode"
@@ -81,6 +80,5 @@ func IsNotificationTimeAllowed(t time.Time) bool {
 	}
 
 	hour := utils.GetHourParis(t)
-	fmt.Println("Local time: %v, Paris time: %v, Hour: %d", t, utils.GetTimeInParis(t), hour)
 	return hour >= 6 && hour < 16
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -13,77 +12,43 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
+	_ "github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/plugimt/transat-backend/handlers"
 	"github.com/plugimt/transat-backend/handlers/club"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/i18n"
+	"github.com/plugimt/transat-backend/internal/config"
+	"github.com/plugimt/transat-backend/internal/database"
 	"github.com/plugimt/transat-backend/middlewares"
 	"github.com/plugimt/transat-backend/routes"
 	"github.com/plugimt/transat-backend/scheduler"
 	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 	"github.com/robfig/cron/v3"
-
-	_ "github.com/lib/pq"
-	_ "github.com/nicksnyder/go-i18n/v2/i18n"
-	"github.com/pressly/goose/v3"
 )
 
 var db *sql.DB
 var jwtSecret []byte
 
-func init() {
-	utils.SentryInit()
-
-	err := godotenv.Load()
-	if err != nil {
+func main() {
+	if err := godotenv.Load(); err != nil {
 		log.Println("Info: ℹ️ Error loading .env file: ", err)
 	}
 
-	jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-	if len(jwtSecret) == 0 {
-		log.Fatal("💥 JWT_SECRET environment variable is not set")
-	}
+	utils.SentryInit()
 
-	// Connect to the database
-	db, err = sql.Open("postgres",
-		fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-			os.Getenv("DB_USER"),
-			os.Getenv("DB_PASS"),
-			os.Getenv("DB_HOST"),
-			os.Getenv("DB_PORT"),
-			os.Getenv("DB_NAME"),
-		),
-	)
+	cfg := config.Load()
+	jwtSecret = cfg.JWTSecret
+
+	var err error
+	db, err = database.Open(cfg.DSN(), "db/migrations")
 	if err != nil {
-		log.Fatalf("💥 Error connecting to the database : %v", err)
-	} else {
-		log.Println("Successfully connected to the database")
+		log.Fatalf("💥 Error initializing database: %v", err)
 	}
-
-	// Ping the database to verify connection
-	if err = db.Ping(); err != nil {
-		log.Fatalf("💥 Error pinging the database : %v", err)
-	} else {
-		log.Println("Database connection verified")
-	}
-
-	// Run migrations
-	log.Println("Running database migrations...")
-	if err := goose.SetDialect("postgres"); err != nil {
-		log.Fatalf("💥 Failed to set goose dialect: %v", err)
-	}
-	if err := goose.Up(db, "db/migrations"); err != nil {
-		log.Fatalf("💥 Failed to run migrations: %v", err)
-	}
-	log.Println("Database migrations completed successfully")
 
 	if err := i18n.Init(); err != nil {
 		log.Fatalf("Failed to initialize i18n: %v", err)
 	}
-}
-
-func main() {
 	app := fiber.New(fiber.Config{
 		StrictRouting:           true,
 		EnableTrustedProxyCheck: true,
@@ -150,7 +115,7 @@ func main() {
 
 	// Use proper CORS origins in production, or * in development
 	if os.Getenv("ENV") == "production" {
-		corsConfig.AllowOrigins = os.Getenv("ALLOWED_ORIGINS")
+		corsConfig.AllowOrigins = cfg.AllowedOrigins
 	} else {
 		corsConfig.AllowOrigins = "*"
 	}
@@ -195,7 +160,7 @@ func main() {
 	routes.SetupStatisticsRoutes(app, db, statisticsService)
 	routes.SetupWashingMachineRoutes(app)
 	routes.SetupWeatherRoutes(app, weatherHandler)
-	routes.SetupNotificationRoutes(app, db, notificationService)
+	// Remove duplicate registration to avoid double-binding routes
 	routes.SetupEventRoutes(app, eventHandler)
 	routes.SetupReservationRoutes(app, db)
 
@@ -204,10 +169,6 @@ func main() {
 	})
 
 	// Start Server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3000" // Default port
-	}
-	log.Printf("Server starting on port %s", port)
-	log.Fatal(app.Listen(":" + port))
+	log.Printf("Server starting on port %s", cfg.Port)
+	log.Fatal(app.Listen(":" + cfg.Port))
 }

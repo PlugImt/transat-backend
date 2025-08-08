@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/robfig/cron/v3"
 )
 
@@ -14,7 +13,7 @@ type Scheduler struct {
 }
 
 // NewScheduler creates a new main scheduler
-func NewScheduler(restaurantHandler *restaurant.RestaurantHandler) *Scheduler {
+func NewScheduler(restaurantHandler RestaurantMenuCronHandler) *Scheduler {
 	return &Scheduler{
 		restaurantScheduler: NewRestaurantScheduler(restaurantHandler),
 		// Initialize other schedulers here

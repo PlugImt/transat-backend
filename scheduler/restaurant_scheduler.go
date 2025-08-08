@@ -2,21 +2,26 @@ package scheduler
 
 import (
 	"log"
+	"sync"
 	"time"
 
-	"github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/utils"
 )
 
+type RestaurantMenuCronHandler interface {
+	CheckAndUpdateMenuCron() (bool, error)
+}
+
 // RestaurantScheduler handles periodic tasks related to restaurant menu
 type RestaurantScheduler struct {
-	restaurantHandler *restaurant.RestaurantHandler
+	restaurantHandler RestaurantMenuCronHandler
 	stopChan          chan struct{}
 	runningChan       chan struct{}
+	stopOnce          sync.Once
 }
 
 // NewRestaurantScheduler creates a new restaurant scheduler
-func NewRestaurantScheduler(handler *restaurant.RestaurantHandler) *RestaurantScheduler {
+func NewRestaurantScheduler(handler RestaurantMenuCronHandler) *RestaurantScheduler {
 	return &RestaurantScheduler{
 		restaurantHandler: handler,
 		stopChan:          make(chan struct{}),
@@ -53,15 +58,14 @@ func (s *RestaurantScheduler) Start() {
 
 // Stop halts the scheduler
 func (s *RestaurantScheduler) Stop() {
-	// Only stop if it's running
-	select {
-	case <-s.runningChan:
-		// It's running, so we can stop it
-		close(s.stopChan)
-	default:
-		// It's not running
-		utils.LogMessage(utils.LevelWarn, "Attempted to stop restaurant scheduler that wasn't running")
-	}
+	s.stopOnce.Do(func() {
+		select {
+		case <-s.runningChan:
+			close(s.stopChan)
+		default:
+			utils.LogMessage(utils.LevelWarn, "Attempted to stop restaurant scheduler that wasn't running")
+		}
+	})
 }
 
 func (s *RestaurantScheduler) isScheduledTimeAllowed(t time.Time) bool {
