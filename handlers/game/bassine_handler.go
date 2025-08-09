@@ -2,7 +2,6 @@ package game
 
 import (
 	"database/sql"
-	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/models"
@@ -10,11 +9,24 @@ import (
 )
 
 type BassineHandler struct {
-    db *sql.DB
+	db *sql.DB
 }
 
 func NewBassineHandler(db *sql.DB) *BassineHandler {
-    return &BassineHandler{db: db}
+	return &BassineHandler{db: db}
+}
+
+// checkUserExists verifies if a user exists in the database
+func (h *BassineHandler) checkUserExists(email string) error {
+	var exists bool
+	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM newf WHERE email = $1)", email).Scan(&exists); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check user existence")
+		return err
+	}
+	if !exists {
+		return fiber.NewError(fiber.StatusNotFound, "User not found")
+	}
+	return nil
 }
 
 // SetUserScore handles PUT /game/bassine/:email with body {"score": number}
@@ -28,30 +40,13 @@ func (h *BassineHandler) SetUserScore(c *fiber.Ctx) error {
         return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Email is required"})
     }
 
-    // Accept score either from JSON body or from query (?score=)
-    var req models.BassineScoreRequest
-    var parseErr error
-
-    if len(c.Body()) > 0 {
-        if err := c.BodyParser(&req); err != nil {
-            utils.LogMessage(utils.LevelWarn, "Invalid request body")
-            utils.LogFooter()
-            return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
-        }
-    } else if qs := c.Query("score"); qs != "" {
-        var s int
-        s, parseErr = strconv.Atoi(qs)
-        if parseErr != nil {
-            utils.LogMessage(utils.LevelWarn, "Invalid score in query")
-            utils.LogFooter()
-            return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid score"})
-        }
-        req.Score = s
-    } else {
-        utils.LogMessage(utils.LevelWarn, "Score is required")
-        utils.LogFooter()
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Score is required"})
-    }
+    	// Parse score from JSON body only
+	var req models.BassineScoreRequest
+	if err := c.BodyParser(&req); err != nil {
+		utils.LogMessage(utils.LevelWarn, "Invalid request body")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
 
     if req.Score < 0 {
         utils.LogMessage(utils.LevelWarn, "Score cannot be negative")
@@ -59,18 +54,12 @@ func (h *BassineHandler) SetUserScore(c *fiber.Ctx) error {
         return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Score cannot be negative"})
     }
 
-    // Ensure user exists
-    var exists bool
-    if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM newf WHERE email = $1)", email).Scan(&exists); err != nil {
-        utils.LogMessage(utils.LevelError, "Failed to check user existence")
-        utils.LogFooter()
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal error"})
-    }
-    if !exists {
-        utils.LogMessage(utils.LevelWarn, "User not found")
-        utils.LogFooter()
-        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
-    }
+    	// Ensure user exists
+	if err := h.checkUserExists(email); err != nil {
+		utils.LogMessage(utils.LevelWarn, "User not found")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
 
     // Upsert score
     _, err := h.db.Exec(`
@@ -100,17 +89,12 @@ func (h *BassineHandler) GetUserScore(c *fiber.Ctx) error {
         return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Email is required"})
     }
 
-    var exists bool
-    if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM newf WHERE email = $1)", email).Scan(&exists); err != nil {
-        utils.LogMessage(utils.LevelError, "Failed to check user existence")
-        utils.LogFooter()
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal error"})
-    }
-    if !exists {
-        utils.LogMessage(utils.LevelWarn, "User not found")
-        utils.LogFooter()
-        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
-    }
+    	// Ensure user exists
+	if err := h.checkUserExists(email); err != nil {
+		utils.LogMessage(utils.LevelWarn, "User not found")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
 
     var score int
     err := h.db.QueryRow("SELECT score FROM bassine_scores WHERE email = $1", email).Scan(&score)
