@@ -260,7 +260,7 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 		FROM reservation_element re
 		         LEFT JOIN reservation r
 		                   ON r.id_reservation_element = re.id_reservation_element
-		                       AND re.slot = TRUE
+		                       AND re.slot = FALSE
 		                       AND r.end_date IS NULL
 		         LEFT JOIN newf n
 		                   ON n.email = r.email
@@ -277,7 +277,7 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 	} else {
 		query += " WHERE id_reservation_category IS NULL;"
 	}
-
+	
 	rows, err := r.DB.Query(query, args...)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get items: %v", err))
