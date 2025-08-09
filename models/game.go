@@ -13,3 +13,10 @@ type BassineScoreResponse struct {
 }
 
 
+// BassineUserScore represents one user's score for the bassine game
+type BassineUserScore struct {
+    User  ReservationUser `json:"user"`
+    Score int             `json:"score"`
+}
+
+

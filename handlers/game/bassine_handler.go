@@ -144,3 +144,62 @@ func (h *BassineHandler) GetUserScore(c *fiber.Ctx) error {
 }
 
 
+// GetAllScores handles GET /game/bassine and returns all users with their scores
+func (h *BassineHandler) GetAllScores(c *fiber.Ctx) error {
+    utils.LogHeader("🎮 Bassine Get All Scores")
+
+    // Join newf (user info) with bassine_scores
+    rows, err := h.db.Query(`
+        SELECT n.email,
+               COALESCE(n.first_name, '') AS first_name,
+               COALESCE(n.last_name, '') AS last_name,
+               COALESCE(n.profile_picture, '') AS profile_picture,
+               COALESCE(n.phone_number, '') AS phone_number,
+               COALESCE(n.graduation_year, 0) AS graduation_year,
+               COALESCE(n.formation_name, '') AS formation_name,
+               COALESCE(n.campus, '') AS campus,
+               bs.score
+        FROM bassine_scores bs
+        JOIN newf n ON n.email = bs.email
+        ORDER BY bs.score DESC;
+    `)
+    if err != nil {
+        utils.LogMessage(utils.LevelError, "Failed to fetch all scores")
+        utils.LogFooter()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch scores"})
+    }
+    defer rows.Close()
+
+    results := make([]models.BassineUserScore, 0, 64)
+    for rows.Next() {
+        var user models.ReservationUser
+        var score int
+        if err := rows.Scan(
+            &user.Email,
+            &user.FirstName,
+            &user.LastName,
+            &user.ProfilePicture,
+            new(string), // phone_number ignored in ReservationUser
+            new(int),    // graduation_year ignored
+            new(string), // formation_name ignored
+            new(string), // campus ignored
+            &score,
+        ); err != nil {
+            utils.LogMessage(utils.LevelError, "Failed to scan row for all scores")
+            utils.LogFooter()
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch scores"})
+        }
+        results = append(results, models.BassineUserScore{User: user, Score: score})
+    }
+    if err := rows.Err(); err != nil {
+        utils.LogMessage(utils.LevelError, "Row iteration error for all scores")
+        utils.LogFooter()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch scores"})
+    }
+
+    utils.LogMessage(utils.LevelInfo, "All scores retrieved")
+    utils.LogFooter()
+    return c.Status(fiber.StatusOK).JSON(results)
+}
+
+

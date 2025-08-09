@@ -14,6 +14,7 @@ func SetupGameRoutes(router fiber.Router, db *sql.DB) {
 
     gameGroup := router.Group("/game", middlewares.JWTMiddleware)
 
+    gameGroup.Get("/bassine", bassineHandler.GetAllScores)
     gameGroup.Get("/bassine/:email", bassineHandler.GetUserScore)
     gameGroup.Put("/bassine/:email", bassineHandler.SetUserScore)
 }
