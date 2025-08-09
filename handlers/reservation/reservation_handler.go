@@ -3,12 +3,13 @@ package reservation
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/handlers/reservation/repository"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
-	"strconv"
-	"time"
 )
 
 type ReservationHandler struct {
@@ -310,10 +311,7 @@ func (h *ReservationHandler) GetItemDetails(c *fiber.Ctx) error {
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Retrieved details for item ID %d", itemID))
 	utils.LogFooter()
 
-	return c.JSON(fiber.Map{
-		"message": "Item details retrieved successfully",
-		"item":    res,
-	})
+	return c.JSON(res)
 }
 
 // UpdateReservationItem handles PATCH /reservation/{id} - make or end reservations
