@@ -1,6 +1,8 @@
 -- +goose Up
 -- +goose StatementBegin
 DROP TABLE IF EXISTS reservations CASCADE;
+DROP TABLE IF EXISTS reservation_element CASCADE;
+DROP TABLE IF EXISTS reservation_category CASCADE;
 
 CREATE TABLE reservation_category
 (
@@ -33,7 +35,6 @@ CREATE TABLE reservation
     start_date             TIMESTAMP,
     end_date               TIMESTAMP,
     CONSTRAINT valid_date_range CHECK (start_date < end_date),
-    CONSTRAINT non_null_dates CHECK (start_date IS NOT NULL AND end_date IS NOT NULL),
     PRIMARY KEY (email, id_reservation_element, start_date),
     FOREIGN KEY (email) REFERENCES newf (email),
     FOREIGN KEY (id_reservation_element) REFERENCES reservation_element (id_reservation_element) ON DELETE CASCADE
