@@ -163,6 +163,7 @@ func main() {
 	// Remove duplicate registration to avoid double-binding routes
 	routes.SetupEventRoutes(app, eventHandler)
 	routes.SetupReservationRoutes(app, db)
+	routes.SetupGameRoutes(app, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
