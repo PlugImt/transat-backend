@@ -172,6 +172,169 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 	return c.JSON(events)
 }
 
+func (h *EventHandler) GetEventByClubID(c *fiber.Ctx) error {
+	utils.LogHeader("🎉 Get All Events")
+
+	timeFilter := c.Query("time", "upcoming") // default to upcoming
+	utils.LogLineKeyValue(utils.LevelInfo, "Time Filter", timeFilter)
+
+	clubID, err := strconv.Atoi(c.Params("id"))
+
+	var query string
+	var args []interface{}
+
+	switch timeFilter {
+	case "past":
+		query = `
+			SELECT 
+				e.id_events,
+				e.name,
+				e.start_date,
+				e.end_date,
+				e.location,
+				e.picture,
+				COALESCE(attendee_count.count, 0) as attendee_count
+			FROM events e
+			LEFT JOIN (
+				SELECT id_events, COUNT(*) as count
+				FROM events_attendents
+				GROUP BY id_events
+			) attendee_count ON e.id_events = attendee_count.id_events
+			WHERE e.start_date < NOW()
+			AND e.id_club = $1
+			ORDER BY e.start_date DESC
+		`
+	case "all":
+		query = `
+			SELECT 
+				e.id_events,
+				e.name,
+				e.start_date,
+				e.end_date,
+				e.location,
+				e.picture,
+				COALESCE(attendee_count.count, 0) as attendee_count
+			FROM events e
+			LEFT JOIN (
+				SELECT id_events, COUNT(*) as count
+				FROM events_attendents
+				GROUP BY id_events
+			) attendee_count ON e.id_events = attendee_count.id_events
+			WHERE e.id_club = $1
+			ORDER BY e.start_date ASC
+		`
+	default: // upcoming
+		query = `
+			SELECT 
+				e.id_events,
+				e.name,
+				e.start_date,
+				e.end_date,
+				e.location,
+				e.picture,
+				COALESCE(attendee_count.count, 0) as attendee_count
+			FROM events e
+			LEFT JOIN (
+				SELECT id_events, COUNT(*) as count
+				FROM events_attendents
+				GROUP BY id_events
+			) attendee_count ON e.id_events = attendee_count.id_events
+			WHERE e.start_date >= NOW()
+			AND e.id_club = $1
+			ORDER BY e.start_date ASC
+		`
+	}
+
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Invalid club ID")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid club ID",
+		})
+	}
+
+	args = append(args, clubID)
+	rows, err := h.db.Query(query, args...)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch events")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch events",
+		})
+	}
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to close rows")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		} else {
+			utils.LogMessage(utils.LevelInfo, "Rows closed successfully")
+		}
+	}(rows)
+
+	var events []map[string]interface{}
+	for rows.Next() {
+		var id int
+		var name, location, picture string
+		var startDate time.Time
+		var endDate sql.NullTime
+		var attendeeCount int
+
+		err := rows.Scan(&id, &name, &startDate, &endDate, &location, &picture, &attendeeCount)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan event")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+
+		event := map[string]interface{}{
+			"id":             id,
+			"name":           name,
+			"start_date":     startDate,
+			"end_date":       endDate.Time,
+			"location":       location,
+			"picture":        picture,
+			"attendee_count": attendeeCount,
+		}
+
+		// Handle null end date
+		if !endDate.Valid {
+			event["end_date"] = nil
+		}
+
+		// Get first 10 attendee profile pictures
+		photosQuery := `
+			SELECT n.profile_picture
+			FROM events_attendents ea
+			JOIN newf n ON ea.email = n.email
+			WHERE ea.id_events = $1 AND n.profile_picture IS NOT NULL AND n.profile_picture != ''
+			ORDER BY n.first_name, n.last_name
+			LIMIT 10
+		`
+		photoRows, err := h.db.Query(photosQuery, id)
+		if err == nil {
+			defer photoRows.Close()
+			var memberPhotos []string
+			for photoRows.Next() {
+				var photo string
+				if err := photoRows.Scan(&photo); err == nil {
+					memberPhotos = append(memberPhotos, photo)
+				}
+			}
+			event["member_photos"] = memberPhotos
+		}
+
+		events = append(events, event)
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully fetched events")
+	utils.LogLineKeyValue(utils.LevelInfo, "Count", len(events))
+	utils.LogFooter()
+
+	return c.JSON(events)
+}
+
 // GetEventByID returns a specific event by ID with detailed information
 func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 	utils.LogHeader("🎉 Get Event By ID")
