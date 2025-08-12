@@ -1,21 +1,21 @@
 -- +goose Up
 -- +goose StatementBegin
-DROP TABLE articles CASCADE;
-DROP TABLE articles_types CASCADE;
-DROP TABLE bassine CASCADE;
-DROP TABLE caps CASCADE;
-DROP TABLE courses CASCADE;
-DROP TABLE games CASCADE;
-DROP TABLE players_bassine CASCADE;
-DROP TABLE players_caps CASCADE;
-DROP TABLE realcampus_posts CASCADE;
-DROP TABLE realcampus_friendships CASCADE;
-DROP TABLE realcampus_post_reactions CASCADE;
-DROP TABLE rooms CASCADE;
-DROP TABLE support CASCADE;
-DROP TABLE support_media CASCADE;
-DROP TABLE washing_machines CASCADE;
-DROP TABLE washing_machines_reports CASCADE;
+DROP TABLE IF EXISTS articles CASCADE;
+DROP TABLE IF EXISTS articles_types CASCADE;
+DROP TABLE IF EXISTS bassine CASCADE;
+DROP TABLE IF EXISTS caps CASCADE;
+DROP TABLE IF EXISTS courses CASCADE;
+DROP TABLE IF EXISTS games CASCADE;
+DROP TABLE IF EXISTS players_bassine CASCADE;
+DROP TABLE IF EXISTS players_caps CASCADE;
+DROP TABLE IF EXISTS realcampus_posts CASCADE;
+DROP TABLE IF EXISTS realcampus_friendships CASCADE;
+DROP TABLE IF EXISTS realcampus_post_reactions CASCADE;
+DROP TABLE IF EXISTS rooms CASCADE;
+DROP TABLE IF EXISTS support CASCADE;
+DROP TABLE IF EXISTS support_media CASCADE;
+DROP TABLE IF EXISTS washing_machines CASCADE;
+DROP TABLE IF EXISTS washing_machines_reports CASCADE;
 
 
 
