@@ -343,7 +343,7 @@ func (r *ReservationRepository) GetItemDetails(itemID int, date time.Time) (mode
 		       n.email,
 		       n.first_name,
 		       n.last_name,
-		       n.profile_picture,
+		       COALESCE(n.profile_picture, ''),
 		       r.id_reservation_element,
 		       r.start_date,
 		       r.end_date
