@@ -204,7 +204,7 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 
 	// Get photos of first 5 members
 	membersQuery := `
-		SELECT n.profile_picture
+		SELECT COALESCE(n.profile_picture, '')
 		FROM clubs_members cm
 		JOIN newf n ON cm.email = n.email
 		WHERE cm.id_clubs = $1 AND n.profile_picture IS NOT NULL AND n.profile_picture != ''
@@ -315,7 +315,7 @@ func (h *ClubHandler) GetClubMembers(c *fiber.Ctx) error {
     	cm.email,
     	n.first_name,
     	n.last_name,
-    	n.profile_picture,
+    	COALESCE(n.profile_picture, ''),
     	n.graduation_year,
     	EXISTS (
     	    SELECT 1

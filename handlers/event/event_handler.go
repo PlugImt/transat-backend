@@ -142,7 +142,7 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 
 		// Get first 10 attendee profile pictures
 		photosQuery := `
-			SELECT n.profile_picture
+			SELECT COALESCE(n.profile_picture,'')
 			FROM events_attendents ea
 			JOIN newf n ON ea.email = n.email
 			WHERE ea.id_events = $1 AND n.profile_picture IS NOT NULL AND n.profile_picture != ''
@@ -305,7 +305,7 @@ func (h *EventHandler) GetEventByClubID(c *fiber.Ctx) error {
 
 		// Get first 10 attendee profile pictures
 		photosQuery := `
-			SELECT n.profile_picture
+			SELECT COALESCE(n.profile_picture, '')
 			FROM events_attendents ea
 			JOIN newf n ON ea.email = n.email
 			WHERE ea.id_events = $1 AND n.profile_picture IS NOT NULL AND n.profile_picture != ''
@@ -412,7 +412,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 			n.email,
 			n.first_name,
 			n.last_name,
-			n.profile_picture,
+			COALESCE(n.profile_picture,''),
 			n.graduation_year
 		FROM newf n
 		WHERE n.email = $1
@@ -481,7 +481,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 			n.email,
 			n.first_name,
 			n.last_name,
-			n.profile_picture,
+			COALESCE(n.profile_picture,''),
 			n.graduation_year
 		FROM events_attendents ea
 		JOIN newf n ON ea.email = n.email
@@ -585,7 +585,7 @@ func (h *EventHandler) GetEventMembers(c *fiber.Ctx) error {
 			ea.email,
 			n.first_name,
 			n.last_name,
-			n.profile_picture,
+			COALESCE(n.profile_picture,''),
 			n.graduation_year
 		FROM events_attendents ea
 		JOIN newf n ON ea.email = n.email

@@ -154,7 +154,6 @@ func main() {
 	routes.SetupFileRoutes(app, db, r2Service)
 	routes.SetupRestaurantRoutes(app, restHandler)
 	routes.SetupClubRoutes(app, clubsHandler)
-	routes.SetupRealCampusRoutes(app, db)
 	routes.SetupPlanningRoutes(app, db)
 	routes.SetupNotificationRoutes(app, db, notificationService)
 	routes.SetupStatisticsRoutes(app, db, statisticsService)

@@ -257,7 +257,7 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 		    n.email,
 		    n.first_name,
 		    n.last_name,
-		    n.profile_picture
+		    COALESCE(n.profile_picture,'')
 		FROM reservation_element re
 		         LEFT JOIN reservation r
 		                   ON r.id_reservation_element = re.id_reservation_element
@@ -601,7 +601,7 @@ func (r *ReservationRepository) EndReservation(item models.ReservationManagement
 			WHERE id_reservation_element = $2 AND email = $3 AND end_date IS NULL
 			RETURNING email
 		)
-		SELECT i.email, n.first_name, n.last_name, n.profile_picture
+		SELECT i.email, n.first_name, n.last_name, COALESCE(n.profile_picture,'')
 		FROM updated i
 		JOIN newf n ON i.email = n.email;
 	`
