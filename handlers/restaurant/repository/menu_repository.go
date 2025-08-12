@@ -144,7 +144,7 @@ func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 
 	// Get all reviews ordered by date (most recent first)
 	reviewsQuery := `
-		SELECT n.first_name, n.last_name, n.profile_picture, ran.note, ran.comment, ran.date
+		SELECT n.first_name, n.last_name, COALESCE(n.profile_picture, ''), ran.note, ran.comment, ran.date
 		FROM restaurant_articles_notes ran
 		JOIN newf n ON ran.email = n.email
 		WHERE ran.id_restaurant_articles = $1

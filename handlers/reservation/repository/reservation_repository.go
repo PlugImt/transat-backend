@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
+	"strings"
 	"time"
 )
 
@@ -277,7 +278,7 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 	} else {
 		query += " WHERE id_reservation_category IS NULL;"
 	}
-	
+
 	rows, err := r.DB.Query(query, args...)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get items: %v", err))
@@ -515,8 +516,8 @@ func (r *ReservationRepository) CreateReservation(item models.ReservationManagem
 		return res, fmt.Errorf("item is not available")
 	}
 
-	columns := "email, id_reservation_element, start_date"
-	values := "$1, $2, $3"
+	columns := []string{"email", "id_reservation_element", "start_date"}
+	values := []string{"$1", "$2", "$3"}
 	args := []interface{}{UserEmail, IDItem, *item.StartDate}
 
 	if ItemPerSlot {
@@ -524,8 +525,8 @@ func (r *ReservationRepository) CreateReservation(item models.ReservationManagem
 		item.EndDate = &endDate
 		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("End date set to %s for item ID %d", endDate, IDItem))
 
-		columns += ", end_date"
-		values += ", $4"
+		columns = append(columns, "end_date")
+		values = append(values, fmt.Sprintf("$%d", len(args)+1))
 		args = append(args, *item.EndDate)
 	}
 
@@ -535,15 +536,21 @@ func (r *ReservationRepository) CreateReservation(item models.ReservationManagem
 			VALUES (%s)
 			RETURNING email
 		)
-		SELECT i.email, n.first_name, n.last_name, n.profile_picture
+		SELECT i.email, n.first_name, n.last_name, COALESCE(n.profile_picture, '') AS profile_picture
 		FROM inserted i
 		JOIN newf n ON i.email = n.email;
-	`, columns, values)
+	`, strings.Join(columns, ", "), strings.Join(values, ", "))
 
 	res.User = &models.ReservationUser{}
+	var profilePicture sql.NullString
 
 	row := r.DB.QueryRow(query, args...)
-	if err := row.Scan(&res.User.Email, &res.User.FirstName, &res.User.LastName, &res.User.ProfilePicture); err != nil {
+	if err := row.Scan(
+		&res.User.Email,
+		&res.User.FirstName,
+		&res.User.LastName,
+		&profilePicture,
+	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("No reservation created for item ID %d at %s", IDItem, *item.StartDate))
 			return res, nil
@@ -552,10 +559,15 @@ func (r *ReservationRepository) CreateReservation(item models.ReservationManagem
 		return res, err
 	}
 
+	if profilePicture.Valid {
+		res.User.ProfilePicture = profilePicture.String
+	} else {
+		res.User.ProfilePicture = ""
+	}
+
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Reservation created for item ID %d at %s", IDItem, *item.StartDate))
 
 	res.ID = IDItem
-	res.Name = "" // Optional
 	res.Slot = ItemPerSlot
 
 	return res, nil
