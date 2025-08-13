@@ -87,3 +87,16 @@ type ReservationItemComplete struct {
 	ID int `json:"id"`
 	ReservationCreateItemRequest
 }
+
+type UserReservation struct {
+	ID        int     `json:"id"`         // reservation element id
+	Name      string  `json:"name"`       // reservation element name
+	Slot      bool    `json:"slot"`       // whether item is slot-based
+	StartDate string  `json:"start_date"` // reservation start
+	EndDate   *string `json:"end_date"`   // reservation end (may be null for ongoing)
+}
+
+type UserReservationsResponse struct {
+	Current []UserReservation `json:"current"`
+	Past    []UserReservation `json:"past"`
+}

@@ -677,3 +677,54 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 		"reservation": deleted,
 	})
 }
+
+func (h *ReservationHandler) GetMyReservations(c *fiber.Ctx) error {
+	utils.LogHeader("📅 Get My Reservations")
+
+	email, ok := c.Locals("email").(string)
+	if !ok || email == "" {
+		utils.LogMessage(utils.LevelWarn, "User email not found in token")
+		utils.LogFooter()
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+
+	filter := c.Query("time", "all")
+
+	res, err := h.ReservationRepository.GetUserReservations(email, filter)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get user reservations: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to retrieve reservations"})
+	}
+
+	switch filter {
+	case "past":
+		return c.JSON(fiber.Map{"past": res.Past})
+	case "current":
+		return c.JSON(fiber.Map{"current": res.Current})
+	default:
+		return c.JSON(res)
+	}
+}
+
+func (h *ReservationHandler) SearchReservation(c *fiber.Ctx) error {
+	utils.LogHeader("📅 Search Reservation")
+
+	q := c.Query("q")
+	if q == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Missing search query 'q'"})
+	}
+
+	categories, items, err := h.ReservationRepository.SearchItemsAndCategories(q)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to perform search: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to perform search"})
+	}
+
+	resp := models.ReservationOverviewResponse{
+		Categories: categories,
+		Items:      items,
+	}
+	return c.JSON(resp)
+}

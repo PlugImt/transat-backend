@@ -3,11 +3,12 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
-	"strings"
-	"time"
 )
 
 type ReservationRepository struct {
@@ -650,4 +651,179 @@ func (r *ReservationRepository) DeleteReservation(item models.ReservationManagem
 	}
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Reservation deleted for item ID %d by user %s at %s", IDItem, UserEmail, *item.StartDate))
 	return true, nil
+}
+
+func (r *ReservationRepository) GetUserReservations(userEmail string, filter string) (models.UserReservationsResponse, error) {
+	var response models.UserReservationsResponse
+
+	// Current & upcoming reservations
+	currentQuery := `
+        SELECT 
+            re.id_reservation_element,
+            re.name,
+            re.slot,
+            r.start_date,
+            r.end_date
+        FROM reservation r
+        JOIN reservation_element re ON re.id_reservation_element = r.id_reservation_element
+        WHERE r.email = $1
+          AND (
+              (re.slot = FALSE AND r.end_date IS NULL) -- ongoing non-slot
+              OR (re.slot = TRUE AND r.start_date >= NOW()) -- future slots
+          )
+        ORDER BY r.start_date ASC;
+    `
+
+	// Past reservations
+	pastQuery := `
+        SELECT 
+            re.id_reservation_element,
+            re.name,
+            re.slot,
+            r.start_date,
+            r.end_date
+        FROM reservation r
+        JOIN reservation_element re ON re.id_reservation_element = r.id_reservation_element
+        WHERE r.email = $1
+          AND (
+              (re.slot = FALSE AND r.end_date IS NOT NULL) -- finished non-slot
+              OR (re.slot = TRUE AND r.start_date < NOW()) -- past slots
+          )
+        ORDER BY r.start_date DESC;
+    `
+
+	// Helper to run a query and append to a target slice
+	scanInto := func(query string, target *[]models.UserReservation) error {
+		rows, err := r.DB.Query(query, userEmail)
+		if err != nil {
+			return err
+		}
+		defer func(rows *sql.Rows) { _ = rows.Close() }(rows)
+		for rows.Next() {
+			var (
+				id    int
+				name  string
+				slot  bool
+				start time.Time
+				end   sql.NullTime
+			)
+			if err := rows.Scan(&id, &name, &slot, &start, &end); err != nil {
+				return err
+			}
+			var endStrPtr *string
+			if end.Valid {
+				s := utils.FormatParis(end.Time, time.RFC3339)
+				endStrPtr = &s
+			}
+			*target = append(*target, models.UserReservation{
+				ID:        id,
+				Name:      name,
+				Slot:      slot,
+				StartDate: utils.FormatParis(start, time.RFC3339),
+				EndDate:   endStrPtr,
+			})
+		}
+		return rows.Err()
+	}
+
+	switch filter {
+	case "current":
+		if err := scanInto(currentQuery, &response.Current); err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get current reservations: %v", err))
+			return response, err
+		}
+	case "past":
+		if err := scanInto(pastQuery, &response.Past); err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get past reservations: %v", err))
+			return response, err
+		}
+	default: // all
+		if err := scanInto(currentQuery, &response.Current); err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get current reservations: %v", err))
+			return response, err
+		}
+		if err := scanInto(pastQuery, &response.Past); err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get past reservations: %v", err))
+			return response, err
+		}
+	}
+
+	return response, nil
+}
+
+func (r *ReservationRepository) SearchItemsAndCategories(search string) ([]models.ReservationCategory, []models.ReservationItem, error) {
+	like := fmt.Sprintf("%%%s%%", strings.ToLower(search))
+
+	// Categories
+	catQuery := `
+        SELECT id_reservation_category, name
+        FROM reservation_category
+        WHERE LOWER(name) LIKE $1
+        ORDER BY name ASC;
+    `
+	catRows, err := r.DB.Query(catQuery, like)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to search categories: %v", err))
+		return nil, nil, err
+	}
+	var categories []models.ReservationCategory
+	for catRows.Next() {
+		var c models.ReservationCategory
+		if err := catRows.Scan(&c.ID, &c.Name); err != nil {
+			_ = catRows.Close()
+			return nil, nil, err
+		}
+		categories = append(categories, c)
+	}
+	if err := catRows.Err(); err != nil {
+		_ = catRows.Close()
+		return nil, nil, err
+	}
+	_ = catRows.Close()
+
+	itemQuery := `
+        SELECT
+            re.id_reservation_element,
+            re.name,
+            re.slot,
+            n.email,
+            n.first_name,
+            n.last_name,
+            COALESCE(n.profile_picture,'')
+        FROM reservation_element re
+        LEFT JOIN reservation r ON r.id_reservation_element = re.id_reservation_element AND re.slot = FALSE AND r.end_date IS NULL
+        LEFT JOIN newf n ON n.email = r.email
+        WHERE LOWER(re.name) LIKE $1 OR LOWER(COALESCE(re.description,'')) LIKE $1 OR LOWER(COALESCE(re.location,'')) LIKE $1
+        ORDER BY re.name ASC;
+    `
+	itemRows, err := r.DB.Query(itemQuery, like)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to search items: %v", err))
+		return nil, nil, err
+	}
+	var items []models.ReservationItem
+	for itemRows.Next() {
+		var it models.ReservationItem
+		var email, firstName, lastName, profilePicture sql.NullString
+		if err := itemRows.Scan(&it.ID, &it.Name, &it.Slot, &email, &firstName, &lastName, &profilePicture); err != nil {
+			_ = itemRows.Close()
+			return nil, nil, err
+		}
+		if email.Valid {
+			it.User = &models.ReservationUser{
+				Email:          email.String,
+				FirstName:      firstName.String,
+				LastName:       lastName.String,
+				ProfilePicture: profilePicture.String,
+			}
+		}
+		items = append(items, it)
+	}
+	if err := itemRows.Err(); err != nil {
+		_ = itemRows.Close()
+		return nil, nil, err
+	}
+	_ = itemRows.Close()
+
+	return categories, items, nil
 }
