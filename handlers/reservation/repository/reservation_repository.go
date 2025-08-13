@@ -656,99 +656,86 @@ func (r *ReservationRepository) DeleteReservation(item models.ReservationManagem
 func (r *ReservationRepository) GetUserReservations(userEmail string, filter string) (models.UserReservationsResponse, error) {
 	var response models.UserReservationsResponse
 
-	// Current & upcoming reservations
-	currentQuery := `
-        SELECT 
-            re.id_reservation_element,
-            re.name,
-            re.slot,
-            r.start_date,
-            r.end_date
-        FROM reservation r
-        JOIN reservation_element re ON re.id_reservation_element = r.id_reservation_element
-        WHERE r.email = $1
-          AND (
-              (re.slot = FALSE AND r.end_date IS NULL) -- ongoing non-slot
-              OR (re.slot = TRUE AND r.start_date >= NOW()) -- future slots
-          )
-        ORDER BY r.start_date ASC;
-    `
-
-	// Past reservations
-	pastQuery := `
-        SELECT 
-            re.id_reservation_element,
-            re.name,
-            re.slot,
-            r.start_date,
-            r.end_date
-        FROM reservation r
-        JOIN reservation_element re ON re.id_reservation_element = r.id_reservation_element
-        WHERE r.email = $1
-          AND (
-              (re.slot = FALSE AND r.end_date IS NOT NULL) -- finished non-slot
-              OR (re.slot = TRUE AND r.start_date < NOW()) -- past slots
-          )
-        ORDER BY r.start_date DESC;
-    `
-
-	// Helper to run a query and append to a target slice
-	scanInto := func(query string, target *[]models.UserReservation) error {
-		rows, err := r.DB.Query(query, userEmail)
-		if err != nil {
-			return err
-		}
-		defer func(rows *sql.Rows) { _ = rows.Close() }(rows)
-		for rows.Next() {
-			var (
-				id    int
-				name  string
-				slot  bool
-				start time.Time
-				end   sql.NullTime
-			)
-			if err := rows.Scan(&id, &name, &slot, &start, &end); err != nil {
-				return err
-			}
-			var endStrPtr *string
-			if end.Valid {
-				s := utils.FormatParis(end.Time, time.RFC3339)
-				endStrPtr = &s
-			}
-			*target = append(*target, models.UserReservation{
-				ID:        id,
-				Name:      name,
-				Slot:      slot,
-				StartDate: utils.FormatParis(start, time.RFC3339),
-				EndDate:   endStrPtr,
-			})
-		}
-		return rows.Err()
-	}
+	baseQuery := `
+		SELECT 
+			re.id_reservation_element,
+			re.name,
+			re.slot,
+			r.start_date,
+			r.end_date,
+			CASE
+				WHEN (re.slot = FALSE AND r.end_date IS NULL) 
+				  OR (re.slot = TRUE AND r.start_date >= NOW())
+				THEN 'current'
+				ELSE 'past'
+			END AS status
+		FROM reservation r
+		JOIN reservation_element re ON re.id_reservation_element = r.id_reservation_element
+		WHERE r.email = $1
+	`
 
 	switch filter {
 	case "current":
-		if err := scanInto(currentQuery, &response.Current); err != nil {
-			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get current reservations: %v", err))
-			return response, err
-		}
+		baseQuery += " AND ((re.slot = FALSE AND r.end_date IS NULL) OR (re.slot = TRUE AND r.start_date >= NOW()))"
 	case "past":
-		if err := scanInto(pastQuery, &response.Past); err != nil {
-			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get past reservations: %v", err))
+		baseQuery += " AND ((re.slot = FALSE AND r.end_date IS NOT NULL) OR (re.slot = TRUE AND r.start_date < NOW()))"
+	}
+
+	if filter == "past" {
+		baseQuery += " ORDER BY r.start_date DESC"
+	} else if filter == "current" {
+		baseQuery += " ORDER BY r.start_date ASC"
+	} else {
+		baseQuery += " ORDER BY status ASC, r.start_date ASC"
+	}
+
+	rows, err := r.DB.Query(baseQuery, userEmail)
+	if err != nil {
+		return response, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			id     int
+			name   string
+			slot   bool
+			start  time.Time
+			end    sql.NullTime
+			status string
+		)
+		if err := rows.Scan(&id, &name, &slot, &start, &end, &status); err != nil {
 			return response, err
 		}
-	default: // all
-		if err := scanInto(currentQuery, &response.Current); err != nil {
-			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get current reservations: %v", err))
-			return response, err
+
+		var endStrPtr *string
+		if end.Valid {
+			s := utils.FormatParis(end.Time, time.RFC3339)
+			endStrPtr = &s
 		}
-		if err := scanInto(pastQuery, &response.Past); err != nil {
-			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get past reservations: %v", err))
-			return response, err
+
+		resItem := models.UserReservation{
+			ID:        id,
+			Name:      name,
+			Slot:      slot,
+			StartDate: utils.FormatParis(start, time.RFC3339),
+			EndDate:   endStrPtr,
+		}
+
+		if filter == "current" {
+			response.Current = append(response.Current, resItem)
+		} else if filter == "past" {
+			response.Past = append(response.Past, resItem)
+		} else {
+			if status == "current" {
+				response.Current = append(response.Current, resItem)
+			} else {
+				response.Past = append(response.Past, resItem)
+			}
 		}
 	}
 
-	return response, nil
+	return response, rows.Err()
 }
 
 func (r *ReservationRepository) SearchItemsAndCategories(search string) ([]models.ReservationCategory, []models.ReservationItem, error) {
