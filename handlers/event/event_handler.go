@@ -37,6 +37,7 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 		query = `
 			SELECT 
 				e.id_events,
+				e.id_club,
 				e.name,
 				e.start_date,
 				e.end_date,
@@ -56,6 +57,7 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 		query = `
 			SELECT 
 				e.id_events,
+				e.id_club,
 				e.name,
 				e.start_date,
 				e.end_date,
@@ -74,6 +76,7 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 		query = `
 			SELECT 
 				e.id_events,
+				e.id_club,
 				e.name,
 				e.start_date,
 				e.end_date,
@@ -113,12 +116,13 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 	var events []map[string]interface{}
 	for rows.Next() {
 		var id int
+		var idClub int
 		var name, location, picture string
 		var startDate time.Time
 		var endDate sql.NullTime
 		var attendeeCount int
 
-		err := rows.Scan(&id, &name, &startDate, &endDate, &location, &picture, &attendeeCount)
+		err := rows.Scan(&id, &idClub, &name, &startDate, &endDate, &location, &picture, &attendeeCount)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, "Failed to scan event")
 			utils.LogLineKeyValue(utils.LevelError, "Error", err)
@@ -127,6 +131,7 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 
 		event := map[string]interface{}{
 			"id":             id,
+			"id_club":        idClub,
 			"name":           name,
 			"start_date":     startDate,
 			"end_date":       endDate.Time,
