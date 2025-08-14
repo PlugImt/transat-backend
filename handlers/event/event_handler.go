@@ -359,6 +359,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 	eventQuery := `
 		SELECT 
 			e.id_events,
+			e.id_club,
 			e.name,
 			e.description,
 			e.link,
@@ -378,6 +379,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 
 	err = h.db.QueryRow(eventQuery, eventID).Scan(
 		&event.ID,
+		&event.ClubID,
 		&event.Name,
 		&description,
 		&link,
@@ -534,6 +536,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 	// Build response
 	response := map[string]interface{}{
 		"id":             event.ID,
+		"id_club":        event.ClubID,
 		"name":           event.Name,
 		"description":    event.Description,
 		"link":           event.Link,
