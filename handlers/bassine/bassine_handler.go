@@ -113,6 +113,23 @@ func (h *BassineHandler) GetBassineLeaderboard(c *fiber.Ctx) error {
 	return c.JSON(models.Leaderboard{Users: users})
 }
 
+// GetBassineGlobalHistory handles GET /bassine/history
+func (h *BassineHandler) GetBassineGlobalHistory(c *fiber.Ctx) error {
+	utils.LogHeader("🍺 Get Global Bassine History")
+
+	history, err := h.BassineRepository.GetGlobalHistory()
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get global bassine history")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to retrieve global history"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully retrieved global bassine history")
+	utils.LogFooter()
+	return c.JSON(history)
+}
+
 // GetBassineHistory handles GET /bassine/history/:email
 func (h *BassineHandler) GetBassineHistory(c *fiber.Ctx) error {
 	utils.LogHeader("🍺 Get Bassine History")

@@ -135,6 +135,58 @@ func (r *BassineRepository) GetUserBassineOverview(email string) (models.Bassine
 	return result, nil
 }
 
+func (r *BassineRepository) GetGlobalHistory() ([]models.BassineHistoryItem, error) {
+	query := `
+		SELECT
+			n.email,
+			n.first_name,
+			n.last_name,
+			COALESCE(n.profile_picture, '') AS profile_picture,
+			b.date
+		FROM bassine_history b
+		JOIN newf n ON n.email = b.email
+		ORDER BY b.date ASC, n.email ASC;
+	`
+
+	rows, err := r.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	historyMap := make(map[string]*models.BassineHistoryItem)
+	for rows.Next() {
+		var email, firstName, lastName, picture string
+		var date time.Time
+		if err := rows.Scan(&email, &firstName, &lastName, &picture, &date); err != nil {
+			return nil, err
+		}
+
+		if _, exists := historyMap[email]; !exists {
+			historyMap[email] = &models.BassineHistoryItem{
+				ReservationUser: &models.ReservationUser{
+					Email:          email,
+					FirstName:      firstName,
+					LastName:       lastName,
+					ProfilePicture: picture,
+				},
+				Dates: make([]time.Time, 0),
+			}
+		}
+		historyMap[email].Dates = append(historyMap[email].Dates, date)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	historyList := make([]models.BassineHistoryItem, 0, len(historyMap))
+	for _, item := range historyMap {
+		historyList = append(historyList, *item)
+	}
+	return historyList, nil
+}
+
 func (r *BassineRepository) GetUserHistory(email string) (models.BassineHistoryItem, error) {
 	var firstName, lastName, picture string
 	err := r.DB.QueryRow(`SELECT first_name, last_name, COALESCE(profile_picture,'') FROM newf WHERE email = $1`, email).Scan(&firstName, &lastName, &picture)

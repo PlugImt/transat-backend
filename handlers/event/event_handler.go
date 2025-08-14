@@ -756,7 +756,7 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Event created successfully",
 		"event": map[string]interface{}{
-			"id_events":   eventID,
+			"id_event":    eventID,
 			"name":        req.Name,
 			"description": req.Description,
 			"link":        req.Link,

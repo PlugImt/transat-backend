@@ -4,7 +4,7 @@ import "time"
 
 // Event represents an event entity
 type Event struct {
-	ID           int        `json:"id_events" db:"id_events"`
+	ID           int        `json:"id_event" db:"id_event"`
 	Name         string     `json:"name" db:"name"`
 	Description  string     `json:"description" db:"description"`
 	Link         string     `json:"link" db:"link"`
@@ -20,7 +20,7 @@ type Event struct {
 // EventAttendee represents an event attendee relationship
 type EventAttendee struct {
 	Email   string `json:"email" db:"email"`
-	EventID int    `json:"id_events" db:"id_events"`
+	EventID int    `json:"id_event" db:"id_event"`
 }
 
 // EventWithDetails represents an event with additional details
