@@ -20,5 +20,6 @@ func SetupBassineRoutes(router fiber.Router, db *sql.DB) {
 	bassineGroup.Patch("/", bassineHandler.IncrementBassine)               // Increments or decrements the bassine count
 	bassineGroup.Get("/me", bassineHandler.GetMyBassine)                   // Returns the user's bassine count, rank, and surrounding users
 	bassineGroup.Get("/leaderboard", bassineHandler.GetBassineLeaderboard) // Returns the leaderboard of users
+	bassineGroup.Get("/history", bassineHandler.GetBassineHistory)         // Returns the history of bassine consumption for the logged-in user
 	bassineGroup.Get("/history/:email", bassineHandler.GetBassineHistory)  // Returns the history of bassine consumption for a specific user
 }
