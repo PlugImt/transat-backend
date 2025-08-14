@@ -19,6 +19,7 @@ func SetupEventRoutes(router fiber.Router, eventHandler *event.EventHandler) {
 	eventGroup.Post("", eventHandler.CreateEvent)
 	eventGroup.Post("/", eventHandler.CreateEvent)
 	eventGroup.Patch("/:id", eventHandler.UpdateEvent)
+	eventGroup.Delete("/:id", eventHandler.DeleteEvent)
 	eventGroup.Get("/club/:id", eventHandler.GetEventByClubID)
 
 	eventGroup.Post("/:id/join", eventHandler.JoinEvent)

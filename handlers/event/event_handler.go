@@ -898,6 +898,112 @@ func (h *EventHandler) UpdateEvent(c *fiber.Ctx) error {
 	})
 }
 
+func (h *EventHandler) DeleteEvent(c *fiber.Ctx) error {
+	utils.LogHeader("🗑️ Delete Event")
+
+	eventID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		utils.LogMessage(utils.LevelWarn, "Invalid event ID")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid event ID",
+		})
+	}
+
+	userEmail := c.Locals("email").(string)
+	utils.LogLineKeyValue(utils.LevelInfo, "Event ID", eventID)
+	utils.LogLineKeyValue(utils.LevelInfo, "User", userEmail)
+
+	// Check if user is the creator of this event
+	var creator string
+	err = h.db.QueryRow("SELECT creator FROM events WHERE id_events = $1", eventID).Scan(&creator)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.LogMessage(utils.LevelWarn, "Event not found")
+			utils.LogFooter()
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Event not found",
+			})
+		}
+		utils.LogMessage(utils.LevelError, "Failed to get event")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get event information",
+		})
+	}
+
+	if creator != userEmail {
+		utils.LogMessage(utils.LevelWarn, "User not authorized to delete event")
+		utils.LogFooter()
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Only event creators can delete the event",
+		})
+	}
+
+	// Start transaction
+	tx, err := h.db.Begin()
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to begin transaction")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Database transaction error",
+		})
+	}
+	defer tx.Rollback()
+
+	// Delete attendees first
+	result, err := tx.Exec("DELETE FROM events_attendents WHERE id_events = $1", eventID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete attendees")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to delete event attendees",
+		})
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get rows affected")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to delete event attendees",
+		})
+	}
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, "No attendees found for event")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "No attendees found for this event",
+		})
+	}
+	// Delete the event
+	_, err = tx.Exec("DELETE FROM events WHERE id_events = $1", eventID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete event")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to delete event",
+		})
+	}
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to commit transaction")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to delete event",
+		})
+	}
+	utils.LogMessage(utils.LevelInfo, "Event deleted successfully")
+	utils.LogFooter()
+	return c.JSON(fiber.Map{
+		"message": "Event deleted successfully",
+	})
+}
+
 // JoinEvent adds the user to an event
 func (h *EventHandler) JoinEvent(c *fiber.Ctx) error {
 	utils.LogHeader("🤝 Join Event")
