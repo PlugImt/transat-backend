@@ -43,7 +43,12 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 				e.end_date,
 				e.location,
 				e.picture,
-				COALESCE(attendee_count.count, 0) as attendee_count
+				COALESCE(attendee_count.count, 0) as attendee_count,
+				EXISTS (
+			    				SELECT 1
+			    				FROM events_attendents ea
+			    				WHERE ea.id_events = e.id_events AND ea.email = $1
+			) AS is_interested 
 			FROM events e
 			LEFT JOIN (
 				SELECT id_events, COUNT(*) as count
@@ -63,7 +68,12 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 				e.end_date,
 				e.location,
 				e.picture,
-				COALESCE(attendee_count.count, 0) as attendee_count
+				COALESCE(attendee_count.count, 0) as attendee_count,
+				EXISTS (
+			    				SELECT 1
+			    				FROM events_attendents ea
+			    				WHERE ea.id_events = e.id_events AND ea.email = $1
+				) AS is_interested
 			FROM events e
 			LEFT JOIN (
 				SELECT id_events, COUNT(*) as count
@@ -82,7 +92,12 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 				e.end_date,
 				e.location,
 				e.picture,
-				COALESCE(attendee_count.count, 0) as attendee_count
+				COALESCE(attendee_count.count, 0) as attendee_count,
+				EXISTS (
+			    				SELECT 1
+			    				FROM events_attendents ea
+			    				WHERE ea.id_events = e.id_events AND ea.email = $1
+				) AS is_interested
 			FROM events e
 			LEFT JOIN (
 				SELECT id_events, COUNT(*) as count
@@ -93,6 +108,10 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 			ORDER BY e.start_date ASC
 		`
 	}
+
+	email := c.Locals("email").(string)
+	utils.LogLineKeyValue(utils.LevelInfo, "User Email", email)
+	args = append(args, email)
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
@@ -121,8 +140,9 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 		var startDate time.Time
 		var endDate sql.NullTime
 		var attendeeCount int
+		var isInterested bool
 
-		err := rows.Scan(&id, &idClub, &name, &startDate, &endDate, &location, &picture, &attendeeCount)
+		err := rows.Scan(&id, &idClub, &name, &startDate, &endDate, &location, &picture, &attendeeCount, &isInterested)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, "Failed to scan event")
 			utils.LogLineKeyValue(utils.LevelError, "Error", err)
@@ -138,6 +158,7 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 			"location":       location,
 			"picture":        picture,
 			"attendee_count": attendeeCount,
+			"is_interested":  isInterested,
 		}
 
 		// Handle null end date
@@ -368,7 +389,12 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 			e.location,
 			e.picture,
 			e.creator,
-			e.id_club
+			e.id_club,
+			EXISTS (
+			    				SELECT 1
+			    				FROM events_attendents ea
+			    				WHERE ea.id_events = e.id_events AND ea.email = $2
+			) AS is_interested
 		FROM events e
 		WHERE e.id_events = $1
 	`
@@ -376,8 +402,9 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 	var event models.Event
 	var description, link sql.NullString
 	var endDate sql.NullTime
+	var isInterested bool
 
-	err = h.db.QueryRow(eventQuery, eventID).Scan(
+	err = h.db.QueryRow(eventQuery, eventID, c.Locals("email").(string)).Scan(
 		&event.ID,
 		&event.ClubID,
 		&event.Name,
@@ -389,6 +416,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 		&event.Picture,
 		&event.Creator,
 		&event.ClubID,
+		&isInterested,
 	)
 
 	if err != nil {
@@ -546,6 +574,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 		"picture":        event.Picture,
 		"attendee_count": attendeeCount,
 		"attendees":      attendees,
+		"is_interested":  isInterested,
 	}
 
 	if creator != nil {
