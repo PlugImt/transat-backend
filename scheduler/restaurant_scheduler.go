@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -71,6 +72,8 @@ func (s *RestaurantScheduler) Stop() {
 func (s *RestaurantScheduler) isScheduledTimeAllowed(t time.Time) bool {
 	parisTime := utils.ToParisTime(t)
 	weekday := parisTime.Weekday()
+	fmt.Println("-------> Weekday:", weekday)
+	fmt.Println("-------> Hour Paris time:", parisTime.Hour())
 	if weekday == time.Saturday || weekday == time.Sunday {
 		return false
 	}

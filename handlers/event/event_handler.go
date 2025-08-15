@@ -37,12 +37,12 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 		query = `
 			SELECT 
 				e.id_events,
-				e.id_club,
-				e.name,
-				e.start_date,
-				e.end_date,
-				e.location,
-				e.picture,
+				e.id_club, 
+				e.name, 
+				e.start_date, 
+				e.end_date, 
+				e.location, 
+				COALESCE(e.picture, ''),
 				COALESCE(attendee_count.count, 0) as attendee_count,
 				EXISTS (
 			    				SELECT 1
@@ -218,7 +218,7 @@ func (h *EventHandler) GetEventByClubID(c *fiber.Ctx) error {
 				e.start_date,
 				e.end_date,
 				e.location,
-				e.picture,
+				COALESCE(e.picture, ''),
 				COALESCE(attendee_count.count, 0) as attendee_count
 			FROM events e
 			LEFT JOIN (
@@ -387,7 +387,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 			e.start_date,
 			e.end_date,
 			e.location,
-			e.picture,
+			COALESCE(e.picture, ''),
 			e.creator,
 			e.id_club,
 			EXISTS (
@@ -815,119 +815,93 @@ func (h *EventHandler) UpdateEvent(c *fiber.Ctx) error {
 	if err != nil {
 		utils.LogMessage(utils.LevelWarn, "Invalid event ID")
 		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid event ID",
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid event ID"})
 	}
 
 	userEmail := c.Locals("email").(string)
 	utils.LogLineKeyValue(utils.LevelInfo, "Event ID", eventID)
 	utils.LogLineKeyValue(utils.LevelInfo, "User", userEmail)
 
-	// Check if user is the creator of this event
 	var creator string
 	err = h.db.QueryRow("SELECT creator FROM events WHERE id_events = $1", eventID).Scan(&creator)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			utils.LogMessage(utils.LevelWarn, "Event not found")
 			utils.LogFooter()
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Event not found",
-			})
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Event not found"})
 		}
 		utils.LogMessage(utils.LevelError, "Failed to get event")
 		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to get event information",
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get event information"})
 	}
 
 	if creator != userEmail {
 		utils.LogMessage(utils.LevelWarn, "User not authorized to update event")
 		utils.LogFooter()
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "Only event creators can update event information",
-		})
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Only event creators can update event information"})
+	}
+
+	var raw map[string]interface{}
+	if err := c.BodyParser(&raw); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to parse request body")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
 	var req models.UpdateEventRequest
 	if err := c.BodyParser(&req); err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to parse request body")
+		utils.LogMessage(utils.LevelError, "Failed to parse request body into struct")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	// Build dynamic update query
+	updates := []struct {
+		jsonKey string
+		dbField string
+		value   interface{}
+	}{
+		{"name", "name", req.Name},
+		{"description", "description", req.Description},
+		{"link", "link", req.Link},
+		{"start_date", "start_date", req.StartDate},
+		{"end_date", "end_date", req.EndDate},
+		{"location", "location", req.Location},
+		{"picture", "picture", req.Picture},
+	}
+
 	var setParts []string
 	var args []interface{}
 	argIndex := 1
 
-	if req.Name != "" {
-		setParts = append(setParts, fmt.Sprintf("name = $%d", argIndex))
-		args = append(args, req.Name)
-		argIndex++
-	}
-	if req.Description != "" {
-		setParts = append(setParts, fmt.Sprintf("description = $%d", argIndex))
-		args = append(args, req.Description)
-		argIndex++
-	}
-	if req.Link != "" {
-		setParts = append(setParts, fmt.Sprintf("link = $%d", argIndex))
-		args = append(args, req.Link)
-		argIndex++
-	}
-	if req.StartDate != nil {
-		setParts = append(setParts, fmt.Sprintf("start_date = $%d", argIndex))
-		args = append(args, req.StartDate)
-		argIndex++
-	}
-	if req.EndDate != nil {
-		setParts = append(setParts, fmt.Sprintf("end_date = $%d", argIndex))
-		args = append(args, req.EndDate)
-		argIndex++
-	}
-	if req.Location != "" {
-		setParts = append(setParts, fmt.Sprintf("location = $%d", argIndex))
-		args = append(args, req.Location)
-		argIndex++
-	}
-	if req.Picture != "" {
-		setParts = append(setParts, fmt.Sprintf("picture = $%d", argIndex))
-		args = append(args, req.Picture)
-		argIndex++
+	for _, u := range updates {
+		if _, exists := raw[u.jsonKey]; exists { // key was actually sent in the JSON
+			setParts = append(setParts, fmt.Sprintf("%s = $%d", u.dbField, argIndex))
+			args = append(args, u.value) // can be nil → SQL NULL
+			argIndex++
+		}
 	}
 
 	if len(setParts) == 0 {
 		utils.LogMessage(utils.LevelWarn, "No fields to update")
 		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "No fields to update",
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No fields to update"})
 	}
 
 	query := fmt.Sprintf("UPDATE events SET %s WHERE id_events = $%d", strings.Join(setParts, ", "), argIndex)
 	args = append(args, eventID)
 
-	_, err = h.db.Exec(query, args...)
-	if err != nil {
+	if _, err := h.db.Exec(query, args...); err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to update event")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update event",
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update event"})
 	}
 
 	utils.LogMessage(utils.LevelInfo, "Event updated successfully")
 	utils.LogFooter()
-
-	return c.JSON(fiber.Map{
-		"message": "Event updated successfully",
-	})
+	return c.JSON(fiber.Map{"message": "Event updated successfully"})
 }
 
 func (h *EventHandler) DeleteEvent(c *fiber.Ctx) error {
