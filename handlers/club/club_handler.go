@@ -773,9 +773,22 @@ func (h *ClubHandler) AddClubRespo(c *fiber.Ctx) error {
 	if err != nil || !isMember {
 		utils.LogMessage(utils.LevelWarn, "User is not a club member")
 		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "User must be a club member to become responsible",
-		})
+		// add the user to the club if they are not a member and try again to add them as responsible
+		_, err = h.db.Exec("INSERT INTO clubs_members (email, id_clubs) VALUES ($1, $2)", req.Email, clubID)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to add user to club")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			utils.LogFooter()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to add user to club",
+			})
+		}
+
+		utils.LogMessage(utils.LevelInfo, "User added to club as member")
+		isMember = true // Now they are a member
+
+	} else {
+		utils.LogMessage(utils.LevelInfo, "User is already a club member")
 	}
 
 	// Start transaction
