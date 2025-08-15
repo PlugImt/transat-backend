@@ -19,10 +19,11 @@ type AuthHandler struct {
 	JwtSecret    []byte
 	NotifService *services.NotificationService
 	EmailService *services.EmailService
+	DiscordService *services.DiscordService
 }
 
 // NewAuthHandler creates a new AuthHandler.
-func NewAuthHandler(db *sql.DB, jwtSecret []byte, notifService *services.NotificationService, emailService *services.EmailService) *AuthHandler {
+func NewAuthHandler(db *sql.DB, jwtSecret []byte, notifService *services.NotificationService, emailService *services.EmailService, discordService *services.DiscordService) *AuthHandler {
 	if emailService == nil {
 		log.Println("Warning: EmailService is nil in NewAuthHandler")
 	}
@@ -31,6 +32,7 @@ func NewAuthHandler(db *sql.DB, jwtSecret []byte, notifService *services.Notific
 		JwtSecret:    jwtSecret,
 		NotifService: notifService, // Store the notification service if needed later
 		EmailService: emailService,
+		DiscordService: discordService,
 	}
 }
 
@@ -211,6 +213,29 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		utils.LogFooter()
 		// Don't rollback here, commit failed after successful ops
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error saving registration"})
+	}
+
+	// Send Discord notification about unverified account creation (async)
+	if h.DiscordService != nil {
+		userForDiscord := models.Newf{
+			Email:         newf.Email,
+			FirstName:     newf.FirstName,
+			LastName:      newf.LastName,
+			Language:      newf.Language,
+			PhoneNumber:   newf.PhoneNumber,
+			ProfilePicture: newf.ProfilePicture,
+			GraduationYear: newf.GraduationYear,
+			FormationName:  newf.FormationName,
+			Campus:         newf.Campus,
+			CreationDate:   newf.CreationDate,
+		}
+		go func(u models.Newf) {
+			if err := h.DiscordService.SendUserRegistered(u); err != nil {
+				utils.LogMessage(utils.LevelWarn, "Failed to send Discord registration webhook")
+				utils.LogLineKeyValue(utils.LevelWarn, "Email", u.Email)
+				utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
+			}
+		}(userForDiscord)
 	}
 
 	// Send verification email *after* successful commit
@@ -575,6 +600,59 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 		utils.LogFooter()
 		// Don't need to rollback here, commit failed
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong saving verification"})
+	}
+
+	// Send Discord notification about verification (async)
+	if h.DiscordService != nil {
+		// Fetch user info for richer payload
+		var email, firstName, lastName, phoneNumber, profilePicture, campus, formationName, creationDateStr string
+		var graduationYear sql.NullInt64
+		fetchQuery := `
+			SELECT email, first_name, last_name, COALESCE(phone_number, ''), COALESCE(profile_picture, ''),
+				   COALESCE(campus, ''), COALESCE(formation_name, ''),
+				   TO_CHAR(creation_date AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+			FROM newf
+			WHERE email = $1;
+		`
+		if errFetch := h.DB.QueryRow(fetchQuery, strings.ToLower(req.Email)).Scan(&email, &firstName, &lastName, &phoneNumber, &profilePicture, &campus, &formationName, &creationDateStr); errFetch != nil {
+			utils.LogMessage(utils.LevelWarn, "Failed to fetch user for Discord verification webhook")
+			utils.LogLineKeyValue(utils.LevelWarn, "Email", req.Email)
+			utils.LogLineKeyValue(utils.LevelWarn, "Error", errFetch)
+		} else {
+			// Get language code
+			langCode, langErr := utils.GetLanguageCode(h.DB, strings.ToLower(req.Email))
+			if langErr != nil {
+				langCode = "fr"
+			}
+			// Graduation year from separate query if needed
+			gradQuery := `SELECT graduation_year FROM newf WHERE email = $1`
+			if errGy := h.DB.QueryRow(gradQuery, strings.ToLower(req.Email)).Scan(&graduationYear); errGy != nil {
+				graduationYear.Valid = false
+			}
+			gy := 0
+			if graduationYear.Valid {
+				gy = int(graduationYear.Int64)
+			}
+			userForDiscord := models.Newf{
+				Email:          email,
+				FirstName:      firstName,
+				LastName:       lastName,
+				Language:       langCode,
+				PhoneNumber:    phoneNumber,
+				ProfilePicture: profilePicture,
+				GraduationYear: gy,
+				FormationName:  formationName,
+				Campus:         campus,
+				CreationDate:   creationDateStr,
+			}
+			go func(u models.Newf) {
+				if err := h.DiscordService.SendUserVerified(u); err != nil {
+					utils.LogMessage(utils.LevelWarn, "Failed to send Discord verification webhook")
+					utils.LogLineKeyValue(utils.LevelWarn, "Email", u.Email)
+					utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
+				}
+			}(userForDiscord)
+		}
 	}
 
 	// Generate JWT for immediate login - fetch user's roles first

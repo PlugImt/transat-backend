@@ -12,10 +12,10 @@ import (
 )
 
 // SetupAuthRoutes configures authentication related routes.
-func SetupAuthRoutes(router fiber.Router, db *sql.DB, jwtSecret []byte, notifService *services.NotificationService, emailService *services.EmailService) {
+func SetupAuthRoutes(router fiber.Router, db *sql.DB, jwtSecret []byte, notifService *services.NotificationService, emailService *services.EmailService, discordService *services.DiscordService) {
 	// Initialize Auth Handler with dependencies
 	// Note: jwtSecret is now passed to the handler constructor
-	authHandler := auth.NewAuthHandler(db, jwtSecret, notifService, emailService)
+	authHandler := auth.NewAuthHandler(db, jwtSecret, notifService, emailService, discordService)
 
 	// Group routes for auth operations and apply multiple security layers
 	authGroup := router.Group("/auth")

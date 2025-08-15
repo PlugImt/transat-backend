@@ -76,6 +76,9 @@ func main() {
 
 	statisticsService := services.NewStatisticsService(db)
 
+	// Discord webhook notifications
+	discordService := services.NewDiscordService(os.Getenv("DISCORD_WEBHOOK_URL"))
+
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
 
 	weatherService, err := services.NewWeatherService()
@@ -148,7 +151,7 @@ func main() {
 	})
 
 	// API Group --- NEW ROUTES
-	routes.SetupAuthRoutes(app, db, jwtSecret, notificationService, emailService)
+	routes.SetupAuthRoutes(app, db, jwtSecret, notificationService, emailService, discordService)
 	routes.SetupUserRoutes(app, db, notificationService)
 	routes.SetupTraqRoutes(app, db)
 	routes.SetupFileRoutes(app, db, r2Service)
