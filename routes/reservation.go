@@ -17,7 +17,7 @@ func SetupReservationRoutes(router fiber.Router, db *sql.DB) {
 	// Root reservation routes
 	reservationGroup.Get("", reservationHandler.GetReservationItems)      // Returns root categories and items TODO: Add filders && add reservations overview
 	reservationGroup.Get("/", reservationHandler.GetReservationItems)     // Returns root categories and items
-	reservationGroup.Get("/my", reservationHandler.GetMyReservations)     // Returns logged in user's reservations
+	reservationGroup.Get("/me", reservationHandler.GetMyReservations)     // Returns logged in user's reservations
 	reservationGroup.Get("/search", reservationHandler.SearchReservation) // Search items and categories
 
 	// Category routes
