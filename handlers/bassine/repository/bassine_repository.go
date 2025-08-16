@@ -87,6 +87,54 @@ func (r *BassineRepository) GetLeaderboard() ([]models.BassineUser, error) {
 	return users, nil
 }
 
+func (r *BassineRepository) GetLeaderboardTop(limit int) ([]models.BassineUser, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	query := `
+        SELECT
+            n.email,
+            n.first_name,
+            n.last_name,
+            COALESCE(n.profile_picture, '') AS profile_picture,
+            s.score,
+            RANK() OVER (ORDER BY s.score DESC, n.email ASC) AS rank
+        FROM bassine_scores s
+        JOIN newf n ON n.email = s.email
+        ORDER BY s.score DESC, n.email ASC
+        LIMIT $1;
+    `
+
+	rows, err := r.DB.Query(query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]models.BassineUser, 0, limit)
+	for rows.Next() {
+		var user models.BassineUser
+		var email, firstName, lastName, picture string
+		var score, rank int
+		if err := rows.Scan(&email, &firstName, &lastName, &picture, &score, &rank); err != nil {
+			return nil, err
+		}
+		user.ReservationUser = &models.ReservationUser{
+			Email:          email,
+			FirstName:      firstName,
+			LastName:       lastName,
+			ProfilePicture: picture,
+		}
+		user.BassineCount = score
+		user.Rank = rank
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (r *BassineRepository) GetUserBassineOverview(email string) (models.BassineCount, error) {
 	// Fetch the full leaderboard in one query and then compute neighbors in memory for simplicity
 	users, err := r.GetLeaderboard()

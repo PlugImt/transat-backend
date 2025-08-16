@@ -67,9 +67,45 @@ func (h *BassineHandler) IncrementBassine(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch updated overview"})
 	}
 
+	// Build top 5 leaderboard with requested fields
+	leaderboardUsers, err := h.BassineRepository.GetLeaderboardTop(5)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch leaderboard")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch leaderboard"})
+	}
+	lb := make([]fiber.Map, 0, len(leaderboardUsers))
+	for _, u := range leaderboardUsers {
+		if u.ReservationUser == nil {
+			continue
+		}
+		lb = append(lb, fiber.Map{
+			"first_name":      u.ReservationUser.FirstName,
+			"last_name":       u.ReservationUser.LastName,
+			"rank":            u.Rank,
+			"score":           u.BassineCount,
+			"profile_picture": u.ReservationUser.ProfilePicture,
+		})
+	}
+
+	// Merge overview with leaderboard in the response
+	resp := fiber.Map{
+		"email":         overview.Email,
+		"rank":          overview.Rank,
+		"bassine_count": overview.BassineCount,
+		"leaderboard":   lb,
+	}
+	if overview.UserAbove.ReservationUser != nil {
+		resp["user_above"] = overview.UserAbove
+	}
+	if overview.UserBelow.ReservationUser != nil {
+		resp["user_below"] = overview.UserBelow
+	}
+
 	utils.LogMessage(utils.LevelInfo, "Bassine counter updated successfully")
 	utils.LogFooter()
-	return c.JSON(overview)
+	return c.JSON(resp)
 }
 
 // GetMyBassine handles GET /bassine/me
@@ -91,9 +127,45 @@ func (h *BassineHandler) GetMyBassine(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to retrieve bassine overview"})
 	}
 
+	// Build top 5 leaderboard with requested fields
+	leaderboardUsers, err := h.BassineRepository.GetLeaderboardTop(5)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get bassine leaderboard")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to retrieve leaderboard"})
+	}
+	lb := make([]fiber.Map, 0, len(leaderboardUsers))
+	for _, u := range leaderboardUsers {
+		if u.ReservationUser == nil {
+			continue
+		}
+		lb = append(lb, fiber.Map{
+			"first_name":      u.ReservationUser.FirstName,
+			"last_name":       u.ReservationUser.LastName,
+			"rank":            u.Rank,
+			"score":           u.BassineCount,
+			"profile_picture": u.ReservationUser.ProfilePicture,
+		})
+	}
+
+	// Merge overview with leaderboard in the response
+	resp := fiber.Map{
+		"email":         overview.Email,
+		"rank":          overview.Rank,
+		"bassine_count": overview.BassineCount,
+		"leaderboard":   lb,
+	}
+	if overview.UserAbove.ReservationUser != nil {
+		resp["user_above"] = overview.UserAbove
+	}
+	if overview.UserBelow.ReservationUser != nil {
+		resp["user_below"] = overview.UserBelow
+	}
+
 	utils.LogMessage(utils.LevelInfo, "Successfully retrieved bassine overview")
 	utils.LogFooter()
-	return c.JSON(overview)
+	return c.JSON(resp)
 }
 
 // GetBassineLeaderboard handles GET /bassine/leaderboard
