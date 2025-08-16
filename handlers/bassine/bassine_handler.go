@@ -83,6 +83,7 @@ func (h *BassineHandler) IncrementBassine(c *fiber.Ctx) error {
 		lb = append(lb, fiber.Map{
 			"first_name":      u.ReservationUser.FirstName,
 			"last_name":       u.ReservationUser.LastName,
+			"email":           u.ReservationUser.Email,
 			"rank":            u.Rank,
 			"score":           u.BassineCount,
 			"profile_picture": u.ReservationUser.ProfilePicture,
@@ -143,6 +144,7 @@ func (h *BassineHandler) GetMyBassine(c *fiber.Ctx) error {
 		lb = append(lb, fiber.Map{
 			"first_name":      u.ReservationUser.FirstName,
 			"last_name":       u.ReservationUser.LastName,
+			"email":           u.ReservationUser.Email,
 			"rank":            u.Rank,
 			"score":           u.BassineCount,
 			"profile_picture": u.ReservationUser.ProfilePicture,
