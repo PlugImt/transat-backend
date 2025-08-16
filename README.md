@@ -32,3 +32,6 @@ Demandez à être ajouté à la team Transat !
 
 ## Informations utiles
 - Version de Go : `1.24.3`
+
+
+![Alt](https://repobeats.axiom.co/api/embed/f93bded0484c20f0245b1947a866816d1b569385.svg "Repobeats analytics image")
