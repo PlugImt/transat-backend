@@ -87,10 +87,6 @@ func (ds *DiscordService) SendUserRegistered(user models.Newf) error {
 			{Name: "First Name", Value: safe(user.FirstName, "N/A"), Inline: true},
 			{Name: "Last Name", Value: safe(user.LastName, "N/A"), Inline: true},
 			{Name: "Language", Value: safe(user.Language, "N/A"), Inline: true},
-			{Name: "Campus", Value: safe(user.Campus, "N/A"), Inline: true},
-			{Name: "Formation", Value: safe(user.FormationName, "N/A"), Inline: true},
-			{Name: "Graduation Year", Value: fmt.Sprintf("%d", user.GraduationYear), Inline: true},
-			{Name: "Phone", Value: safe(user.PhoneNumber, "N/A"), Inline: true},
 			{Name: "Created At", Value: safe(user.CreationDate, "N/A"), Inline: true},
 		},
 	}
@@ -107,10 +103,6 @@ func (ds *DiscordService) SendUserVerified(user models.Newf) error {
 			{Name: "First Name", Value: safe(user.FirstName, "N/A"), Inline: true},
 			{Name: "Last Name", Value: safe(user.LastName, "N/A"), Inline: true},
 			{Name: "Language", Value: safe(user.Language, "N/A"), Inline: true},
-			{Name: "Campus", Value: safe(user.Campus, "N/A"), Inline: true},
-			{Name: "Formation", Value: safe(user.FormationName, "N/A"), Inline: true},
-			{Name: "Graduation Year", Value: fmt.Sprintf("%d", user.GraduationYear), Inline: true},
-			{Name: "Phone", Value: safe(user.PhoneNumber, "N/A"), Inline: true},
 			{Name: "Created At", Value: safe(user.CreationDate, "N/A"), Inline: true},
 		},
 	}
