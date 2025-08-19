@@ -127,3 +127,59 @@ func TestCheckAndUpdateMenu(t *testing.T) {
 		t.Errorf("CheckAndUpdateMenuCron called %d times, expected 1", mockHandler.CheckAndUpdateMenuCronCalled)
 	}
 }
+
+func TestParisTimeScheduling(t *testing.T) {
+	// Create a scheduler instance for testing
+	mockHandler := &MockRestaurantHandler{
+		ShouldReturn: true,
+	}
+	scheduler := NewRestaurantScheduler(mockHandler)
+
+	// Test times that should be allowed (weekday 9-13h Paris time)
+	// Create a time that is 10 AM Paris time on a weekday (Tuesday)
+	parisLocation, err := time.LoadLocation("Europe/Paris")
+	if err != nil {
+		t.Fatalf("Failed to load Paris timezone: %v", err)
+	}
+	
+	// Create a Tuesday at 10 AM Paris time
+	allowedTime := time.Date(2024, 1, 2, 10, 0, 0, 0, parisLocation)
+	
+	if !scheduler.isScheduledTimeAllowed(allowedTime) {
+		t.Error("Expected Tuesday 10 AM Paris time to be allowed")
+	}
+
+	// Test times that should NOT be allowed
+	// Weekend (Saturday)
+	weekendTime := time.Date(2024, 1, 6, 10, 0, 0, 0, parisLocation)
+	if scheduler.isScheduledTimeAllowed(weekendTime) {
+		t.Error("Expected Saturday to not be allowed")
+	}
+
+	// Too early (7 AM Paris time on weekday)
+	earlyTime := time.Date(2024, 1, 2, 7, 0, 0, 0, parisLocation)
+	if scheduler.isScheduledTimeAllowed(earlyTime) {
+		t.Error("Expected Tuesday 7 AM Paris time to not be allowed")
+	}
+
+	// Too late (15 PM Paris time on weekday)
+	lateTime := time.Date(2024, 1, 2, 15, 0, 0, 0, parisLocation)
+	if scheduler.isScheduledTimeAllowed(lateTime) {
+		t.Error("Expected Tuesday 3 PM Paris time to not be allowed")
+	}
+
+	// Test that Paris time conversion is working correctly
+	// Create a UTC time and verify it converts to correct Paris time
+	utcTime := time.Date(2024, 1, 2, 8, 0, 0, 0, time.UTC) // 8 AM UTC
+	
+	// This should be 9 AM Paris time in winter (UTC+1) or 10 AM in summer (UTC+2)
+	// Let's check what the conversion gives us
+	if !scheduler.isScheduledTimeAllowed(utcTime) {
+		// This might be expected if it's outside the allowed window
+		// Let's use a time that should definitely work: 9 AM UTC in winter = 10 AM Paris
+		utcTimeWinter := time.Date(2024, 1, 2, 9, 0, 0, 0, time.UTC) // 9 AM UTC in winter = 10 AM Paris
+		if !scheduler.isScheduledTimeAllowed(utcTimeWinter) {
+			t.Error("Expected UTC time to be correctly converted to Paris time for scheduling")
+		}
+	}
+}

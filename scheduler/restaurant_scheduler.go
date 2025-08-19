@@ -44,7 +44,7 @@ func (s *RestaurantScheduler) Start() {
 		for {
 			select {
 			case <-ticker.C:
-				if s.isScheduledTimeAllowed(time.Now()) {
+				if s.isScheduledTimeAllowed(utils.Now()) {
 					go s.checkAndUpdateMenu()
 				} else {
 					utils.LogMessage(utils.LevelDebug, "Scheduler: Outside allowed time window (weekdays 9h-14h), skipping check")
@@ -83,7 +83,7 @@ func (s *RestaurantScheduler) isScheduledTimeAllowed(t time.Time) bool {
 }
 
 func (s *RestaurantScheduler) checkAndUpdateMenu() {
-	now := time.Now()
+	now := utils.Now()
 
 	if !s.isScheduledTimeAllowed(now) {
 		utils.LogMessage(utils.LevelInfo, "Scheduler: Outside allowed time window (weekdays 9h-14h), skipping menu check")
