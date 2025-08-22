@@ -144,14 +144,19 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			utils.LogLineKeyValue(utils.LevelWarn, "Email", newf.Email)
 			utils.LogFooter()
 			commitOrRollback(tx, err) // Rollback
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "You already have an account"})
+			tx, err = h.DB.Begin()
+			if err != nil {
+				fmt.Println("Failed to begin database transaction")
+			}
+			//return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "You already have an account"})
+		} else {
+			utils.LogMessage(utils.LevelError, "Failed to insert newf")
+			utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			utils.LogFooter()
+			commitOrRollback(tx, err) // Rollback
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong creating account"})
 		}
-		utils.LogMessage(utils.LevelError, "Failed to insert newf")
-		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		commitOrRollback(tx, err) // Rollback
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong creating account"})
 	}
 
 	// Add initial 'VERIFYING' role
@@ -161,12 +166,23 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	`
 	_, err = tx.Exec(addRoleQuery, newf.Email)
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to add initial role")
-		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		commitOrRollback(tx, err) // Rollback
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong setting up account roles"})
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			utils.LogMessage(utils.LevelWarn, "User already exists")
+			utils.LogLineKeyValue(utils.LevelWarn, "Email", newf.Email)
+			utils.LogFooter()
+			commitOrRollback(tx, err)
+			tx, err = h.DB.Begin()
+			if err != nil {
+				fmt.Println("Failed to begin database transaction")
+			}
+		} else {
+			utils.LogMessage(utils.LevelError, "Failed to add initial role")
+			utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			utils.LogFooter()
+			commitOrRollback(tx, err) // Rollback
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong setting up account roles"})
+		}
 	}
 
 	// Generate and store verification code (within the same transaction)
