@@ -43,6 +43,10 @@ title = "New Support Request"
 title = "🍽️ MENU AVAILABLE!"
 message = "A delicious new menu awaits you at the RU! Discover today's dishes and leave your reviews. Enjoy your meal!"
 
+[event_reminder]
+title = "⏰ {{.EventName}} starts soon"
+message = "Starts at {{.StartTime}} at {{.Location}}"
+
 [buttons]
 open_app = "Open App"
 check_it_out = "Check it out"
