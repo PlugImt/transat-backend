@@ -2,6 +2,7 @@ package utils
 
 import (
 	"time"
+	_ "time/tzdata"
 )
 
 var (
