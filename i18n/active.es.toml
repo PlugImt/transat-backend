@@ -39,10 +39,6 @@ future_message = "Estamos mejorando la aplicación gracias a tus comentarios, y 
 title = "🍽️ ¡NUEVO MENÚ DISPONIBLE!"
 message = "¡Un delicioso nuevo menú te espera en el RU! Descubre los platos del día y deja tus reseñas. ¡Buen provecho!"
 
-[event_reminder]
-title = "⏰ {{.EventName}} comienza pronto"
-message = "Empieza a las {{.StartTime}} en {{.Location}}"
-
 [weather]
 thunderstorm = "Tormenta"
 drizzle = "Llovizna"

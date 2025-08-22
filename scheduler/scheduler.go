@@ -2,8 +2,6 @@ package scheduler
 
 import (
 	"github.com/robfig/cron/v3"
-	"log"
-	"time"
 )
 
 // Scheduler manages all scheduled tasks in the application
@@ -16,16 +14,10 @@ type Scheduler struct {
 
 // NewScheduler creates a new main scheduler
 func NewScheduler(restaurantHandler RestaurantMenuCronHandler) *Scheduler {
-	loc, err := time.LoadLocation("Europe/Paris")
-	if err != nil {
-		log.Printf("Failed to load Europe/Paris timezone, defaulting to local: %v", err)
-		loc = time.Local
-	}
-
 	return &Scheduler{
 		restaurantScheduler: NewRestaurantScheduler(restaurantHandler),
 		// Initialize other schedulers here
-		cron:         cron.New(cron.WithLocation(loc)),
+		cron:         cron.New(),
 		cronEntryIDs: make(map[string]cron.EntryID),
 	}
 }

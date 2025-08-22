@@ -24,6 +24,7 @@ import (
 	"github.com/plugimt/transat-backend/scheduler"
 	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
+	"github.com/robfig/cron/v3"
 )
 
 var db *sql.DB
@@ -99,13 +100,11 @@ func main() {
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
 
-	if err := appScheduler.AddCronJob("scheduled-notification-sweep", "*/5 * * * *", func() {
-		utils.LogMessage(utils.LevelInfo, "Cron: Starting scheduled notification sweep")
-		notificationService.ProcessScheduledNotifications()
-		utils.LogMessage(utils.LevelInfo, "Cron: Scheduled notification sweep finished")
-	}); err != nil {
-		log.Fatalf("Failed to schedule notification sweep job: %v", err)
-	}
+	// Cron Jobs - Requires access to handlers/services
+	c := cron.New()
+
+	c.Start()
+	defer c.Stop()
 
 	// ---- SECURITY MIDDLEWARES ----
 	// 1. Add security headers to all responses

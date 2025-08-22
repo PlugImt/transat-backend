@@ -10,15 +10,12 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/plugimt/transat-backend/models" // Assuming models are correctly placed
 	"github.com/plugimt/transat-backend/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/lib/pq"
-	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
-	i18n "github.com/plugimt/transat-backend/i18n"
 )
 
 // NotificationService handles sending notifications.
@@ -339,134 +336,6 @@ func (ns *NotificationService) SendPushNotification(payload models.NotificationP
 
 	log.Printf("Successfully sent all %d push notifications", totalTokens)
 	return nil
-}
-
-func (ns *NotificationService) ProcessScheduledNotifications() {
-    utils.LogHeader("🔔 Scheduled Notification Sweep")
-
-    now := utils.Now()
-    windowEnd := now.Add(1 * time.Hour)
-
-    evRows, err := ns.db.Query(`
-        SELECT id_events, name, start_date, location, id_club
-        FROM events
-        WHERE start_date >= $1 AND start_date < $2
-    `, now, windowEnd)
-    if err != nil {
-        utils.LogLineKeyValue(utils.LevelError, "Failed to query upcoming events", err.Error())
-        utils.LogFooter()
-        return
-    }
-    defer evRows.Close()
-
-    sentTotal := 0
-    eventsProcessed := 0
-
-    for evRows.Next() {
-        var (
-            eventID  int
-            name     string
-            startAt  time.Time
-            location string
-            clubID   int
-        )
-        if err := evRows.Scan(&eventID, &name, &startAt, &location, &clubID); err != nil {
-            utils.LogLineKeyValue(utils.LevelError, "Failed to scan event", err.Error())
-            continue
-        }
-        eventsProcessed++
-
-        recRows, err := ns.db.Query(`
-            WITH recipients AS (
-                SELECT email FROM clubs_members WHERE id_clubs = $1
-                UNION
-                SELECT email FROM events_attendents WHERE id_events = $2
-            )
-            SELECT DISTINCT nf.email, nf.notification_token, l.code AS lang
-            FROM recipients r
-            JOIN newf nf ON nf.email = r.email
-            JOIN languages l ON nf.language = l.id_languages
-            WHERE nf.notification_token IS NOT NULL AND nf.notification_token <> ''
-        `, clubID, eventID)
-        if err != nil {
-            utils.LogLineKeyValue(utils.LevelError, "Failed to query recipients for event", fmt.Sprintf("%d: %v", eventID, err))
-            continue
-        }
-
-        startTimeStr := utils.FormatParis(startAt, "15:04")
-
-        for recRows.Next() {
-            var email, token, lang string
-            if err := recRows.Scan(&email, &token, &lang); err != nil {
-                utils.LogLineKeyValue(utils.LevelWarn, "Failed to scan recipient row", err.Error())
-                continue
-            }
-
-            var exists bool
-            if err := ns.db.QueryRow(
-                `SELECT EXISTS (SELECT 1 FROM event_notification_sends WHERE event_id=$1 AND email=$2 AND notification_type=$3)`,
-                eventID, email, "event_reminder_1h",
-            ).Scan(&exists); err != nil {
-                utils.LogLineKeyValue(utils.LevelWarn, "Failed to check send log", err.Error())
-                continue
-            }
-            if exists {
-                continue
-            }
-
-            localizer := i18n.GetLocalizer(lang)
-            data := map[string]interface{}{
-                "EventName": name,
-                "StartTime": startTimeStr,
-                "Location":  location,
-            }
-
-            title, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: "event_reminder.title", TemplateData: data})
-            if err != nil || title == "" {
-                title = fmt.Sprintf("%s starting soon", name)
-            }
-            body, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: "event_reminder.message", TemplateData: data})
-            if err != nil || body == "" {
-                body = fmt.Sprintf("Starts at %s at %s", startTimeStr, location)
-            }
-
-            payload := models.NotificationPayload{
-                NotificationTokens: []string{token},
-                Title:              title,
-                Message:            body,
-                Sound:              "default",
-                ChannelID:          "default",
-                Data: map[string]interface{}{
-                    "screen":   "Event",
-                    "event_id": eventID,
-                },
-            }
-
-            if err := ns.SendPushNotification(payload); err != nil {
-                utils.LogLineKeyValue(utils.LevelWarn, "Failed to send event reminder", fmt.Sprintf("event=%d user=%s err=%v", eventID, email, err))
-                continue
-            }
-
-            if _, err := ns.db.Exec(
-                `INSERT INTO event_notification_sends (event_id, email, notification_type) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-                eventID, email, "event_reminder_1h",
-            ); err != nil {
-                utils.LogLineKeyValue(utils.LevelWarn, "Failed to insert send log", err.Error())
-            } else {
-                sentTotal++
-            }
-        }
-
-        _ = recRows.Close()
-    }
-
-    if err := evRows.Err(); err != nil {
-        utils.LogLineKeyValue(utils.LevelError, "Error iterating events", err.Error())
-    }
-
-    utils.LogLineKeyValue(utils.LevelInfo, "Scheduled sweep done. Events processed", eventsProcessed)
-    utils.LogLineKeyValue(utils.LevelInfo, "Total reminders sent", sentTotal)
-    utils.LogFooter()
 }
 
 // SendNotification handles sending notifications based on payload details.

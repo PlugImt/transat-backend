@@ -2,10 +2,6 @@
 title = "🍽️ NEUES MENÜ VERFÜGBAR!"
 message = "Ein köstliches neues Menü erwartet Sie im RU! Entdecken Sie die Tagesgerichte und hinterlassen Sie Ihre Kommentare. Guten Appetit!"
 
-[event_reminder]
-title = "⏰ {{.EventName}} beginnt bald"
-message = "Beginnt um {{.StartTime}} in {{.Location}}"
-
 [weather]
 thunderstorm = "Gewitter"
 drizzle = "Nieselregen"
