@@ -15,10 +15,10 @@ import (
 
 // AuthHandler handles authentication related requests.
 type AuthHandler struct {
-	DB           *sql.DB
-	JwtSecret    []byte
-	NotifService *services.NotificationService
-	EmailService *services.EmailService
+	DB             *sql.DB
+	JwtSecret      []byte
+	NotifService   *services.NotificationService
+	EmailService   *services.EmailService
 	DiscordService *services.DiscordService
 }
 
@@ -28,10 +28,10 @@ func NewAuthHandler(db *sql.DB, jwtSecret []byte, notifService *services.Notific
 		log.Println("Warning: EmailService is nil in NewAuthHandler")
 	}
 	return &AuthHandler{
-		DB:           db,
-		JwtSecret:    jwtSecret,
-		NotifService: notifService, // Store the notification service if needed later
-		EmailService: emailService,
+		DB:             db,
+		JwtSecret:      jwtSecret,
+		NotifService:   notifService, // Store the notification service if needed later
+		EmailService:   emailService,
 		DiscordService: discordService,
 	}
 }
@@ -218,11 +218,11 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	// Send Discord notification about unverified account creation (async)
 	if h.DiscordService != nil {
 		userForDiscord := models.Newf{
-			Email:         newf.Email,
-			FirstName:     newf.FirstName,
-			LastName:      newf.LastName,
-			Language:      newf.Language,
-			PhoneNumber:   newf.PhoneNumber,
+			Email:          newf.Email,
+			FirstName:      newf.FirstName,
+			LastName:       newf.LastName,
+			Language:       newf.Language,
+			PhoneNumber:    newf.PhoneNumber,
 			ProfilePicture: newf.ProfilePicture,
 			GraduationYear: newf.GraduationYear,
 			FormationName:  newf.FormationName,
@@ -230,7 +230,15 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			CreationDate:   newf.CreationDate,
 		}
 		go func(u models.Newf) {
-			if err := h.DiscordService.SendUserRegistered(u); err != nil {
+			countQuery := `SELECT COUNT(*) FROM newf;`
+			var count int
+			err := h.DB.QueryRow(countQuery).Scan(&count)
+			if err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to get number of accounts")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			}
+
+			if err := h.DiscordService.SendUserRegistered(u, count); err != nil {
 				utils.LogMessage(utils.LevelWarn, "Failed to send Discord registration webhook")
 				utils.LogLineKeyValue(utils.LevelWarn, "Email", u.Email)
 				utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
@@ -646,7 +654,15 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 				CreationDate:   creationDateStr,
 			}
 			go func(u models.Newf) {
-				if err := h.DiscordService.SendUserVerified(u); err != nil {
+				countQuery := `SELECT COUNT(*) FROM newf;`
+				var count int
+				err := h.DB.QueryRow(countQuery).Scan(&count)
+				if err != nil {
+					utils.LogMessage(utils.LevelError, "Failed to get number of accounts")
+					utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				}
+
+				if err := h.DiscordService.SendUserVerified(u, count); err != nil {
 					utils.LogMessage(utils.LevelWarn, "Failed to send Discord verification webhook")
 					utils.LogLineKeyValue(utils.LevelWarn, "Email", u.Email)
 					utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
