@@ -131,6 +131,9 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		}
 	}
 
+	var alreadyExists bool
+	alreadyExists = false
+
 	// Insert user
 	insertUserQuery := `
 		INSERT INTO newf (email, password, first_name, last_name, language)
@@ -148,6 +151,8 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			if err != nil {
 				fmt.Println("Failed to begin database transaction")
 			}
+
+			alreadyExists = true
 			//return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "You already have an account"})
 		} else {
 			utils.LogMessage(utils.LevelError, "Failed to insert newf")
@@ -159,29 +164,31 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		}
 	}
 
-	// Add initial 'VERIFYING' role
-	addRoleQuery := `
+	if !alreadyExists {
+		// Add initial 'VERIFYING' role
+		addRoleQuery := `
 		INSERT INTO newf_roles (email, id_roles)
 		VALUES ($1, (SELECT id_roles FROM roles WHERE name = 'VERIFYING'));
 	`
-	_, err = tx.Exec(addRoleQuery, newf.Email)
-	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
-			utils.LogMessage(utils.LevelWarn, "User already exists")
-			utils.LogLineKeyValue(utils.LevelWarn, "Email", newf.Email)
-			utils.LogFooter()
-			commitOrRollback(tx, err)
-			tx, err = h.DB.Begin()
-			if err != nil {
-				fmt.Println("Failed to begin database transaction")
+		_, err = tx.Exec(addRoleQuery, newf.Email)
+		if err != nil {
+			if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+				utils.LogMessage(utils.LevelWarn, "User already exists")
+				utils.LogLineKeyValue(utils.LevelWarn, "Email", newf.Email)
+				utils.LogFooter()
+				commitOrRollback(tx, err)
+				tx, err = h.DB.Begin()
+				if err != nil {
+					fmt.Println("Failed to begin database transaction")
+				}
+			} else {
+				utils.LogMessage(utils.LevelError, "Failed to add initial role")
+				utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				utils.LogFooter()
+				commitOrRollback(tx, err) // Rollback
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong setting up account roles"})
 			}
-		} else {
-			utils.LogMessage(utils.LevelError, "Failed to add initial role")
-			utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
-			utils.LogLineKeyValue(utils.LevelError, "Error", err)
-			utils.LogFooter()
-			commitOrRollback(tx, err) // Rollback
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong setting up account roles"})
 		}
 	}
 
@@ -202,23 +209,25 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong setting up verification"})
 	}
 
-	// Subscribe user to all available notification services
-	subscribeToAllServicesQuery := `
+	if !alreadyExists {
+		// Subscribe user to all available notification services
+		subscribeToAllServicesQuery := `
 		INSERT INTO notifications (email, id_services)
 		SELECT $1, id_services FROM services;
 	`
-	_, err = tx.Exec(subscribeToAllServicesQuery, newf.Email)
-	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to subscribe user to all notification services")
-		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		// Don't fail registration if subscription fails, just log the error
-		// We'll continue with the commit
-		utils.LogMessage(utils.LevelWarn, "Registration will proceed despite subscription error")
-		err = nil // Reset error so commit proceeds
-	} else {
-		utils.LogMessage(utils.LevelInfo, "User subscribed to all notification services")
+		_, err = tx.Exec(subscribeToAllServicesQuery, newf.Email)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to subscribe user to all notification services")
+			utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			utils.LogFooter()
+			// Don't fail registration if subscription fails, just log the error
+			// We'll continue with the commit
+			utils.LogMessage(utils.LevelWarn, "Registration will proceed despite subscription error")
+			err = nil // Reset error so commit proceeds
+		} else {
+			utils.LogMessage(utils.LevelInfo, "User subscribed to all notification services")
+		}
 	}
 
 	// Commit the transaction now
