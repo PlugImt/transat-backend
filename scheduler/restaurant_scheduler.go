@@ -47,7 +47,7 @@ func (s *RestaurantScheduler) Start() {
 				if s.isScheduledTimeAllowed(time.Now()) {
 					go s.checkAndUpdateMenu()
 				} else {
-					utils.LogMessage(utils.LevelDebug, "Scheduler: Outside allowed time window (weekdays 8h-14h), skipping check")
+					utils.LogMessage(utils.LevelDebug, "Scheduler: Outside allowed time window (weekdays 9h-14h), skipping check")
 				}
 			case <-s.stopChan:
 				utils.LogMessage(utils.LevelInfo, "Stopping restaurant menu scheduler")
@@ -79,14 +79,14 @@ func (s *RestaurantScheduler) isScheduledTimeAllowed(t time.Time) bool {
 	}
 
 	hour := parisTime.Hour()
-	return hour >= 10 && hour < 14
+	return hour >= 8 && hour < 14
 }
 
 func (s *RestaurantScheduler) checkAndUpdateMenu() {
 	now := time.Now()
 
 	if !s.isScheduledTimeAllowed(now) {
-		utils.LogMessage(utils.LevelInfo, "Scheduler: Outside allowed time window (weekdays 8h-14h), skipping menu check")
+		utils.LogMessage(utils.LevelInfo, "Scheduler: Outside allowed time window (weekdays 9h-14h), skipping menu check")
 		return
 	}
 
