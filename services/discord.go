@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/plugimt/transat-backend/models"
@@ -77,7 +78,7 @@ func safe(v string, fallback string) string {
 	return v
 }
 
-func (ds *DiscordService) SendUserRegistered(user models.Newf) error {
+func (ds *DiscordService) SendUserRegistered(user models.Newf, numberOfAccounts int) error {
 	embed := discordEmbed{
 		Title:     "New Account Created (Unverified)",
 		Color:     0xFFA000, // amber
@@ -88,12 +89,13 @@ func (ds *DiscordService) SendUserRegistered(user models.Newf) error {
 			{Name: "Last Name", Value: safe(user.LastName, "N/A"), Inline: true},
 			{Name: "Language", Value: safe(user.Language, "N/A"), Inline: true},
 			{Name: "Created At", Value: safe(user.CreationDate, "N/A"), Inline: true},
+			{Name: "Number of Accounts", Value: strconv.Itoa(numberOfAccounts), Inline: true},
 		},
 	}
 	return ds.sendEmbed(embed)
 }
 
-func (ds *DiscordService) SendUserVerified(user models.Newf) error {
+func (ds *DiscordService) SendUserVerified(user models.Newf, numberOfAccounts int) error {
 	embed := discordEmbed{
 		Title:     "Account Verified",
 		Color:     0x00C853, // green
@@ -104,6 +106,7 @@ func (ds *DiscordService) SendUserVerified(user models.Newf) error {
 			{Name: "Last Name", Value: safe(user.LastName, "N/A"), Inline: true},
 			{Name: "Language", Value: safe(user.Language, "N/A"), Inline: true},
 			{Name: "Created At", Value: safe(user.CreationDate, "N/A"), Inline: true},
+			{Name: "Number of Accounts", Value: strconv.Itoa(numberOfAccounts), Inline: true},
 		},
 	}
 	return ds.sendEmbed(embed)

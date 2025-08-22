@@ -15,10 +15,10 @@ import (
 
 // AuthHandler handles authentication related requests.
 type AuthHandler struct {
-	DB           *sql.DB
-	JwtSecret    []byte
-	NotifService *services.NotificationService
-	EmailService *services.EmailService
+	DB             *sql.DB
+	JwtSecret      []byte
+	NotifService   *services.NotificationService
+	EmailService   *services.EmailService
 	DiscordService *services.DiscordService
 }
 
@@ -28,10 +28,10 @@ func NewAuthHandler(db *sql.DB, jwtSecret []byte, notifService *services.Notific
 		log.Println("Warning: EmailService is nil in NewAuthHandler")
 	}
 	return &AuthHandler{
-		DB:           db,
-		JwtSecret:    jwtSecret,
-		NotifService: notifService, // Store the notification service if needed later
-		EmailService: emailService,
+		DB:             db,
+		JwtSecret:      jwtSecret,
+		NotifService:   notifService, // Store the notification service if needed later
+		EmailService:   emailService,
 		DiscordService: discordService,
 	}
 }
@@ -144,14 +144,19 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			utils.LogLineKeyValue(utils.LevelWarn, "Email", newf.Email)
 			utils.LogFooter()
 			commitOrRollback(tx, err) // Rollback
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "You already have an account"})
+			tx, err = h.DB.Begin()
+			if err != nil {
+				fmt.Println("Failed to begin database transaction")
+			}
+			//return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "You already have an account"})
+		} else {
+			utils.LogMessage(utils.LevelError, "Failed to insert newf")
+			utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			utils.LogFooter()
+			commitOrRollback(tx, err) // Rollback
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong creating account"})
 		}
-		utils.LogMessage(utils.LevelError, "Failed to insert newf")
-		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		commitOrRollback(tx, err) // Rollback
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong creating account"})
 	}
 
 	// Add initial 'VERIFYING' role
@@ -161,12 +166,23 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	`
 	_, err = tx.Exec(addRoleQuery, newf.Email)
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to add initial role")
-		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		commitOrRollback(tx, err) // Rollback
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong setting up account roles"})
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			utils.LogMessage(utils.LevelWarn, "User already exists")
+			utils.LogLineKeyValue(utils.LevelWarn, "Email", newf.Email)
+			utils.LogFooter()
+			commitOrRollback(tx, err)
+			tx, err = h.DB.Begin()
+			if err != nil {
+				fmt.Println("Failed to begin database transaction")
+			}
+		} else {
+			utils.LogMessage(utils.LevelError, "Failed to add initial role")
+			utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			utils.LogFooter()
+			commitOrRollback(tx, err) // Rollback
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong setting up account roles"})
+		}
 	}
 
 	// Generate and store verification code (within the same transaction)
@@ -218,11 +234,11 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	// Send Discord notification about unverified account creation (async)
 	if h.DiscordService != nil {
 		userForDiscord := models.Newf{
-			Email:         newf.Email,
-			FirstName:     newf.FirstName,
-			LastName:      newf.LastName,
-			Language:      newf.Language,
-			PhoneNumber:   newf.PhoneNumber,
+			Email:          newf.Email,
+			FirstName:      newf.FirstName,
+			LastName:       newf.LastName,
+			Language:       newf.Language,
+			PhoneNumber:    newf.PhoneNumber,
 			ProfilePicture: newf.ProfilePicture,
 			GraduationYear: newf.GraduationYear,
 			FormationName:  newf.FormationName,
@@ -230,7 +246,15 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			CreationDate:   newf.CreationDate,
 		}
 		go func(u models.Newf) {
-			if err := h.DiscordService.SendUserRegistered(u); err != nil {
+			countQuery := `SELECT COUNT(*) FROM newf;`
+			var count int
+			err := h.DB.QueryRow(countQuery).Scan(&count)
+			if err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to get number of accounts")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			}
+
+			if err := h.DiscordService.SendUserRegistered(u, count); err != nil {
 				utils.LogMessage(utils.LevelWarn, "Failed to send Discord registration webhook")
 				utils.LogLineKeyValue(utils.LevelWarn, "Email", u.Email)
 				utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
@@ -646,7 +670,15 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 				CreationDate:   creationDateStr,
 			}
 			go func(u models.Newf) {
-				if err := h.DiscordService.SendUserVerified(u); err != nil {
+				countQuery := `SELECT COUNT(*) FROM newf;`
+				var count int
+				err := h.DB.QueryRow(countQuery).Scan(&count)
+				if err != nil {
+					utils.LogMessage(utils.LevelError, "Failed to get number of accounts")
+					utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				}
+
+				if err := h.DiscordService.SendUserVerified(u, count); err != nil {
 					utils.LogMessage(utils.LevelWarn, "Failed to send Discord verification webhook")
 					utils.LogLineKeyValue(utils.LevelWarn, "Email", u.Email)
 					utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
