@@ -55,7 +55,7 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 				FROM events_attendents
 				GROUP BY id_events
 			) attendee_count ON e.id_events = attendee_count.id_events
-			WHERE e.start_date < NOW()
+			WHERE e.end_date < NOW()
 			ORDER BY e.start_date DESC
 		`
 	case "all":
@@ -104,7 +104,7 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 				FROM events_attendents
 				GROUP BY id_events
 			) attendee_count ON e.id_events = attendee_count.id_events
-			WHERE e.start_date >= NOW()
+			WHERE e.end_date >= NOW()
 			ORDER BY e.start_date ASC
 		`
 	}
