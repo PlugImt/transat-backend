@@ -138,7 +138,7 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 		var idClub int
 		var name, location, picture string
 		var startDate time.Time
-		var endDate sql.NullTime
+		var endDate time.Time
 		var attendeeCount int
 		var isInterested bool
 
@@ -154,16 +154,11 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 			"id_club":        idClub,
 			"name":           name,
 			"start_date":     startDate,
-			"end_date":       endDate.Time,
+			"end_date":       endDate,
 			"location":       location,
 			"picture":        picture,
 			"attendee_count": attendeeCount,
 			"is_interested":  isInterested,
-		}
-
-		// Handle null end date
-		if !endDate.Valid {
-			event["end_date"] = nil
 		}
 
 		// Get first 10 attendee profile pictures
@@ -304,7 +299,7 @@ func (h *EventHandler) GetEventByClubID(c *fiber.Ctx) error {
 		var id int
 		var name, location, picture string
 		var startDate time.Time
-		var endDate sql.NullTime
+		var endDate time.Time
 		var attendeeCount int
 
 		err := rows.Scan(&id, &name, &startDate, &endDate, &location, &picture, &attendeeCount)
@@ -318,15 +313,10 @@ func (h *EventHandler) GetEventByClubID(c *fiber.Ctx) error {
 			"id":             id,
 			"name":           name,
 			"start_date":     startDate,
-			"end_date":       endDate.Time,
+			"end_date":       endDate,
 			"location":       location,
 			"picture":        picture,
 			"attendee_count": attendeeCount,
-		}
-
-		// Handle null end date
-		if !endDate.Valid {
-			event["end_date"] = nil
 		}
 
 		// Get first 10 attendee profile pictures
@@ -400,7 +390,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 
 	var event models.Event
 	var description, link sql.NullString
-	var endDate sql.NullTime
+	var endDate time.Time
 	var isInterested bool
 
 	err = h.db.QueryRow(eventQuery, eventID, c.Locals("email").(string)).Scan(
@@ -435,9 +425,7 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 
 	event.Description = description.String
 	event.Link = link.String
-	if endDate.Valid {
-		event.EndDate = &endDate.Time
-	}
+	event.EndDate = &endDate
 
 	// Get creator details
 	creatorQuery := `
