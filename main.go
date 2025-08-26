@@ -67,10 +67,9 @@ func main() {
 	}
 
 	emailService := services.NewEmailService(
-		os.Getenv("EMAIL_HOST"),
-		os.Getenv("EMAIL_PORT"),
+		os.Getenv("MAILGUN_API_KEY"),
+		os.Getenv("MAILGUN_DOMAIN"),
 		os.Getenv("EMAIL_SENDER"),
-		os.Getenv("EMAIL_PASSWORD"),
 		os.Getenv("EMAIL_SENDER_NAME"),
 	)
 

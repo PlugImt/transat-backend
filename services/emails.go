@@ -2,45 +2,41 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"html/template"
 	"log"
 	"os"
-	"path/filepath" // Added for template name parsing
-	"strconv"
+	"path/filepath"
 
+	mailgun "github.com/mailgun/mailgun-go/v4"
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	i18n "github.com/plugimt/transat-backend/i18n"
-	"github.com/plugimt/transat-backend/models" // Ensure models path is correct
-	gomail "gopkg.in/mail.v2"
+	"github.com/plugimt/transat-backend/models"
 )
 
-// EmailService handles sending emails.
+// EmailService handles sending emails using Mailgun API.
 type EmailService struct {
-	dialer      *gomail.Dialer
+	client      mailgun.Mailgun
 	senderName  string
 	senderEmail string
+	domain      string
 }
 
-// NewEmailService creates a new EmailService instance.
-// It requires email server host, port, sender email, password, and sender name.
-func NewEmailService(host, portStr, senderEmail, password, senderName string) *EmailService {
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		log.Printf("Warning: Invalid EMAIL_PORT value '%s'. Using default 587. Error: %v", portStr, err)
-		port = 587 // Default SMTP port
-	}
-
-	dialer := gomail.NewDialer(host, port, senderEmail, password)
+// NewEmailService creates a new EmailService instance using Mailgun API.
+// It requires Mailgun API key, domain, sender email, and sender name.
+func NewEmailService(apiKey, domain, senderEmail, senderName string) *EmailService {
+	client := mailgun.NewMailgun(domain, apiKey)
 
 	return &EmailService{
-		dialer:      dialer,
+		client:      client,
 		senderName:  senderName,
 		senderEmail: senderEmail,
+		domain:      domain,
 	}
 }
 
-// SendEmail sends an email using a template and data.
+// SendEmail sends an email using a template and data via Mailgun API.
 // It utilizes the i18n setup for subject and template content localization.
 func (es *EmailService) SendEmail(mailDetails models.Email, emailData interface{}) error {
 	// Read the HTML template file
@@ -51,9 +47,8 @@ func (es *EmailService) SendEmail(mailDetails models.Email, emailData interface{
 	}
 
 	// Get localizer for the specified language
-	localizer := i18n.GetLocalizer(mailDetails.Language) // Uses GetLocalizer from utils/i18n.go
+	localizer := i18n.GetLocalizer(mailDetails.Language)
 	if localizer == nil {
-		// This case should ideally be handled within GetLocalizer itself
 		log.Printf("Error: Could not get localizer for language '%s'. Using default.", mailDetails.Language)
 		localizer = i18n.GetLocalizer("fr") // Fallback
 	}
@@ -122,17 +117,19 @@ func (es *EmailService) SendEmail(mailDetails models.Email, emailData interface{
 		return fmt.Errorf("error executing template '%s': %w", mailDetails.Template, err)
 	}
 
-	// Create the email message
-	m := gomail.NewMessage()
-	// Use sender name and email from the EmailService configuration
-	senderAddress := fmt.Sprintf("%s <%s>", es.senderName, es.senderEmail)
-	m.SetHeader("From", senderAddress)
-	m.SetHeader("To", mailDetails.Recipient)
-	m.SetHeader("Subject", subject)
-	m.SetBody("text/html", body.String())
+	// Create the email message using Mailgun
+	message := mailgun.NewMessage(
+		fmt.Sprintf("%s <%s>", es.senderName, es.senderEmail), // From
+		subject,               // Subject
+		"",                    // Text body (empty for HTML-only)
+		mailDetails.Recipient, // To
+	)
+	message.SetHTML(body.String())
 
-	// Send the email using the configured dialer
-	if err := es.dialer.DialAndSend(m); err != nil {
+	// Send the email using Mailgun API
+	ctx := context.Background()
+	_, _, err = es.client.Send(ctx, message)
+	if err != nil {
 		log.Printf("Error sending email to %s: %v", mailDetails.Recipient, err)
 		return fmt.Errorf("error sending email: %w", err)
 	}
