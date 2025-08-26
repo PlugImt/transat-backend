@@ -27,6 +27,7 @@ type EmailService struct {
 // It requires Mailgun API key, domain, sender email, and sender name.
 func NewEmailService(apiKey, domain, senderEmail, senderName string) *EmailService {
 	client := mailgun.NewMailgun(domain, apiKey)
+	client.SetAPIBase("https://api.eu.mailgun.net/v3")
 
 	return &EmailService{
 		client:      client,
