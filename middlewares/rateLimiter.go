@@ -9,8 +9,8 @@ import (
 
 // GeneralRateLimiter is a middleware that limits repeated requests to all API endpoints
 var GeneralRateLimiter = limiter.New(limiter.Config{
-	Max:        100,              // 100 requests
-	Expiration: 1 * time.Minute,  // per minute
+	Max:        1000,            // 100 requests
+	Expiration: 1 * time.Minute, // per minute
 	KeyGenerator: func(c *fiber.Ctx) string {
 		// Use both IP and path to create more targeted rate limiting
 		return c.IP() + "-" + c.Path()
@@ -26,8 +26,8 @@ var GeneralRateLimiter = limiter.New(limiter.Config{
 
 // AccountRateLimiter protects account-related endpoints
 var AccountRateLimiter = limiter.New(limiter.Config{
-	Max:        5,                // 5 requests
-	Expiration: 1 * time.Minute,  // per minute
+	Max:        50,              // 5 requests
+	Expiration: 1 * time.Minute, // per minute
 	KeyGenerator: func(c *fiber.Ctx) string {
 		return c.IP() + "-account"
 	},
@@ -40,8 +40,8 @@ var AccountRateLimiter = limiter.New(limiter.Config{
 
 // AccessRateLimiter for public access points (even more strict)
 var AccessRateLimiter = limiter.New(limiter.Config{
-	Max:        10,               // 10 requests
-	Expiration: 5 * time.Minute,  // per 5 minutes
+	Max:        100,             // 10 requests
+	Expiration: 5 * time.Minute, // per 5 minutes
 	KeyGenerator: func(c *fiber.Ctx) string {
 		return c.IP() + "-access"
 	},
@@ -50,6 +50,6 @@ var AccessRateLimiter = limiter.New(limiter.Config{
 			"error": "Too many access attempts. Please try again later.",
 		})
 	},
-	SkipFailedRequests: false,  // Count failed requests against the limit
+	SkipFailedRequests:     false, // Count failed requests against the limit
 	SkipSuccessfulRequests: false, // Count successful requests against the limit
-}) 
+})
