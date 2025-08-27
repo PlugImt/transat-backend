@@ -100,6 +100,14 @@ func main() {
 
 	eventHandler := event.NewEventHandler(db)
 
+	whatsappService, err := services.NewWhatsAppService()
+	if err != nil {
+		log.Fatalf("💥 Failed to create WhatsApp Service: %v", err)
+	}
+
+	// pour tester temporairemetn
+	whatsappHandler := handlers.NewWhatsAppHandler(whatsappService)
+
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
@@ -169,6 +177,7 @@ func main() {
 	routes.SetupEventRoutes(app, eventHandler)
 	routes.SetupReservationRoutes(app, db)
 	routes.SetupBassineRoutes(app, db)
+	routes.SetupWhatsAppRoutes(app, whatsappHandler)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
