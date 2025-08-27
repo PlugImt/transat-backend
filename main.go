@@ -66,9 +66,14 @@ func main() {
 		log.Fatalf("💥 Failed to create Translation Service: %v", err)
 	}
 
+	// Initialize Brevo Email Service (API-based, not SMTP)
+	brevoAPIKey := os.Getenv("BREVO_API_KEY")
+	if brevoAPIKey == "" {
+		log.Fatal("💥 BREVO_API_KEY environment variable is not set")
+	}
+
 	emailService := services.NewEmailService(
-		os.Getenv("MAILGUN_API_KEY"),
-		os.Getenv("MAILGUN_DOMAIN"),
+		brevoAPIKey,
 		os.Getenv("EMAIL_SENDER"),
 		os.Getenv("EMAIL_SENDER_NAME"),
 	)

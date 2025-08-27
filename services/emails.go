@@ -5,39 +5,40 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 
-	mailgun "github.com/mailgun/mailgun-go/v4"
+	brevo "github.com/getbrevo/brevo-go/lib"
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	i18n "github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/models"
 )
 
-// EmailService handles sending emails using Mailgun API.
+// EmailService handles sending emails using Brevo (Sendinblue) API.
 type EmailService struct {
-	client      mailgun.Mailgun
+	client      *brevo.APIClient
+	apiKey      string
 	senderName  string
 	senderEmail string
-	domain      string
 }
 
-// NewEmailService creates a new EmailService instance using Mailgun API.
-// It requires Mailgun API key, domain, sender email, and sender name.
-func NewEmailService(apiKey, domain, senderEmail, senderName string) *EmailService {
-	client := mailgun.NewMailgun(domain, apiKey)
-	client.SetAPIBase("https://api.eu.mailgun.net/v3")
+// NewEmailService creates a new EmailService instance using Brevo API.
+// It requires Brevo API key, sender email, and sender name.
+func NewEmailService(apiKey, senderEmail, senderName string) *EmailService {
+	cfg := brevo.NewConfiguration()
+	client := brevo.NewAPIClient(cfg)
 
 	return &EmailService{
 		client:      client,
+		apiKey:      apiKey,
 		senderName:  senderName,
 		senderEmail: senderEmail,
-		domain:      domain,
 	}
 }
 
-// SendEmail sends an email using a template and data via Mailgun API.
+// SendEmail sends an email using a template and data via Brevo API.
 // It utilizes the i18n setup for subject and template content localization.
 func (es *EmailService) SendEmail(mailDetails models.Email, emailData interface{}) error {
 	// Read the HTML template file
@@ -118,23 +119,65 @@ func (es *EmailService) SendEmail(mailDetails models.Email, emailData interface{
 		return fmt.Errorf("error executing template '%s': %w", mailDetails.Template, err)
 	}
 
-	// Create the email message using Mailgun
-	message := mailgun.NewMessage(
-		fmt.Sprintf("%s <%s>", es.senderName, es.senderEmail), // From
-		subject,               // Subject
-		"",                    // Text body (empty for HTML-only)
-		mailDetails.Recipient, // To
+	// Debug information before sending
+	log.Printf("Brevo: preparing send | to=%s from=%s <%s> subject=%q template=%s lang=%s",
+		mailDetails.Recipient, es.senderName, es.senderEmail, subject, mailDetails.Template, mailDetails.Language,
 	)
-	message.SetHTML(body.String())
+	// Log safe API key fingerprint and length (do not log full secret)
+	ak := es.apiKey
+	mask := "(empty)"
+	if ak != "" {
+		if len(ak) >= 8 {
+			mask = ak[:4] + "..." + ak[len(ak)-4:]
+		} else {
+			mask = "***"
+		}
+	}
+	log.Printf("Brevo: api key fingerprint=%s len=%d", mask, len(ak))
 
-	// Send the email using Mailgun API
-	ctx := context.Background()
-	_, _, err = es.client.Send(ctx, message)
+	// Build Brevo payload
+	send := brevo.SendSmtpEmail{
+		To: []brevo.SendSmtpEmailTo{
+			{Email: mailDetails.Recipient},
+		},
+		Sender: &brevo.SendSmtpEmailSender{
+			Email: es.senderEmail,
+			Name:  es.senderName,
+		},
+		Subject:     subject,
+		HtmlContent: body.String(),
+	}
+
+	// Send the email using Brevo API (set API key in context)
+	ctx := context.WithValue(context.Background(), brevo.ContextAPIKey, brevo.APIKey{Key: es.apiKey})
+	res, httpResp, err := es.client.TransactionalEmailsApi.SendTransacEmail(ctx, send)
 	if err != nil {
-		log.Printf("Error sending email to %s: %v", mailDetails.Recipient, err)
+		status := ""
+		if httpResp != nil {
+			status = httpResp.Status
+		}
+		log.Printf("Brevo: send failed | status=%s to=%s subject=%q", status, mailDetails.Recipient, subject)
+		// Try to log API error body when available
+		if apiErr, ok := err.(interface{ Error() string }); ok {
+			log.Printf("Brevo: error=%s", apiErr.Error())
+		}
+		if httpResp != nil {
+			log.Printf("Brevo: response headers=%v", httpResp.Header)
+			if httpResp.Request != nil && httpResp.Request.URL != nil {
+				log.Printf("Brevo: request url=%s", httpResp.Request.URL.String())
+			}
+			// Try to read response body for detailed error message
+			if httpResp.Body != nil {
+				defer httpResp.Body.Close()
+				if b, rErr := io.ReadAll(httpResp.Body); rErr == nil {
+					log.Printf("Brevo: response body=%s", string(b))
+				}
+			}
+		}
 		return fmt.Errorf("error sending email: %w", err)
 	}
 
-	log.Printf("Email sent successfully to %s (Subject: %s)", mailDetails.Recipient, subject)
+	// Success logging (include message ID if available)
+	log.Printf("Brevo: sent | to=%s subject=%q message=%+v", mailDetails.Recipient, subject, res)
 	return nil
 }
