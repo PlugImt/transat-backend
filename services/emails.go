@@ -178,7 +178,7 @@ func (es *EmailService) SendEmail(mailDetails models.Email, emailData interface{
 	smtp1 := smtpConfig{
 		Host:       firstNonEmpty(os.Getenv("EMAIL_HOST_GMAIL_1"), "smtp.gmail.com"),
 		Port:       firstNonEmpty(os.Getenv("EMAIL_PORT_GMAIL_1"), "587"),
-		Username:   os.Getenv("EMAIL_SENDER_NAME_GMAIL_1"),
+		Username:   os.Getenv("EMAIL_SENDER_GMAIL_1"),
 		Password:   os.Getenv("EMAIL_PASSWORD_GMAIL_1"),
 		SenderName: firstNonEmpty(os.Getenv("EMAIL_SENDER_NAME_GMAIL_1"), es.senderName),
 		Sender:     firstNonEmpty(os.Getenv("EMAIL_SENDER_GMAIL_1"), es.senderEmail),
@@ -196,7 +196,7 @@ func (es *EmailService) SendEmail(mailDetails models.Email, emailData interface{
 	smtp2 := smtpConfig{
 		Host:       firstNonEmpty(os.Getenv("EMAIL_HOST_GMAIL_2"), "smtp.gmail.com"),
 		Port:       firstNonEmpty(os.Getenv("EMAIL_PORT_GMAIL_2"), "587"),
-		Username:   os.Getenv("EMAIL_SENDER_NAME_GMAIL_2"),
+		Username:   os.Getenv("EMAIL_SENDER_GMAIL_2"),
 		Password:   os.Getenv("EMAIL_PASSWORD_GMAIL_2"),
 		SenderName: firstNonEmpty(os.Getenv("EMAIL_SENDER_NAME_GMAIL_2"), es.senderName),
 		Sender:     os.Getenv("EMAIL_SENDER_GMAIL_2"),
