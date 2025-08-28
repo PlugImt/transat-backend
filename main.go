@@ -100,6 +100,14 @@ func main() {
 
 	eventHandler := event.NewEventHandler(db)
 
+	whatsappService, err := services.NewWhatsAppService()
+	if err != nil {
+		log.Fatalf("💥 Failed to create WhatsApp Service: %v", err)
+	}
+
+	// Initialize Phone Verification Service
+	phoneVerificationService := services.NewPhoneVerificationService(whatsappService)
+
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
@@ -156,7 +164,7 @@ func main() {
 
 	// API Group --- NEW ROUTES
 	routes.SetupAuthRoutes(app, db, jwtSecret, notificationService, emailService, discordService)
-	routes.SetupUserRoutes(app, db, notificationService)
+	routes.SetupUserRoutes(app, db, notificationService, phoneVerificationService)
 	routes.SetupTraqRoutes(app, db)
 	routes.SetupFileRoutes(app, db, r2Service)
 	routes.SetupRestaurantRoutes(app, restHandler)

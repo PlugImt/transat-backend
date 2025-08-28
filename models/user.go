@@ -8,17 +8,20 @@ type Newf struct {
 	NewPasswordConfirmation string `json:"new_password_confirmation"`
 	PasswordUpdatedDate     string `json:"password_updated_date"`
 	VerificationCodeData
-	CreationDate      string `json:"creation_date"`
-	FirstName         string `json:"first_name"`
-	LastName          string `json:"last_name"`
-	PhoneNumber       string `json:"phone_number"`
-	ProfilePicture    string `json:"profile_picture"`
-	NotificationToken string `json:"notification_token"`
-	GraduationYear    int    `json:"graduation_year"`
-	FormationName     string `json:"formation_name"`
-	Campus            string `json:"campus"`
-	TotalUsers        int    `json:"total_newf"`
-	Language          string `json:"language"`
+	CreationDate                          string `json:"creation_date"`
+	FirstName                             string `json:"first_name"`
+	LastName                              string `json:"last_name"`
+	PhoneNumber                           string `json:"phone_number"`
+	PhoneNumberVerified                   bool   `json:"phone_number_verified"`
+	PhoneNumberVerificationCode           string `json:"phone_number_verification_code"`
+	PhoneNumberVerificationCodeExpiration string `json:"phone_number_verification_code_expiration"`
+	ProfilePicture                        string `json:"profile_picture"`
+	NotificationToken                     string `json:"notification_token"`
+	GraduationYear                        int    `json:"graduation_year"`
+	FormationName                         string `json:"formation_name"`
+	Campus                                string `json:"campus"`
+	TotalUsers                            int    `json:"total_newf"`
+	Language                              string `json:"language"`
 }
 
 // VerificationCodeData holds verification code details.
