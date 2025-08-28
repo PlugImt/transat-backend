@@ -105,8 +105,8 @@ func main() {
 		log.Fatalf("💥 Failed to create WhatsApp Service: %v", err)
 	}
 
-	// pour tester temporairemetn
-	whatsappHandler := handlers.NewWhatsAppHandler(whatsappService)
+	// Initialize Phone Verification Service
+	phoneVerificationService := services.NewPhoneVerificationService(whatsappService)
 
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
@@ -164,7 +164,7 @@ func main() {
 
 	// API Group --- NEW ROUTES
 	routes.SetupAuthRoutes(app, db, jwtSecret, notificationService, emailService, discordService)
-	routes.SetupUserRoutes(app, db, notificationService)
+	routes.SetupUserRoutes(app, db, notificationService, phoneVerificationService)
 	routes.SetupTraqRoutes(app, db)
 	routes.SetupFileRoutes(app, db, r2Service)
 	routes.SetupRestaurantRoutes(app, restHandler)
@@ -177,7 +177,6 @@ func main() {
 	routes.SetupEventRoutes(app, eventHandler)
 	routes.SetupReservationRoutes(app, db)
 	routes.SetupBassineRoutes(app, db)
-	routes.SetupWhatsAppRoutes(app, whatsappHandler)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/plugimt/transat-backend/utils"
 	"github.com/wapikit/wapi.go/manager"
 	wapi "github.com/wapikit/wapi.go/pkg/client"
 	"github.com/wapikit/wapi.go/pkg/components"
@@ -27,6 +28,7 @@ func NewWhatsAppService() (*WhatsAppService, error) {
 	client := wapi.New(&wapi.ClientConfig{
 		ApiAccessToken:    apiAccessToken,
 		BusinessAccountId: businessAccountId,
+		// si besoin de gérer les réponses, on peut rajouter un truc pour faire un callback, mais flemme
 	})
 
 	messageClient := client.NewMessagingClient(phoneNumberId)
@@ -41,7 +43,8 @@ func (s *WhatsAppService) SendTemplateMessage(templateName, phoneNumber string, 
 	templateMsg := &components.TemplateMessage{
 		Name: templateName,
 		Language: components.TemplateMessageLanguage{
-			Code: language,
+			Code:   language,
+			Policy: "deterministic",
 		},
 		Components: templateComponents,
 	}
@@ -55,17 +58,35 @@ func (s *WhatsAppService) SendTemplateMessage(templateName, phoneNumber string, 
 }
 
 func (s *WhatsAppService) SendVerificationCode(phoneNumber, code string, language string) error {
-	_, err := s.SendTemplateMessage("verify_code", phoneNumber, language, []components.TemplateMessageComponent{
+	res, err := s.SendTemplateMessage("verify_code", phoneNumber, language, []components.TemplateMessageComponent{
 		components.TemplateMessageComponentBodyType{
 			Type: components.TemplateMessageComponentTypeBody,
 			Parameters: []components.TemplateMessageParameter{
 				components.TemplateMessageBodyAndHeaderParameter{
-					Type:          "text",
-					ParameterName: &[]string{"code"}[0],
-					Text:          &code,
+					Type: "text",
+					Text: &code,
+				},
+			},
+		},
+		components.TemplateMessageComponentButtonType{
+			Type:    components.TemplateMessageComponentTypeButton,
+			SubType: components.TemplateMessageButtonComponentTypeUrl,
+			Index:   0,
+			Parameters: &[]components.TemplateMessageParameter{
+				components.TemplateMessageBodyAndHeaderParameter{
+					Type: "text",
+					Text: &code,
 				},
 			},
 		},
 	})
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Message sent successfully")
+	utils.LogLineKeyValue(utils.LevelInfo, "Message", res.Messages[0].ID)
+
+	return nil
 }
