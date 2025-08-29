@@ -116,15 +116,16 @@ func main() {
 
 	// 2. CORS configuration - restrict to allowed origins in production
 	corsConfig := cors.Config{
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Requested-With",
+		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+		AllowOrigins:     "http://localhost:3001", // pour le pannel admin en dev
+		AllowCredentials: true,
+		ExposeHeaders:    "Content-Length, Content-Type",
 	}
 
 	// Use proper CORS origins in production, or * in development
 	if os.Getenv("ENV") == "production" {
 		corsConfig.AllowOrigins = cfg.AllowedOrigins
-	} else {
-		corsConfig.AllowOrigins = "*"
 	}
 
 	app.Use(cors.New(corsConfig))
@@ -169,6 +170,7 @@ func main() {
 	routes.SetupEventRoutes(app, eventHandler)
 	routes.SetupReservationRoutes(app, db)
 	routes.SetupBassineRoutes(app, db)
+	routes.SetupAdminRoutes(app, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")

@@ -1,0 +1,71 @@
+export interface User {
+  id_newf: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone_number?: string;
+  profile_picture?: string;
+  graduation_year?: number;
+  formation_name?: string;
+  campus?: string;
+  language: string;
+  password_updated_date?: string;
+  creation_date?: string;
+  verification_code?: string;
+  verification_code_expiration?: string;
+  roles?: string[];
+}
+
+export interface Event {
+  id_events: number;
+  name: string;
+  description: string;
+  link: string;
+  start_date: string;
+  end_date: string;
+  location: string;
+  creation_date: string;
+  picture: string;
+  creator: string;
+  id_club: number;
+  attendee_count?: number;
+}
+
+export interface Club {
+  id_clubs: number;
+  name: string;
+  picture: string;
+  description: string;
+  location: string;
+  link: string;
+  member_count?: number;
+}
+
+export interface ClubWithResponsible extends Club {
+  responsible?: {
+    first_name: string;
+    last_name: string;
+  };
+}
+
+export interface DashboardStats {
+  totalUsers: number;
+  unverifiedUsers: number;
+  totalEvents: number;
+  totalClubs: number;
+  userGrowth: { date: string; count: number; cumulativeCount: number }[];
+}
+
+// Types pour la gestion des erreurs
+export interface ApiError {
+  message?: string;
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+}
+
+export interface EventWithClubName extends Event {
+  club_name?: string;
+}

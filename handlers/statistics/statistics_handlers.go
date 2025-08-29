@@ -70,3 +70,79 @@ func (h *StatisticsHandler) GetGlobalStatistics(c *fiber.Ctx) error {
 		"statistics": stats,
 	})
 }
+
+func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
+	utils.LogHeader("📊 Get Dashboard Statistics")
+
+	type DashboardStats struct {
+		TotalUsers      int                      `json:"totalUsers"`
+		UnverifiedUsers int                      `json:"unverifiedUsers"`
+		TotalEvents     int                      `json:"totalEvents"`
+		TotalClubs      int                      `json:"totalClubs"`
+		UserGrowth      []map[string]interface{} `json:"userGrowth"`
+	}
+
+	var stats DashboardStats
+
+	userCountQuery := `SELECT COUNT(*) FROM newf`
+	err := h.db.QueryRow(userCountQuery).Scan(&stats.TotalUsers)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get total users count")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+	}
+
+	unverifiedQuery := `SELECT COUNT(*) FROM newf WHERE verification_code IS NOT NULL AND verification_code != ''`
+	err = h.db.QueryRow(unverifiedQuery).Scan(&stats.UnverifiedUsers)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get unverified users count")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+	}
+
+	eventsQuery := `SELECT COUNT(*) FROM events`
+	err = h.db.QueryRow(eventsQuery).Scan(&stats.TotalEvents)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get events count")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+	}
+
+	clubsQuery := `SELECT COUNT(*) FROM clubs`
+	err = h.db.QueryRow(clubsQuery).Scan(&stats.TotalClubs)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get clubs count")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+	}
+
+	growthQuery := `
+		SELECT 
+			DATE(creation_date) as date,
+			COUNT(*) as count,
+			SUM(COUNT(*)) OVER (ORDER BY DATE(creation_date) ASC) as cumulativeCount
+		FROM newf 
+		GROUP BY DATE(creation_date)
+		ORDER BY date ASC
+	`
+	rows, err := h.db.Query(growthQuery)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get user growth data")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+	} else {
+		defer rows.Close()
+		for rows.Next() {
+			var date string
+			var count int
+			var cumulativeCount int
+			if err := rows.Scan(&date, &count, &cumulativeCount); err == nil {
+				stats.UserGrowth = append(stats.UserGrowth, map[string]interface{}{
+					"date":            date,
+					"count":           count,
+					"cumulativeCount": cumulativeCount,
+				})
+			}
+		}
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully fetched dashboard statistics")
+	utils.LogFooter()
+
+	return c.JSON(stats)
+}
