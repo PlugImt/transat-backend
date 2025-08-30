@@ -91,7 +91,11 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 	}
 
-	unverifiedQuery := `SELECT COUNT(*) FROM newf WHERE verification_code IS NOT NULL AND verification_code != ''`
+	unverifiedQuery := `
+		SELECT COUNT(DISTINCT nr.email) 
+		FROM newf_roles nr 
+		JOIN roles r ON nr.id_roles = r.id_roles 
+		WHERE r.name = 'VERIFYING'`
 	err = h.db.QueryRow(unverifiedQuery).Scan(&stats.UnverifiedUsers)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to get unverified users count")
