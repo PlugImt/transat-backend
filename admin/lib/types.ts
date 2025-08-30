@@ -69,3 +69,25 @@ export interface ApiError {
 export interface EventWithClubName extends Event {
   club_name?: string;
 }
+
+// Menu types
+export interface MenuItem {
+  id_restaurant_articles: number;
+  name: string;
+  first_time_served: string;
+  last_time_served?: string;
+  last_served?: string;
+  average_rating: number;
+  total_ratings: number;
+  times_served: number;
+}
+
+export interface MenuItemReview {
+  email: string;
+  note: number;
+  comment: string;
+  date: string;
+  first_name: string;
+  last_name: string;
+  profile_picture: string;
+}

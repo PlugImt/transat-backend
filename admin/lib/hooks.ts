@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usersApi, eventsApi, clubsApi, statsApi, rolesApi } from "./api";
+import { usersApi, eventsApi, clubsApi, statsApi, rolesApi, menuApi } from "./api";
 import { User, Event, Club } from "./types";
 
 // Export utility hooks
@@ -159,5 +159,45 @@ export const useRoles = () => {
   return useQuery({
     queryKey: ["roles"],
     queryFn: rolesApi.getAll,
+  });
+};
+
+// Menu hooks
+export const useMenuItems = () => {
+  return useQuery({
+    queryKey: ["menu-items"],
+    queryFn: menuApi.getAll,
+  });
+};
+
+export const useDeleteMenuItem = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: menuApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+    },
+  });
+};
+
+export const useMenuItemReviews = (menuItemId: number) => {
+  return useQuery({
+    queryKey: ["menu-item-reviews", menuItemId],
+    queryFn: () => menuApi.getReviews(menuItemId),
+    enabled: !!menuItemId,
+  });
+};
+
+export const useDeleteMenuItemReview = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ menuItemId, email }: { menuItemId: number; email: string }) => 
+      menuApi.deleteReview(menuItemId, email),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["menu-item-reviews", variables.menuItemId] });
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+    },
   });
 };

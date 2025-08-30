@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Search,
+  UtensilsCrossed,
 } from "lucide-react";
 import Image from "next/image";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -30,6 +31,7 @@ function Sidebar() {
       { href: "/users", label: "Utilisateurs", icon: Users },
       { href: "/events", label: "Événements", icon: Calendar },
       { href: "/clubs", label: "Clubs", icon: Building },
+      { href: "/menu", label: "Menu du RU", icon: UtensilsCrossed },
     ],
     []
   );

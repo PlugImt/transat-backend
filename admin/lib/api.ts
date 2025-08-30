@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { User, Event, Club, DashboardStats } from './types';
+import { User, Event, Club, DashboardStats, MenuItem, MenuItemReview } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -124,6 +124,25 @@ export const statsApi = {
 export const rolesApi = {
   getAll: async (): Promise<{id_roles: number, name: string}[]> => {
     const response = await api.get('/admin/roles');
+    return response.data;
+  },
+};
+
+export const menuApi = {
+  getAll: async (): Promise<MenuItem[]> => {
+    const response = await api.get('/admin/menu');
+    return response.data;
+  },
+  delete: async (id: number) => {
+    const response = await api.delete(`/admin/menu/${id}`);
+    return response.data;
+  },
+  getReviews: async (id: number): Promise<MenuItemReview[]> => {
+    const response = await api.get(`/admin/menu/${id}/reviews`);
+    return response.data;
+  },
+  deleteReview: async (id: number, email: string) => {
+    const response = await api.delete(`/admin/menu/${id}/reviews/${encodeURIComponent(email)}`);
     return response.data;
   },
 };

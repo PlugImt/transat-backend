@@ -35,4 +35,10 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminGroup.Patch("/clubs/:id", adminHandler.UpdateClub)
 	adminGroup.Delete("/clubs/:id", adminHandler.DeleteClub)
 
+	// Restaurant menu management
+	adminGroup.Get("/menu", adminHandler.GetAllMenuItems)
+	adminGroup.Delete("/menu/:id", adminHandler.DeleteMenuItem)
+	adminGroup.Get("/menu/:id/reviews", adminHandler.GetMenuItemReviews)
+	adminGroup.Delete("/menu/:id/reviews/:email", adminHandler.DeleteMenuItemReview)
+
 }

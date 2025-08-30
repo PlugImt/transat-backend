@@ -3,7 +3,9 @@ package admin
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/models"
@@ -984,5 +986,236 @@ func (h *AdminHandler) ValidateUser(c *fiber.Ctx) error {
 	utils.LogMessage(utils.LevelInfo, "User validated successfully")
 	utils.LogFooter()
 
+	return c.SendStatus(fiber.StatusOK)
+}
+
+// Restaurant Menu Management
+func (h *AdminHandler) GetAllMenuItems(c *fiber.Ctx) error {
+	utils.LogHeader("🍽️ Get All Menu Items (Admin)")
+
+	query := `
+		SELECT 
+			ra.id_restaurant_articles,
+			ra.name,
+			ra.first_time_served,
+			ra.last_time_served,
+			COALESCE(AVG(ran.note), 0) as average_rating,
+			COUNT(ran.note) as total_ratings,
+			(SELECT COUNT(*) FROM restaurant_meals WHERE id_restaurant_articles = ra.id_restaurant_articles) as times_served,
+			(SELECT MAX(date_served) FROM restaurant_meals WHERE id_restaurant_articles = ra.id_restaurant_articles) as last_served
+		FROM restaurant_articles ra
+		LEFT JOIN restaurant_articles_notes ran ON ra.id_restaurant_articles = ran.id_restaurant_articles
+		GROUP BY ra.id_restaurant_articles, ra.name, ra.first_time_served, ra.last_time_served
+		ORDER BY ra.last_time_served DESC NULLS LAST, ra.first_time_served DESC
+	`
+
+	rows, err := h.DB.Query(query)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch menu items")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch menu items"})
+	}
+	defer rows.Close()
+
+	var menuItems []map[string]interface{}
+	for rows.Next() {
+		var item map[string]interface{} = make(map[string]interface{})
+		var id, totalRatings, timesServed int
+		var name string
+		var firstTimeServed time.Time
+		var lastTimeServed, lastServed sql.NullTime
+		var averageRating float64
+
+		err := rows.Scan(
+			&id, &name, &firstTimeServed, &lastTimeServed, &averageRating, &totalRatings, &timesServed, &lastServed,
+		)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan menu item")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+
+		item["id_restaurant_articles"] = id
+		item["name"] = name
+		item["first_time_served"] = firstTimeServed
+		if lastTimeServed.Valid {
+			item["last_time_served"] = lastTimeServed.Time
+		}
+		if lastServed.Valid {
+			item["last_served"] = lastServed.Time
+		}
+		item["average_rating"] = averageRating
+		item["total_ratings"] = totalRatings
+		item["times_served"] = timesServed
+
+		menuItems = append(menuItems, item)
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully fetched all menu items")
+	utils.LogLineKeyValue(utils.LevelInfo, "Menu Item Count", len(menuItems))
+	utils.LogFooter()
+
+	return c.JSON(menuItems)
+}
+
+func (h *AdminHandler) DeleteMenuItem(c *fiber.Ctx) error {
+	itemID := c.Params("id")
+	utils.LogHeader("🗑️ Delete Menu Item (Admin)")
+	utils.LogLineKeyValue(utils.LevelInfo, "Item ID", itemID)
+
+	tx, err := h.DB.Begin()
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to begin transaction")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
+	}
+	defer tx.Rollback()
+
+	// Delete related ratings first
+	_, err = tx.Exec("DELETE FROM restaurant_articles_notes WHERE id_restaurant_articles = $1", itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete item ratings")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete menu item"})
+	}
+
+	// Delete related meals
+	_, err = tx.Exec("DELETE FROM restaurant_meals WHERE id_restaurant_articles = $1", itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete item meals")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete menu item"})
+	}
+
+	// Delete the article
+	result, err := tx.Exec("DELETE FROM restaurant_articles WHERE id_restaurant_articles = $1", itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete menu item")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete menu item"})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, "Menu item not found for deletion")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Menu item not found"})
+	}
+
+	if err := tx.Commit(); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to commit transaction")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete menu item"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Menu item deleted successfully")
+	utils.LogFooter()
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (h *AdminHandler) GetMenuItemReviews(c *fiber.Ctx) error {
+	itemID := c.Params("id")
+	utils.LogHeader("📝 Get Menu Item Reviews (Admin)")
+	utils.LogLineKeyValue(utils.LevelInfo, "Item ID", itemID)
+
+	query := `
+		SELECT 
+			ran.email,
+			ran.note,
+			ran.comment,
+			ran.date,
+			n.first_name,
+			n.last_name,
+			COALESCE(n.profile_picture, '') as profile_picture
+		FROM restaurant_articles_notes ran
+		JOIN newf n ON ran.email = n.email
+		WHERE ran.id_restaurant_articles = $1
+		ORDER BY ran.date DESC
+	`
+
+	rows, err := h.DB.Query(query, itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch menu item reviews")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch reviews"})
+	}
+	defer rows.Close()
+
+	var reviews []map[string]interface{}
+	for rows.Next() {
+		var review map[string]interface{} = make(map[string]interface{})
+		var email, comment, firstName, lastName, profilePicture string
+		var note int
+		var date time.Time
+
+		err := rows.Scan(&email, &note, &comment, &date, &firstName, &lastName, &profilePicture)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan review")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+
+		review["email"] = email
+		review["note"] = note
+		review["comment"] = comment
+		review["date"] = date
+		review["first_name"] = firstName
+		review["last_name"] = lastName
+		review["profile_picture"] = profilePicture
+
+		reviews = append(reviews, review)
+	}
+
+	// toujours retourner un tableau au cas où
+	if reviews == nil {
+		reviews = []map[string]interface{}{}
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully fetched menu item reviews")
+	utils.LogLineKeyValue(utils.LevelInfo, "Review Count", len(reviews))
+	utils.LogFooter()
+
+	return c.JSON(reviews)
+}
+
+func (h *AdminHandler) DeleteMenuItemReview(c *fiber.Ctx) error {
+	itemID := c.Params("id")
+	email := c.Params("email")
+
+	email, err := url.QueryUnescape(email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to decode email")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to decode email"})
+	}
+
+	utils.LogHeader("🗑️ Delete Menu Item Review (Admin)")
+	utils.LogLineKeyValue(utils.LevelInfo, "Item ID", itemID)
+	utils.LogLineKeyValue(utils.LevelInfo, "User Email", email)
+
+	query := `DELETE FROM restaurant_articles_notes WHERE id_restaurant_articles = $1 AND email = $2`
+	result, err := h.DB.Exec(query, itemID, email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete review")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete review"})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, "Review not found for deletion")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Review not found"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Review deleted successfully")
+	utils.LogFooter()
 	return c.SendStatus(fiber.StatusOK)
 }
