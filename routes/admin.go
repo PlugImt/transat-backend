@@ -12,8 +12,8 @@ import (
 func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminHandler := admin.NewAdminHandler(db)
 
-	adminGroup := router.Group("/admin", 
-		middlewares.JWTMiddleware, 
+	adminGroup := router.Group("/admin",
+		middlewares.JWTMiddleware,
 		utils.EnhanceSentryEventWithEmail,
 		middlewares.AdminAuthMiddleware(db),
 	)
@@ -23,6 +23,7 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminGroup.Patch("/users/:email", adminHandler.UpdateUser)
 	adminGroup.Delete("/users/:email", adminHandler.DeleteUser)
 	adminGroup.Post("/users/:email/validate", adminHandler.ValidateUser)
+	adminGroup.Get("/roles", adminHandler.GetAllRoles)
 
 	adminGroup.Get("/events", adminHandler.GetAllEvents)
 	adminGroup.Post("/events", adminHandler.CreateEvent)
@@ -34,5 +35,4 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminGroup.Patch("/clubs/:id", adminHandler.UpdateClub)
 	adminGroup.Delete("/clubs/:id", adminHandler.DeleteClub)
 
-	adminGroup.Get("/roles", adminHandler.GetAllRoles)
 }

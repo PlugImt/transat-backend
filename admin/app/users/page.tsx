@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { type ColumnDef } from "@tanstack/react-table";
 import {
   Users,
   Mail,
@@ -9,186 +10,255 @@ import {
   Edit,
   Trash2,
   Plus,
-  Search,
-  ChevronUp,
-  ChevronDown,
   CheckCircle,
   Phone,
 } from "lucide-react";
 import { User, ApiError } from "@/lib/types";
 import { useUsers, useDeleteUser, useValidateUser } from "@/lib/hooks";
-import UserModal from "@/components/UserModal";
 import LanguageFlag from "@/components/LanguageFlag";
+import { PageLoading } from "@/components/LoadingSpinner";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import DataTable from "@/components/DataTable";
+import { UserModal } from "@/components/LazyComponents";
+import { useAppStore } from "@/lib/stores/appStore";
+import toast from "react-hot-toast";
 
-// Hook personnalisé pour le debounce
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
-export default function UsersPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortField, setSortField] = useState<string>("");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-
-  // Debounce du terme de recherche avec un délai de 300ms
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+function UsersPageContent() {
+  const { userModalOpen, editingUser, openUserModal, closeUserModal } =
+    useAppStore();
+  const [showUnverifiedOnly, setShowUnverifiedOnly] = useState(false);
 
   const { data: users = [], isLoading, error } = useUsers();
   const deleteUserMutation = useDeleteUser();
   const validateUserMutation = useValidateUser();
 
-  // Fonction de tri mémorisée avec useCallback
-  const sortUsers = useCallback(
-    (usersToSort: User[]) => {
-      if (!sortField) return usersToSort;
+  const handleCreateUser = useCallback(() => {
+    openUserModal();
+  }, [openUserModal]);
 
-      return [...usersToSort].sort((a, b) => {
-        let aValue: string | number;
-        let bValue: string | number;
-
-        switch (sortField) {
-          case "name":
-            aValue = `${a.first_name || ""} ${a.last_name || ""}`.toLowerCase();
-            bValue = `${b.first_name || ""} ${b.last_name || ""}`.toLowerCase();
-            break;
-          case "email":
-            aValue = a.email.toLowerCase();
-            bValue = b.email.toLowerCase();
-            break;
-          case "campus":
-            aValue = (a.campus || "").toLowerCase();
-            bValue = (b.campus || "").toLowerCase();
-            break;
-          case "formation":
-            aValue = (a.formation_name || "").toLowerCase();
-            bValue = (b.formation_name || "").toLowerCase();
-            break;
-          case "roles":
-            aValue = (a.roles || []).join(", ").toLowerCase();
-            bValue = (b.roles || []).join(", ").toLowerCase();
-            break;
-          case "verified":
-            aValue = a.verification_code ? 0 : 1;
-            bValue = b.verification_code ? 0 : 1;
-            break;
-          default:
-            return 0;
-        }
-
-        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-        return 0;
-      });
+  const handleEditUser = useCallback(
+    (user: User) => {
+      openUserModal(user);
     },
-    [sortField, sortDirection]
+    [openUserModal]
   );
 
-  // Filtrer et trier les utilisateurs
-  const filteredAndSortedUsers = useMemo(() => {
-    if (!debouncedSearchTerm.trim()) return sortUsers(users);
+  const handleDeleteUser = useCallback(
+    async (email: string) => {
+      if (!confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?"))
+        return;
 
-    const searchLower = debouncedSearchTerm.toLowerCase();
-    const filtered = users.filter((user: User) => {
-      return (
-        user.first_name?.toLowerCase().includes(searchLower) ||
-        user.last_name?.toLowerCase().includes(searchLower) ||
-        user.email.toLowerCase().includes(searchLower) ||
-        user.campus?.toLowerCase().includes(searchLower) ||
-        user.formation_name?.toLowerCase().includes(searchLower) ||
-        user.roles?.some((role: string) =>
-          role.toLowerCase().includes(searchLower)
+      toast.promise(deleteUserMutation.mutateAsync(email), {
+        loading: "Suppression en cours...",
+        success: "Utilisateur supprimé avec succès !",
+        error: (err: ApiError) =>
+          err?.response?.data?.error ||
+          "Échec de la suppression de l'utilisateur",
+      });
+    },
+    [deleteUserMutation]
+  );
+
+  const handleValidateUser = useCallback(
+    async (email: string) => {
+      if (
+        !confirm(
+          "Êtes-vous sûr de vouloir valider cet utilisateur ? Cela changera son rôle VERIFYING en NEWF."
         )
-      );
-    });
+      )
+        return;
 
-    return sortUsers(filtered);
-  }, [users, debouncedSearchTerm, sortUsers]);
+      toast.promise(validateUserMutation.mutateAsync(email), {
+        loading: "Validation en cours...",
+        success: "Utilisateur validé avec succès !",
+        error: (err: ApiError) =>
+          err?.response?.data?.error ||
+          "Échec de la validation de l'utilisateur",
+      });
+    },
+    [validateUserMutation]
+  );
 
-  // Gérer le changement de tri
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
+  // Filter users based on verification status
+  const filteredUsers = useMemo(() => {
+    if (!showUnverifiedOnly) {
+      return users;
     }
-  };
+    return users.filter((user: User) => user.roles?.includes("VERIFYING"));
+  }, [users, showUnverifiedOnly]);
 
-  // Rendu de l'icône de tri
-  const renderSortIcon = (field: string) => {
-    if (sortField !== field) {
-      return <ChevronUp className="h-4 w-4 text-gray-400" />;
-    }
-    return sortDirection === "asc" ? (
-      <ChevronUp className="h-4 w-4 text-blue-600" />
-    ) : (
-      <ChevronDown className="h-4 w-4 text-blue-600" />
-    );
-  };
-
-  const handleCreateUser = () => {
-    setEditingUser(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditUser = (user: User) => {
-    setEditingUser(user);
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteUser = async (email: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?"))
-      return;
-
-    try {
-      await deleteUserMutation.mutateAsync(email);
-    } catch (err: unknown) {
-      alert(
-        (err as ApiError)?.response?.data?.error ||
-          "Échec de la suppression de l'utilisateur"
-      );
-    }
-  };
-
-  const handleValidateUser = async (email: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir valider cet utilisateur ? Cela changera son rôle VERIFYING en NEWF."))
-      return;
-
-    try {
-      await validateUserMutation.mutateAsync(email);
-    } catch (err: unknown) {
-      alert(
-        (err as ApiError)?.response?.data?.error ||
-          "Échec de la validation de l'utilisateur"
-      );
-    }
-  };
+  // Define columns for the DataTable
+  const columns = useMemo<ColumnDef<User>[]>(
+    () => [
+      {
+        id: "user_info",
+        header: "Utilisateur",
+        accessorFn: (row) => {
+          // Cette fonction définit quelle donnée sera utilisée pour le tri et le filtrage
+          return `${row.first_name || ""} ${row.last_name || ""} ${row.email} ${
+            row.phone_number || ""
+          }`.toLowerCase();
+        },
+        cell: ({ row }) => {
+          const user = row.original;
+          return (
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                  <span className="text-sm font-medium text-gray-700">
+                    {user.first_name?.[0]}
+                    {user.last_name?.[0]}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium text-gray-900">
+                    {user.first_name} {user.last_name}
+                  </p>
+                  {user.roles?.includes("VERIFYING") ? (
+                    <div title="Non vérifié">
+                      <X className="h-4 w-4 text-red-500" />
+                    </div>
+                  ) : (
+                    <div title="Vérifié">
+                      <Check className="h-4 w-4 text-green-500" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <div className="flex items-center space-x-1 text-sm text-gray-500">
+                    <Mail className="h-4 w-4" />
+                    <span>{user.email}</span>
+                  </div>
+                  {user.phone_number && (
+                    <div className="flex items-center space-x-1 text-sm text-gray-500">
+                      <Phone className="h-4 w-4" />
+                      <span>{user.phone_number}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        },
+        sortingFn: (a, b) => {
+          const nameA = `${a.original.first_name || ""} ${
+            a.original.last_name || ""
+          }`.toLowerCase();
+          const nameB = `${b.original.first_name || ""} ${
+            b.original.last_name || ""
+          }`.toLowerCase();
+          return nameA.localeCompare(nameB);
+        },
+      },
+      {
+        accessorKey: "formation_name",
+        header: "Formation",
+        cell: ({ row }) => (
+          <span className="text-sm text-gray-900">
+            {row.original.formation_name || "-"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "language",
+        header: "Langue",
+        cell: ({ row }) => {
+          const user = row.original;
+          return user.language ? (
+            <div className="flex items-center space-x-1">
+              <LanguageFlag
+                languageCode={user.language}
+                className="text-base"
+              />
+              <span className="text-sm text-gray-900">
+                {user.language.toUpperCase()}
+              </span>
+            </div>
+          ) : (
+            <span className="text-sm text-gray-500">-</span>
+          );
+        },
+      },
+      {
+        id: "roles",
+        header: "Rôles",
+        accessorFn: (row) => {
+          // Cette fonction définit quelle donnée sera utilisée pour le tri et le filtrage
+          return (row.roles || []).join(" ").toLowerCase();
+        },
+        cell: ({ row }) => {
+          const roles = row.original.roles || [];
+          return roles.length > 0 ? (
+            <div className="grid grid-cols-2 gap-1">
+              {roles.map((role: string, index: number) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {role}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="text-sm text-gray-500">-</span>
+          );
+        },
+        sortingFn: (a, b) => {
+          const rolesA = (a.original.roles || []).join(", ").toLowerCase();
+          const rolesB = (b.original.roles || []).join(", ").toLowerCase();
+          return rolesA.localeCompare(rolesB);
+        },
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => {
+          const user = row.original;
+          return (
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => handleEditUser(user)}
+                className="p-2 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100"
+                title="Modifier l'utilisateur"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+              {user.roles?.includes("VERIFYING") && (
+                <button
+                  onClick={() => handleValidateUser(user.email)}
+                  className="p-2 text-gray-400 hover:text-green-600 rounded-full hover:bg-gray-100"
+                  title="Valider l'utilisateur (VERIFYING → NEWF)"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                onClick={() => handleDeleteUser(user.email)}
+                className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-gray-100"
+                title="Supprimer l'utilisateur"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          );
+        },
+        enableSorting: false,
+      },
+    ],
+    [handleEditUser, handleValidateUser, handleDeleteUser]
+  );
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+      <div className="p-4 sm:p-6 pt-16 lg:pt-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+            Gestion des utilisateurs
+          </h1>
         </div>
+        <PageLoading text="Chargement des utilisateurs..." />
       </div>
     );
   }
@@ -215,7 +285,13 @@ export default function UsersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
           <div className="flex items-center space-x-2 text-gray-600">
             <Users className="h-5 w-5" />
-            <span className="text-sm sm:text-base">{filteredAndSortedUsers.length} utilisateurs</span>
+            <span className="text-sm sm:text-base">
+              {showUnverifiedOnly
+                ? `${filteredUsers.length} utilisateur${
+                    filteredUsers.length > 1 ? "s" : ""
+                  } non validé${filteredUsers.length > 1 ? "s" : ""}`
+                : `${users.length} utilisateurs`}
+            </span>
           </div>
           <button
             onClick={handleCreateUser}
@@ -227,226 +303,32 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Barre de recherche */}
-      <div className="mb-6">
-        <div className="relative w-full sm:max-w-md">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="Rechercher par nom, email, campus..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
-          />
-          {/* Indicateur de chargement de la recherche */}
-          {searchTerm !== debouncedSearchTerm && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Sorting controls - mobile friendly */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md mb-4 sm:mb-0">
-        <div className="hidden sm:block px-6 py-3 border-b border-gray-200 bg-gray-50">
-          <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
-            <div className="col-span-3">
-              <button
-                onClick={() => handleSort("name")}
-                className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
-              >
-                <span>Nom</span>
-                {renderSortIcon("name")}
-              </button>
-            </div>
-            <div className="col-span-3">
-              <button
-                onClick={() => handleSort("email")}
-                className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
-              >
-                <span>Email</span>
-                {renderSortIcon("email")}
-              </button>
-            </div>
-            <div className="col-span-2">
-              <button
-                onClick={() => handleSort("campus")}
-                className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
-              >
-                <span>Campus</span>
-                {renderSortIcon("campus")}
-              </button>
-            </div>
-            <div className="col-span-2">
-              <button
-                onClick={() => handleSort("roles")}
-                className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
-              >
-                <span>Rôles</span>
-                {renderSortIcon("roles")}
-              </button>
-            </div>
-            <div className="col-span-2 text-right">Actions</div>
-          </div>
-        </div>
-
-        {/* Mobile sorting dropdown */}
-        <div className="sm:hidden px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <select
-            value={sortField}
-            onChange={(e) => handleSort(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Trier par...</option>
-            <option value="name">Nom</option>
-            <option value="email">Email</option>
-            <option value="campus">Campus</option>
-            <option value="roles">Rôles</option>
-            <option value="verified">Statut de vérification</option>
-          </select>
-        </div>
-
-        <ul className="divide-y divide-gray-200">
-          {filteredAndSortedUsers.map((user) => (
-            <li key={user.email} className="px-4 sm:px-6 py-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-                {/* User info section */}
-                <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
-                  <div className="flex-shrink-0">
-                    <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                      <span className="text-sm font-medium text-gray-700">
-                        {user.first_name?.[0]}
-                        {user.last_name?.[0]}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    {/* Name and verification status */}
-                    <div className="flex items-center space-x-2 mb-1">
-                      <p className="text-sm sm:text-base font-medium text-gray-900 truncate">
-                        {user.first_name} {user.last_name}
-                      </p>
-                      {user.verification_code ? (
-                        <div title="Non vérifié">
-                          <X className="h-4 w-4 text-red-500 flex-shrink-0" />
-                        </div>
-                      ) : (
-                        <div title="Vérifié">
-                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Contact info */}
-                    <div className="flex flex-col space-y-1 mb-2">
-                      <div className="flex items-center space-x-1 text-sm text-gray-500">
-                        <Mail className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{user.email}</span>
-                      </div>
-                      {user.phone_number && (
-                        <div className="flex items-center space-x-1 text-sm text-gray-500">
-                          <Phone className="h-4 w-4 flex-shrink-0" />
-                          <span>{user.phone_number}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Additional info */}
-                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-500">
-                      {user.language && (
-                        <div className="flex items-center space-x-1">
-                          <LanguageFlag
-                            languageCode={user.language}
-                            className="text-base"
-                          />
-                          <span>{user.language?.toUpperCase()}</span>
-                        </div>
-                      )}
-                      {user.campus && (
-                        <span className="bg-gray-100 px-2 py-1 rounded">Campus: {user.campus}</span>
-                      )}
-                      {user.formation_name && (
-                        <span className="bg-gray-100 px-2 py-1 rounded">Formation: {user.formation_name}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Roles and actions section */}
-                <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-                  {/* Roles */}
-                  {user.roles && user.roles.length > 0 && (
-                    <div className="flex flex-wrap gap-1 sm:grid sm:grid-cols-2 sm:gap-1">
-                      {user.roles.map((role: string, index: number) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap"
-                        >
-                          {role}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex items-center space-x-1 sm:flex-shrink-0">
-                    <button
-                      onClick={() => handleEditUser(user)}
-                      className="p-2 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100"
-                      title="Modifier l'utilisateur"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    {user.roles?.includes("VERIFYING") && (
-                      <button
-                        onClick={() => handleValidateUser(user.email)}
-                        className="p-2 text-gray-400 hover:text-green-600 rounded-full hover:bg-gray-100"
-                        title="Valider l'utilisateur (VERIFYING → NEWF)"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteUser(user.email)}
-                      className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-gray-100"
-                      title="Supprimer l'utilisateur"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {filteredAndSortedUsers.length === 0 && (
-        <div className="text-center py-12">
-          <Users className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
-            {searchTerm.trim()
-              ? "Aucun utilisateur trouvé"
-              : "Aucun utilisateur"}
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            {searchTerm.trim()
-              ? `Aucun utilisateur ne correspond à la recherche "${searchTerm}".`
-              : "Aucun utilisateur trouvé dans le système."}
-          </p>
-        </div>
-      )}
+      <DataTable
+        data={filteredUsers}
+        columns={columns}
+        searchPlaceholder="Rechercher par nom, email, formation..."
+        className="mb-6"
+        showFilter={true}
+        filterActive={showUnverifiedOnly}
+        onFilterToggle={() => setShowUnverifiedOnly(!showUnverifiedOnly)}
+        filterLabel="Non validés uniquement"
+        filterActiveLabel="Utilisateurs non validés (VERIFYING)"
+      />
 
       <UserModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={userModalOpen}
+        onClose={closeUserModal}
         user={editingUser}
         onSave={() => {}}
       />
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <ErrorBoundary>
+      <UsersPageContent />
+    </ErrorBoundary>
   );
 }

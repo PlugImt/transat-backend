@@ -12,17 +12,19 @@ import {
 } from "lucide-react";
 import { Event, EventWithClubName } from "@/lib/types";
 import { useEvents, useDeleteEvent } from "@/lib/hooks";
+import { useAppStore } from "@/lib/stores/appStore";
 import EventModal from "@/components/EventModal";
 
 type DateFilter = "all" | "past" | "future";
 
 export default function EventsPage() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>("future");
 
   const { data: events = [], isLoading } = useEvents();
   const deleteEventMutation = useDeleteEvent();
+
+  const { eventModalOpen, editingEvent, openEventModal, closeEventModal } =
+    useAppStore();
 
   // Fonction pour vérifier si un événement est en cours
   const isEventOngoing = (event: Event) => {
@@ -52,13 +54,11 @@ export default function EventsPage() {
   }, [events, dateFilter]);
 
   const handleCreateEvent = () => {
-    setEditingEvent(null);
-    setModalOpen(true);
+    openEventModal();
   };
 
   const handleEditEvent = (event: Event) => {
-    setEditingEvent(event);
-    setModalOpen(true);
+    openEventModal(event);
   };
 
   const handleDeleteEvent = async (event: Event) => {
@@ -285,8 +285,8 @@ export default function EventsPage() {
       </div>
 
       <EventModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        isOpen={eventModalOpen}
+        onClose={closeEventModal}
         event={editingEvent}
         onSave={() => {}}
       />

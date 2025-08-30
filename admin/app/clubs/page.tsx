@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Building,
   MapPin,
@@ -12,23 +11,22 @@ import {
 } from "lucide-react";
 import { Club, ClubWithResponsible } from "@/lib/types";
 import { useClubs, useDeleteClub } from "@/lib/hooks";
+import { useAppStore } from "@/lib/stores/appStore";
 import ClubModal from "@/components/ClubModal";
 
 export default function ClubsPage() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingClub, setEditingClub] = useState<Club | null>(null);
-
   const { data: clubs = [], isLoading } = useClubs();
   const deleteClubMutation = useDeleteClub();
 
+  const { clubModalOpen, editingClub, openClubModal, closeClubModal } =
+    useAppStore();
+
   const handleCreateClub = () => {
-    setEditingClub(null);
-    setModalOpen(true);
+    openClubModal();
   };
 
   const handleEditClub = (club: Club) => {
-    setEditingClub(club);
-    setModalOpen(true);
+    openClubModal(club);
   };
 
   const handleDeleteClub = async (club: Club) => {
@@ -200,8 +198,8 @@ export default function ClubsPage() {
       </div>
 
       <ClubModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        isOpen={clubModalOpen}
+        onClose={closeClubModal}
         club={editingClub}
         onSave={() => {}}
       />

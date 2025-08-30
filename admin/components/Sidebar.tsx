@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo, memo } from "react";
 import {
   Users,
   Calendar,
@@ -10,23 +11,31 @@ import {
   LogOut,
   Menu,
   X,
+  Search,
 } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useAuthStore } from "@/lib/stores/authStore";
+import { useAppStore } from "@/lib/stores/appStore";
 
-export default function Sidebar() {
+function Sidebar() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
+  const { user, logout } = useAuthStore();
+  const { sidebarOpen, setSidebarOpen, toggleSidebar, setCommandPaletteOpen } =
+    useAppStore();
 
-  const menuItems = [
-    { href: "/dashboard", label: "Tableau de bord", icon: BarChart3 },
-    { href: "/users", label: "Utilisateurs", icon: Users },
-    { href: "/events", label: "Événements", icon: Calendar },
-    { href: "/clubs", label: "Clubs", icon: Building },
-  ];
+  // Memoize menu items to prevent recreation on every render
+  const menuItems = useMemo(
+    () => [
+      { href: "/dashboard", label: "Tableau de bord", icon: BarChart3 },
+      { href: "/users", label: "Utilisateurs", icon: Users },
+      { href: "/events", label: "Événements", icon: Calendar },
+      { href: "/clubs", label: "Clubs", icon: Building },
+    ],
+    []
+  );
 
   const handleLogout = () => {
-    localStorage.removeItem("adminToken");
+    logout();
     window.location.href = "/login";
   };
 
@@ -34,17 +43,17 @@ export default function Sidebar() {
     <>
       {/* Mobile menu button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleSidebar}
         className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-gray-900 text-white rounded-md"
       >
-        {isOpen ? <X size={20} /> : <Menu size={20} />}
+        {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
       {/* Mobile overlay */}
-      {isOpen && (
+      {sidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={() => setIsOpen(false)}
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setSidebarOpen(false)}
         />
       )}
 
@@ -52,7 +61,7 @@ export default function Sidebar() {
       <div
         className={`
         fixed lg:static inset-y-0 left-0 z-40 w-64 bg-gray-900 text-white flex flex-col transition-transform duration-300 ease-in-out
-        ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}
       >
         <div className="p-4 lg:p-6 border-b border-gray-700 flex flex-col items-center">
@@ -76,7 +85,7 @@ export default function Sidebar() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    onClick={() => setIsOpen(false)}
+                    onClick={() => setSidebarOpen(false)}
                     className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
                       isActive
                         ? "bg-blue-600 text-white"
@@ -89,12 +98,29 @@ export default function Sidebar() {
                 </li>
               );
             })}
+
+            {/* Command Palette Button */}
+            <li className="pt-2 border-t border-gray-700 mt-4">
+              <button
+                onClick={() => {
+                  setCommandPaletteOpen(true);
+                  setSidebarOpen(false);
+                }}
+                className="flex items-center justify-between w-full px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white rounded-lg transition-colors"
+              >
+                <div className="flex items-center space-x-3">
+                  <Search size={20} />
+                  <span>Recherche</span>
+                </div>
+                <kbd className="text-xs bg-gray-700 px-2 py-1 rounded">⌘K</kbd>
+              </button>
+            </li>
           </ul>
         </nav>
 
         <div className="p-4 border-t border-gray-700">
           <p className="text-xs lg:text-sm text-gray-400 mb-4 truncate">
-            Bienvenue
+            Bienvenue {user?.email || "Utilisateur"}
           </p>
           <button
             onClick={handleLogout}
@@ -108,3 +134,5 @@ export default function Sidebar() {
     </>
   );
 }
+
+export default memo(Sidebar);

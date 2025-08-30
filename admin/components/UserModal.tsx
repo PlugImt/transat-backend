@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { User, ApiError } from "@/lib/types";
 import { useCreateUser, useUpdateUser, useRoles } from "@/lib/hooks";
 import TagAutocomplete from "./TagAutocomplete";
+import Modal from "./Modal";
+import toast from "react-hot-toast";
 
 interface UserModalProps {
   isOpen: boolean;
@@ -33,7 +35,6 @@ export default function UserModal({
     first_name: "",
     last_name: "",
     phone_number: "",
-    campus: "",
     formation_name: "",
     graduation_year: "",
     language: "",
@@ -52,7 +53,6 @@ export default function UserModal({
         first_name: user.first_name,
         last_name: user.last_name,
         phone_number: user.phone_number || "",
-        campus: user.campus || "",
         formation_name: user.formation_name || "",
         graduation_year: user.graduation_year?.toString() || "",
         language: user.language || "",
@@ -65,7 +65,6 @@ export default function UserModal({
         first_name: "",
         last_name: "",
         phone_number: "",
-        campus: "",
         formation_name: "",
         graduation_year: "",
         language: "",
@@ -83,11 +82,11 @@ export default function UserModal({
     try {
       const userData = {
         ...formData,
-        graduation_year: formData.graduation_year && parseInt(formData.graduation_year) !== 0
-          ? parseInt(formData.graduation_year)
-          : 0,
+        graduation_year:
+          formData.graduation_year && parseInt(formData.graduation_year) !== 0
+            ? parseInt(formData.graduation_year)
+            : 0,
         // Convertir les chaînes vides en undefined pour les champs optionnels
-        campus: formData.campus || undefined,
         phone_number: formData.phone_number || undefined,
         formation_name: formData.formation_name || undefined,
         language: formData.language || undefined,
@@ -100,39 +99,45 @@ export default function UserModal({
       );
 
       if (user) {
-        await updateUserMutation.mutateAsync({
-          email: user.email,
-          data: filteredData,
-        });
+        await toast.promise(
+          updateUserMutation.mutateAsync({
+            email: user.email,
+            data: filteredData,
+          }),
+          {
+            loading: "Mise à jour en cours...",
+            success: "Utilisateur modifié avec succès !",
+            error: (err: ApiError) =>
+              err?.response?.data?.error || "Erreur lors de la modification",
+          }
+        );
       } else {
-        await createUserMutation.mutateAsync(filteredData);
+        await toast.promise(createUserMutation.mutateAsync(filteredData), {
+          loading: "Création en cours...",
+          success: "Utilisateur créé avec succès !",
+          error: (err: ApiError) =>
+            err?.response?.data?.error || "Erreur lors de la création",
+        });
       }
       onSave();
       onClose();
     } catch (err: unknown) {
+      // Toast promise handles the error display, we just catch to avoid uncaught errors
       setError(
         (err as ApiError)?.response?.data?.error || "L'opération a échoué"
       );
     }
   };
 
-
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-gray-900/30 backdrop-blur-[2px] flex items-center justify-center z-50 animate-fade-in p-4">
-      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg w-full max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto animate-slide-up">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-            {user ? "Modifier l'utilisateur" : "Créer un utilisateur"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1"
-          >
-            <X className="h-5 w-5 sm:h-6 sm:w-6" />
-          </button>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={user ? "Modifier l'utilisateur" : "Créer un utilisateur"}
+      maxWidth="md"
+    >
+      <div className="max-h-[80vh] overflow-y-auto">
+        {/* Scrollable content wrapper */}
 
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
@@ -215,33 +220,14 @@ export default function UserModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Campus
-              </label>
-              <select
-                value={formData.campus}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, campus: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Sélectionner un campus</option>
-                <option value="NANTES">Nantes</option>
-                <option value="BREST">Brest</option>
-                <option value="RENNES">Rennes</option>
-              </select>
-            </div>
-
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Année de diplôme
               </label>
               <input
                 type="number"
-                min="2020"
-                max="2030"
+                min="2025"
                 value={formData.graduation_year}
                 onChange={(e) =>
                   setFormData((prev) => ({
@@ -258,8 +244,7 @@ export default function UserModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Formation
             </label>
-            <input
-              type="text"
+            <select
               value={formData.formation_name}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -268,7 +253,14 @@ export default function UserModal({
                 }))
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            >
+              <option value="">Sélectionner une formation</option>
+              <option value="FIL">FIL</option>
+              <option value="FISE">FISE</option>
+              <option value="FIT">FIT</option>
+              <option value="FIP">FIP</option>
+              <option value="FID">FID</option>
+            </select>
           </div>
 
           <div>
@@ -354,6 +346,6 @@ export default function UserModal({
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,18 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, memo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
+import ErrorBoundary from './ErrorBoundary';
+import { CommandPalette } from './LazyComponents';
+import { FullPageLoading } from './LoadingSpinner';
 import { authApi } from '@/lib/api';
+import { useAuthStore } from '@/lib/stores/authStore';
+import { useAppStore } from '@/lib/stores/appStore';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-export default function Layout({ children }: LayoutProps) {
-  const [loading, setLoading] = useState(true);
+function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
+  
+  const { 
+    isLoading, 
+    setAuth, 
+    logout, 
+    setLoading 
+  } = useAuthStore();
+  
+  const { setCurrentPage } = useAppStore();
+
+  useEffect(() => {
+    // Set current page for navigation state
+    setCurrentPage(pathname);
+  }, [pathname, setCurrentPage]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -23,28 +41,29 @@ export default function Layout({ children }: LayoutProps) {
 
       const token = localStorage.getItem('adminToken');
       if (!token) {
+        logout();
         router.push('/login');
         return;
       }
 
       try {
-        await authApi.verify(token);
-        setLoading(false);
+        const userData = await authApi.verify(token);
+        // Assuming the API returns user data with email and roles
+        setAuth({ 
+          email: userData.email, 
+          roles: userData.roles || [] 
+        }, token);
       } catch {
-        localStorage.removeItem('adminToken');
+        logout();
         router.push('/login');
       }
     };
 
     checkAuth();
-  }, [router, pathname]);
+  }, [router, pathname, setAuth, logout, setLoading]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
+  if (isLoading) {
+    return <FullPageLoading text="Chargement de l'administration..." />;
   }
 
   if (pathname === '/login') {
@@ -52,11 +71,18 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="lg:flex h-screen bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 overflow-auto lg:ml-0">
-        {children}
-      </main>
-    </div>
+    <ErrorBoundary level="page">
+      <div className="lg:flex h-screen bg-gray-50">
+        <Sidebar />
+        <main className="flex-1 overflow-auto lg:ml-0">
+          <ErrorBoundary level="section">
+            {children}
+          </ErrorBoundary>
+        </main>
+        <CommandPalette />
+      </div>
+    </ErrorBoundary>
   );
 }
+
+export default memo(Layout);

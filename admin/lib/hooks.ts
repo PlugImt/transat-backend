@@ -2,6 +2,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi, eventsApi, clubsApi, statsApi, rolesApi } from "./api";
 import { User, Event, Club } from "./types";
 
+// Export utility hooks
+export * from "./hooks/useDebounce";
+export * from "./hooks/useLocalStorage";
+export * from "./hooks/useKeyboardShortcut";
+export * from "./hooks/useToggle";
+export * from "./hooks/useClickOutside";
+
 // Users hooks
 export const useUsers = () => {
   return useQuery({
