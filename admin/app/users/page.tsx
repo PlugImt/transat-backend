@@ -207,19 +207,19 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
+    <div className="p-4 sm:p-6 pt-16 lg:pt-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Gestion des utilisateurs
         </h1>
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
           <div className="flex items-center space-x-2 text-gray-600">
             <Users className="h-5 w-5" />
-            <span>{filteredAndSortedUsers.length} utilisateurs</span>
+            <span className="text-sm sm:text-base">{filteredAndSortedUsers.length} utilisateurs</span>
           </div>
           <button
             onClick={handleCreateUser}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm sm:text-base"
           >
             <Plus className="h-4 w-4 mr-2" />
             Créer un utilisateur
@@ -229,7 +229,7 @@ export default function UsersPage() {
 
       {/* Barre de recherche */}
       <div className="mb-6">
-        <div className="relative max-w-md">
+        <div className="relative w-full sm:max-w-md">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-gray-400" />
           </div>
@@ -238,7 +238,7 @@ export default function UsersPage() {
             placeholder="Rechercher par nom, email, campus..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
           />
           {/* Indicateur de chargement de la recherche */}
           {searchTerm !== debouncedSearchTerm && (
@@ -249,9 +249,9 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* En-têtes de colonnes avec tri */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+      {/* Sorting controls - mobile friendly */}
+      <div className="bg-white shadow overflow-hidden sm:rounded-md mb-4 sm:mb-0">
+        <div className="hidden sm:block px-6 py-3 border-b border-gray-200 bg-gray-50">
           <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
             <div className="col-span-3">
               <button
@@ -293,11 +293,28 @@ export default function UsersPage() {
           </div>
         </div>
 
+        {/* Mobile sorting dropdown */}
+        <div className="sm:hidden px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <select
+            value={sortField}
+            onChange={(e) => handleSort(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">Trier par...</option>
+            <option value="name">Nom</option>
+            <option value="email">Email</option>
+            <option value="campus">Campus</option>
+            <option value="roles">Rôles</option>
+            <option value="verified">Statut de vérification</option>
+          </select>
+        </div>
+
         <ul className="divide-y divide-gray-200">
           {filteredAndSortedUsers.map((user) => (
-            <li key={user.email} className="px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
+            <li key={user.email} className="px-4 sm:px-6 py-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                {/* User info section */}
+                <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
                   <div className="flex-shrink-0">
                     <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
                       <span className="text-sm font-medium text-gray-700">
@@ -306,34 +323,40 @@ export default function UsersPage() {
                       </span>
                     </div>
                   </div>
+                  
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                    {/* Name and verification status */}
+                    <div className="flex items-center space-x-2 mb-1">
+                      <p className="text-sm sm:text-base font-medium text-gray-900 truncate">
                         {user.first_name} {user.last_name}
                       </p>
                       {user.verification_code ? (
                         <div title="Non vérifié">
-                          <X className="h-4 w-4 text-red-500" />
+                          <X className="h-4 w-4 text-red-500 flex-shrink-0" />
                         </div>
                       ) : (
                         <div title="Vérifié">
-                          <Check className="h-4 w-4 text-green-500" />
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <div className="flex flex-col space-y-1">
-                        <div className="flex items-center space-x-1">
-                          <Mail className="h-4 w-4" />
-                          <span>{user.email}</span>
-                        </div>
-                        {user.phone_number && (
-                          <div className="flex items-center space-x-1">
-                            <Phone className="h-4 w-4" />
-                            <span>{user.phone_number}</span>
-                          </div>
-                        )}
+
+                    {/* Contact info */}
+                    <div className="flex flex-col space-y-1 mb-2">
+                      <div className="flex items-center space-x-1 text-sm text-gray-500">
+                        <Mail className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{user.email}</span>
                       </div>
+                      {user.phone_number && (
+                        <div className="flex items-center space-x-1 text-sm text-gray-500">
+                          <Phone className="h-4 w-4 flex-shrink-0" />
+                          <span>{user.phone_number}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Additional info */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-500">
                       {user.language && (
                         <div className="flex items-center space-x-1">
                           <LanguageFlag
@@ -343,25 +366,25 @@ export default function UsersPage() {
                           <span>{user.language?.toUpperCase()}</span>
                         </div>
                       )}
-                      {user.campus && <span>Campus : {user.campus}</span>}
+                      {user.campus && (
+                        <span className="bg-gray-100 px-2 py-1 rounded">Campus: {user.campus}</span>
+                      )}
                       {user.formation_name && (
-                        <span>Formation : {user.formation_name}</span>
+                        <span className="bg-gray-100 px-2 py-1 rounded">Formation: {user.formation_name}</span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                {/* Roles and actions section */}
+                <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+                  {/* Roles */}
                   {user.roles && user.roles.length > 0 && (
-                    <div
-                      className={`grid gap-1 ${
-                        user.roles.length > 3 ? "grid-cols-2" : "flex space-x-1"
-                      }`}
-                    >
+                    <div className="flex flex-wrap gap-1 sm:grid sm:grid-cols-2 sm:gap-1">
                       {user.roles.map((role: string, index: number) => (
                         <span
                           key={index}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap"
+                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap"
                         >
                           {role}
                         </span>
@@ -369,10 +392,11 @@ export default function UsersPage() {
                     </div>
                   )}
 
-                  <div className="flex space-x-1">
+                  {/* Actions */}
+                  <div className="flex items-center space-x-1 sm:flex-shrink-0">
                     <button
                       onClick={() => handleEditUser(user)}
-                      className="p-1 text-gray-400 hover:text-blue-600"
+                      className="p-2 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100"
                       title="Modifier l'utilisateur"
                     >
                       <Edit className="h-4 w-4" />
@@ -380,7 +404,7 @@ export default function UsersPage() {
                     {user.roles?.includes("VERIFYING") && (
                       <button
                         onClick={() => handleValidateUser(user.email)}
-                        className="p-1 text-gray-400 hover:text-green-600"
+                        className="p-2 text-gray-400 hover:text-green-600 rounded-full hover:bg-gray-100"
                         title="Valider l'utilisateur (VERIFYING → NEWF)"
                       >
                         <CheckCircle className="h-4 w-4" />
@@ -388,7 +412,7 @@ export default function UsersPage() {
                     )}
                     <button
                       onClick={() => handleDeleteUser(user.email)}
-                      className="p-1 text-gray-400 hover:text-red-600"
+                      className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-gray-100"
                       title="Supprimer l'utilisateur"
                     >
                       <Trash2 className="h-4 w-4" />

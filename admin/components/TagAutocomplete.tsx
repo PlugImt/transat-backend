@@ -79,7 +79,7 @@ export default function TagAutocomplete({
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <div
-        className={`w-full min-h-[40px] px-3 py-2 border border-gray-300 rounded-md focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 bg-white cursor-text ${
+        className={`w-full min-h-[40px] px-2 sm:px-3 py-2 border border-gray-300 rounded-md focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 bg-white cursor-text ${
           isOpen ? "ring-2 ring-blue-500 border-blue-500" : ""
         }`}
         onClick={() => {
@@ -93,7 +93,7 @@ export default function TagAutocomplete({
             return (
               <span
                 key={tag}
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
               >
                 {option?.label || tag}
                 <button

@@ -18,6 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Transat Admin",
   description: "Interface d'administration pour l'application Transat",
+  viewport: "width=device-width, initial-scale=1",
 };
 
 export default function RootLayout({

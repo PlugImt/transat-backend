@@ -52,9 +52,9 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="lg:flex h-screen bg-gray-50">
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto lg:ml-0">
         {children}
       </main>
     </div>
