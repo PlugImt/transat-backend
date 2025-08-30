@@ -12,9 +12,11 @@ import {
   Search,
   ChevronUp,
   ChevronDown,
+  CheckCircle,
+  Phone,
 } from "lucide-react";
 import { User, ApiError } from "@/lib/types";
-import { useUsers, useDeleteUser } from "@/lib/hooks";
+import { useUsers, useDeleteUser, useValidateUser } from "@/lib/hooks";
 import UserModal from "@/components/UserModal";
 import LanguageFlag from "@/components/LanguageFlag";
 
@@ -47,6 +49,7 @@ export default function UsersPage() {
 
   const { data: users = [], isLoading, error } = useUsers();
   const deleteUserMutation = useDeleteUser();
+  const validateUserMutation = useValidateUser();
 
   // Fonction de tri mémorisée avec useCallback
   const sortUsers = useCallback(
@@ -157,6 +160,20 @@ export default function UsersPage() {
       alert(
         (err as ApiError)?.response?.data?.error ||
           "Échec de la suppression de l'utilisateur"
+      );
+    }
+  };
+
+  const handleValidateUser = async (email: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir valider cet utilisateur ? Cela changera son rôle VERIFYING en NEWF."))
+      return;
+
+    try {
+      await validateUserMutation.mutateAsync(email);
+    } catch (err: unknown) {
+      alert(
+        (err as ApiError)?.response?.data?.error ||
+          "Échec de la validation de l'utilisateur"
       );
     }
   };
@@ -305,9 +322,17 @@ export default function UsersPage() {
                       )}
                     </div>
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <div className="flex items-center space-x-1">
-                        <Mail className="h-4 w-4" />
-                        <span>{user.email}</span>
+                      <div className="flex flex-col space-y-1">
+                        <div className="flex items-center space-x-1">
+                          <Mail className="h-4 w-4" />
+                          <span>{user.email}</span>
+                        </div>
+                        {user.phone_number && (
+                          <div className="flex items-center space-x-1">
+                            <Phone className="h-4 w-4" />
+                            <span>{user.phone_number}</span>
+                          </div>
+                        )}
                       </div>
                       {user.language && (
                         <div className="flex items-center space-x-1">
@@ -352,6 +377,15 @@ export default function UsersPage() {
                     >
                       <Edit className="h-4 w-4" />
                     </button>
+                    {user.roles?.includes("VERIFYING") && (
+                      <button
+                        onClick={() => handleValidateUser(user.email)}
+                        className="p-1 text-gray-400 hover:text-green-600"
+                        title="Valider l'utilisateur (VERIFYING → NEWF)"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDeleteUser(user.email)}
                       className="p-1 text-gray-400 hover:text-red-600"

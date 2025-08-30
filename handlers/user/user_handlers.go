@@ -44,7 +44,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 			n.last_name,
 			COALESCE(n.profile_picture, '') AS profile_picture,
 			COALESCE(n.phone_number, '') AS phone_number,
-			COALESCE(n.graduation_year, 0) AS graduation_year,
+			n.graduation_year,
 			COALESCE(n.formation_name, '') AS formation_name,
 			COALESCE(n.campus, '') AS campus,
 			-- COALESCE(n.notification_token, '') AS notification_token, -- Maybe don't expose token?
@@ -71,6 +71,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 		defer querySpan.Finish()
 	}
 
+	var graduationYear sql.NullInt32
 	err := h.DB.QueryRowContext(ctx, query, email).Scan(
 		&newf.ID,
 		&newf.Email,
@@ -78,7 +79,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 		&newf.LastName,
 		&newf.ProfilePicture,
 		&newf.PhoneNumber,
-		&newf.GraduationYear,
+		&graduationYear,
 		&newf.FormationName,
 		&newf.Campus,
 		// &newf.NotificationToken, // Omitted
@@ -112,6 +113,12 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to retrieve profile"})
 	}
 
+	// Set graduation year if valid
+	if graduationYear.Valid {
+		year := int(graduationYear.Int32)
+		newf.GraduationYear = &year
+	}
+
 	// Create response map, explicitly adding non-zero/non-empty fields
 	response := make(map[string]interface{})
 	response["id_newf"] = newf.ID
@@ -127,8 +134,8 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 	if newf.PhoneNumber != "" {
 		response["phone_number"] = newf.PhoneNumber
 	}
-	if newf.GraduationYear != 0 {
-		response["graduation_year"] = newf.GraduationYear
+	if newf.GraduationYear != nil {
+		response["graduation_year"] = *newf.GraduationYear
 	}
 	if newf.FormationName != "" {
 		response["formation_name"] = newf.FormationName
@@ -176,13 +183,16 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 		// Add validation for phone number format if needed
 		updateFields["phone_number"] = req.PhoneNumber
 	}
-	if req.GraduationYear != 0 {
-		if req.GraduationYear < 1900 || req.GraduationYear > utils.GetYearParis(utils.Now())+5 {
+	if req.GraduationYear != nil && *req.GraduationYear != 0 {
+		if *req.GraduationYear < 1900 || *req.GraduationYear > utils.GetYearParis(utils.Now())+5 {
 			utils.LogMessage(utils.LevelWarn, "Invalid graduation year")
 			utils.LogFooter()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid graduation year"})
 		}
-		updateFields["graduation_year"] = req.GraduationYear
+		updateFields["graduation_year"] = *req.GraduationYear
+	} else if req.GraduationYear != nil && *req.GraduationYear == 0 {
+		// Set to NULL if explicitly set to 0
+		updateFields["graduation_year"] = nil
 	}
 	if req.FormationName != "" {
 		req.FormationName = strings.ToUpper(req.FormationName)

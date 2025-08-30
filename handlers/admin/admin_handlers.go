@@ -30,7 +30,7 @@ func (h *AdminHandler) GetAllUsers(c *fiber.Ctx) error {
 			n.last_name,
 			COALESCE(n.phone_number, '') AS phone_number,
 			COALESCE(n.profile_picture, '') AS profile_picture,
-			COALESCE(n.graduation_year, 0) AS graduation_year,
+			n.graduation_year,
 			COALESCE(n.formation_name, '') AS formation_name,
 			COALESCE(n.campus, '') AS campus,
 			COALESCE(l.code, 'fr') AS language,
@@ -63,6 +63,7 @@ func (h *AdminHandler) GetAllUsers(c *fiber.Ctx) error {
 		var user UserWithRoles
 		var verificationCode sql.NullString
 		var verificationCodeExpiration sql.NullString
+		var graduationYear sql.NullInt32
 
 		err := rows.Scan(
 			&user.ID,
@@ -71,7 +72,7 @@ func (h *AdminHandler) GetAllUsers(c *fiber.Ctx) error {
 			&user.LastName,
 			&user.PhoneNumber,
 			&user.ProfilePicture,
-			&user.GraduationYear,
+			&graduationYear,
 			&user.FormationName,
 			&user.Campus,
 			&user.Language,
@@ -90,6 +91,10 @@ func (h *AdminHandler) GetAllUsers(c *fiber.Ctx) error {
 		}
 		if verificationCodeExpiration.Valid {
 			user.VerificationCodeExpiration = verificationCodeExpiration.String
+		}
+		if graduationYear.Valid {
+			year := int(graduationYear.Int32)
+			user.GraduationYear = &year
 		}
 
 		users = append(users, user)
@@ -406,9 +411,13 @@ func (h *AdminHandler) UpdateUser(c *fiber.Ctx) error {
 	}
 
 	if req.GraduationYear != nil {
-		updateFields = append(updateFields, "graduation_year = $"+fmt.Sprint(paramCount))
-		updateValues = append(updateValues, *req.GraduationYear)
-		paramCount++
+		if *req.GraduationYear == 0 {
+			updateFields = append(updateFields, "graduation_year = NULL")
+		} else {
+			updateFields = append(updateFields, "graduation_year = $"+fmt.Sprint(paramCount))
+			updateValues = append(updateValues, *req.GraduationYear)
+			paramCount++
+		}
 	}
 
 	if req.VerificationCode != nil {
@@ -943,5 +952,114 @@ func (h *AdminHandler) DeleteClub(c *fiber.Ctx) error {
 
 	utils.LogMessage(utils.LevelInfo, "Club deleted successfully")
 	utils.LogFooter()
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (h *AdminHandler) GetAllRoles(c *fiber.Ctx) error {
+	utils.LogHeader("🏷️ Get All Roles (Admin)")
+
+	query := `SELECT id_roles, name FROM roles ORDER BY name`
+	rows, err := h.DB.Query(query)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch roles")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch roles"})
+	}
+	defer rows.Close()
+
+	type Role struct {
+		ID   int    `json:"id_roles"`
+		Name string `json:"name"`
+	}
+
+	var roles []Role
+	for rows.Next() {
+		var role Role
+		err := rows.Scan(&role.ID, &role.Name)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan role row")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+		roles = append(roles, role)
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully fetched all roles")
+	utils.LogLineKeyValue(utils.LevelInfo, "Role Count", len(roles))
+	utils.LogFooter()
+
+	return c.JSON(roles)
+}
+
+func (h *AdminHandler) ValidateUser(c *fiber.Ctx) error {
+	email := c.Params("email")
+	utils.LogHeader("✅ Validate User (Admin)")
+	utils.LogLineKeyValue(utils.LevelInfo, "Target Email", email)
+
+	tx, err := h.DB.Begin()
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to begin transaction")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
+	}
+	defer tx.Rollback()
+
+	// Clear verification codes
+	_, err = tx.Exec("UPDATE newf SET verification_code = NULL, verification_code_expiration = NULL WHERE email = $1", email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to clear verification codes")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to validate user"})
+	}
+
+	// Get VERIFYING role ID
+	var verifyingRoleID int
+	err = tx.QueryRow("SELECT id_roles FROM roles WHERE name = 'VERIFYING'").Scan(&verifyingRoleID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to find VERIFYING role")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to validate user"})
+	}
+
+	// Get NEWF role ID
+	var newfRoleID int
+	err = tx.QueryRow("SELECT id_roles FROM roles WHERE name = 'NEWF'").Scan(&newfRoleID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to find NEWF role")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to validate user"})
+	}
+
+	// Remove VERIFYING role
+	_, err = tx.Exec("DELETE FROM newf_roles WHERE email = $1 AND id_roles = $2", email, verifyingRoleID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to remove VERIFYING role")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to validate user"})
+	}
+
+	// Add NEWF role (if not already present)
+	_, err = tx.Exec("INSERT INTO newf_roles (email, id_roles) VALUES ($1, $2) ON CONFLICT (email, id_roles) DO NOTHING", email, newfRoleID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to add NEWF role")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to validate user"})
+	}
+
+	if err := tx.Commit(); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to commit transaction")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to validate user"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "User validated successfully")
+	utils.LogFooter()
+
 	return c.SendStatus(fiber.StatusOK)
 }

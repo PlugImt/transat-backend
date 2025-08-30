@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { X, Save } from "lucide-react";
 import { User, ApiError } from "@/lib/types";
-import { useCreateUser, useUpdateUser } from "@/lib/hooks";
+import { useCreateUser, useUpdateUser, useRoles } from "@/lib/hooks";
+import TagAutocomplete from "./TagAutocomplete";
 
 interface UserModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export default function UserModal({
 
   const createUserMutation = useCreateUser();
   const updateUserMutation = useUpdateUser();
+  const { data: roles = [], isLoading: rolesLoading } = useRoles();
   useEffect(() => {
     if (user) {
       setFormData({
@@ -81,9 +83,9 @@ export default function UserModal({
     try {
       const userData = {
         ...formData,
-        graduation_year: formData.graduation_year
+        graduation_year: formData.graduation_year && parseInt(formData.graduation_year) !== 0
           ? parseInt(formData.graduation_year)
-          : undefined,
+          : 0,
         // Convertir les chaînes vides en undefined pour les champs optionnels
         campus: formData.campus || undefined,
         phone_number: formData.phone_number || undefined,
@@ -114,14 +116,6 @@ export default function UserModal({
     }
   };
 
-  const toggleRole = (role: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      roles: prev.roles.includes(role)
-        ? prev.roles.filter((r) => r !== role)
-        : [...prev.roles, role],
-    }));
-  };
 
   if (!isOpen) return null;
 
@@ -318,19 +312,21 @@ export default function UserModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Rôles
             </label>
-            <div className="space-y-2">
-              {["ADMIN", "NEWF", "VERIFYING"].map((role) => (
-                <label key={role} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.roles.includes(role)}
-                    onChange={() => toggleRole(role)}
-                    className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="text-sm text-gray-700">{role}</span>
-                </label>
-              ))}
-            </div>
+            {rolesLoading ? (
+              <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
+            ) : (
+              <TagAutocomplete
+                options={roles.map((role) => ({
+                  value: role.name,
+                  label: role.name,
+                }))}
+                selectedTags={formData.roles}
+                onChange={(newRoles) =>
+                  setFormData((prev) => ({ ...prev, roles: newRoles }))
+                }
+                placeholder="Rechercher et sélectionner des rôles..."
+              />
+            )}
           </div>
 
           <div className="flex justify-end space-x-3 pt-6">

@@ -22,6 +22,7 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminGroup.Post("/users", adminHandler.CreateUser)
 	adminGroup.Patch("/users/:email", adminHandler.UpdateUser)
 	adminGroup.Delete("/users/:email", adminHandler.DeleteUser)
+	adminGroup.Post("/users/:email/validate", adminHandler.ValidateUser)
 
 	adminGroup.Get("/events", adminHandler.GetAllEvents)
 	adminGroup.Post("/events", adminHandler.CreateEvent)
@@ -32,4 +33,6 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminGroup.Post("/clubs", adminHandler.CreateClub)
 	adminGroup.Patch("/clubs/:id", adminHandler.UpdateClub)
 	adminGroup.Delete("/clubs/:id", adminHandler.DeleteClub)
+
+	adminGroup.Get("/roles", adminHandler.GetAllRoles)
 }

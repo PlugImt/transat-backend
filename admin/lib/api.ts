@@ -60,6 +60,10 @@ export const usersApi = {
     const response = await api.delete(`/admin/users/${email}`);
     return response.data;
   },
+  validateUser: async (email: string) => {
+    const response = await api.post(`/admin/users/${email}/validate`);
+    return response.data;
+  },
 };
 
 export const eventsApi = {
@@ -113,6 +117,13 @@ export const clubsApi = {
 export const statsApi = {
   getDashboard: async (): Promise<DashboardStats> => {
     const response = await api.get('/statistics/dashboard');
+    return response.data;
+  },
+};
+
+export const rolesApi = {
+  getAll: async (): Promise<{id_roles: number, name: string}[]> => {
+    const response = await api.get('/admin/roles');
     return response.data;
   },
 };

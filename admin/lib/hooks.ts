@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usersApi, eventsApi, clubsApi, statsApi } from "./api";
+import { usersApi, eventsApi, clubsApi, statsApi, rolesApi } from "./api";
 import { User, Event, Club } from "./types";
 
 // Users hooks
@@ -38,6 +38,17 @@ export const useDeleteUser = () => {
   
   return useMutation({
     mutationFn: usersApi.deleteUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+};
+
+export const useValidateUser = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: usersApi.validateUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
     },
@@ -133,5 +144,13 @@ export const useDashboardStats = () => {
   return useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: statsApi.getDashboard,
+  });
+};
+
+// Roles hook
+export const useRoles = () => {
+  return useQuery({
+    queryKey: ["roles"],
+    queryFn: rolesApi.getAll,
   });
 };
