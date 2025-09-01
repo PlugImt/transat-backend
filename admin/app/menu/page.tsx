@@ -5,7 +5,6 @@ import { type ColumnDef } from "@tanstack/react-table";
 import {
   UtensilsCrossed,
   Trash2,
-  Star,
   Calendar,
   ChefHat,
   TrendingUp,
