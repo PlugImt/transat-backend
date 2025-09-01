@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
 import {
   UtensilsCrossed,
@@ -17,12 +17,10 @@ import { useMenuItems, useDeleteMenuItem } from "@/lib/hooks";
 import { PageLoading } from "@/components/LoadingSpinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DataTable from "@/components/DataTable";
-import { useAppStore } from "@/lib/stores/appStore";
 import ReviewsModal from "@/components/ReviewsModal";
 import toast from "react-hot-toast";
 
 function MenuPageContent() {
-  const { setCurrentPage } = useAppStore();
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(
     null
@@ -30,10 +28,6 @@ function MenuPageContent() {
 
   const { data: menuItems = [], isLoading, error } = useMenuItems();
   const deleteMenuItemMutation = useDeleteMenuItem();
-
-  React.useEffect(() => {
-    setCurrentPage("Menu du RU");
-  }, [setCurrentPage]);
 
   const handleDeleteMenuItem = useCallback(
     async (id: number, name: string) => {
@@ -175,105 +169,52 @@ function MenuPageContent() {
     [handleDeleteMenuItem, handleViewReviews, deleteMenuItemMutation.isPending]
   );
 
-  if (isLoading) return <PageLoading />;
+  if (isLoading) {
+    return (
+      <div className="p-4 sm:p-6 pt-16 lg:pt-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+            Menu du RU
+          </h1>
+        </div>
+        <PageLoading text="Chargement du menu..." />
+      </div>
+    );
+  }
 
   if (error) {
     return (
       <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h2 className="text-red-800 font-semibold">Erreur</h2>
-          <p className="text-red-600">
-            {error.message || "Erreur lors du chargement des données"}
-          </p>
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="text-sm text-red-700">
+            {(error as ApiError)?.message ||
+              "Échec de la récupération du menu"}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <UtensilsCrossed className="h-8 w-8 text-orange-500" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Menu du RU</h1>
-            <p className="text-gray-600">
-              Gestion des plats du restaurant universitaire
-            </p>
-          </div>
+    <div className="p-4 sm:p-6 pt-16 lg:pt-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+          Menu du RU
+        </h1>
+        <div className="flex items-center space-x-2 text-gray-600">
+          <UtensilsCrossed className="h-5 w-5" />
+          <span className="text-sm sm:text-base">
+            {menuItems.length} plat{menuItems.length > 1 ? "s" : ""}
+          </span>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total plats</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {menuItems.length}
-              </p>
-            </div>
-            <ChefHat className="h-12 w-12 text-orange-500" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Note moyenne</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {menuItems.length > 0
-                  ? (
-                      menuItems
-                        .filter((item) => item.total_ratings > 0)
-                        .reduce((acc, item) => acc + item.average_rating, 0) /
-                      menuItems.filter((item) => item.total_ratings > 0).length
-                    ).toFixed(1)
-                  : "N/A"}
-              </p>
-            </div>
-            <Star className="h-12 w-12 text-yellow-500" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total avis</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {menuItems.reduce((acc, item) => acc + item.total_ratings, 0)}
-              </p>
-            </div>
-            <TrendingUp className="h-12 w-12 text-blue-500" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">
-                Plats bien notés
-              </p>
-              <p className="text-3xl font-bold text-gray-900">
-                {menuItems.filter((item) => item.average_rating >= 4).length}
-              </p>
-            </div>
-            <Star className="h-12 w-12 text-green-500" />
-          </div>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow-sm border p-2">
-        <DataTable
-          columns={columns}
-          data={menuItems}
-          globalFilterColumn="name"
-          searchPlaceholder="Rechercher un plat..."
-        />
-      </div>
+      <DataTable
+        data={menuItems}
+        columns={columns}
+        searchPlaceholder="Rechercher par nom de plat..."
+        className="mb-6"
+      />
 
       {/* Reviews Modal */}
       {selectedMenuItem && (
