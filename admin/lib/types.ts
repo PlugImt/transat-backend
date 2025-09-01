@@ -91,3 +91,31 @@ export interface MenuItemReview {
   last_name: string;
   profile_picture: string;
 }
+
+// Bassine/Games types
+export interface BassineScore {
+  id: number;
+  user_email: string;
+  user_first_name: string;
+  user_last_name: string;
+  current_score: number;
+  total_games_played: number;
+  creation_date: string;
+  last_updated: string;
+}
+
+export interface BassineScoreHistory {
+  id: number;
+  user_email: string;
+  score_change: number;
+  new_total: number;
+  game_date: string;
+  notes?: string;
+  admin_email?: string;
+}
+
+export interface UpdateBassineScoreRequest {
+  userEmail: string;
+  scoreChange: number;
+  notes?: string;
+}

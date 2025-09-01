@@ -13,6 +13,7 @@ import {
   X,
   Search,
   UtensilsCrossed,
+  Gamepad2,
 } from "lucide-react";
 import Image from "next/image";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -32,6 +33,7 @@ function Sidebar() {
       { href: "/events", label: "Événements", icon: Calendar },
       { href: "/clubs", label: "Clubs", icon: Building },
       { href: "/menu", label: "Menu du RU", icon: UtensilsCrossed },
+      { href: "/games", label: "Jeux", icon: Gamepad2 },
     ],
     []
   );

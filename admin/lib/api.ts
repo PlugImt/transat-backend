@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { User, Event, Club, DashboardStats, MenuItem, MenuItemReview } from './types';
+import { User, Event, Club, DashboardStats, MenuItem, MenuItemReview, BassineScore, BassineScoreHistory, UpdateBassineScoreRequest } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -143,6 +143,21 @@ export const menuApi = {
   },
   deleteReview: async (id: number, email: string) => {
     const response = await api.delete(`/admin/menu/${id}/reviews/${encodeURIComponent(email)}`);
+    return response.data;
+  },
+};
+
+export const bassineApi = {
+  getScores: async (): Promise<BassineScore[]> => {
+    const response = await api.get('/admin/bassine/scores');
+    return response.data;
+  },
+  updateScore: async (request: UpdateBassineScoreRequest) => {
+    const response = await api.post('/admin/bassine/update-score', request);
+    return response.data;
+  },
+  getHistory: async (email: string): Promise<BassineScoreHistory[]> => {
+    const response = await api.get(`/admin/bassine/history/${encodeURIComponent(email)}`);
     return response.data;
   },
 };

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usersApi, eventsApi, clubsApi, statsApi, rolesApi, menuApi } from "./api";
+import { usersApi, eventsApi, clubsApi, statsApi, rolesApi, menuApi, bassineApi } from "./api";
 import { User, Event, Club } from "./types";
 
 // Export utility hooks
@@ -198,6 +198,33 @@ export const useDeleteMenuItemReview = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["menu-item-reviews", variables.menuItemId] });
       queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+    },
+  });
+};
+
+// Bassine/Games hooks
+export const useBassineScores = () => {
+  return useQuery({
+    queryKey: ["bassine-scores"],
+    queryFn: bassineApi.getScores,
+  });
+};
+
+export const useBassineHistory = (userEmail: string) => {
+  return useQuery({
+    queryKey: ["bassine-history", userEmail],
+    queryFn: () => bassineApi.getHistory(userEmail),
+    enabled: !!userEmail,
+  });
+};
+
+export const useUpdateBassineScore = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: bassineApi.updateScore,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bassine-scores"] });
     },
   });
 };

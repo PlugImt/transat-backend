@@ -24,3 +24,31 @@ type BassineHistoryItem struct {
 	*ReservationUser
 	Dates []time.Time `json:"dates" bson:"dates"`
 }
+
+// Admin-specific types
+type AdminBassineScore struct {
+	ID                int         `json:"id"`
+	UserEmail         string      `json:"user_email"`
+	UserFirstName     string      `json:"user_first_name"`
+	UserLastName      string      `json:"user_last_name"`
+	CurrentScore      int         `json:"current_score"`
+	TotalGamesPlayed  int         `json:"total_games_played"`
+	CreationDate      time.Time   `json:"creation_date"`
+	LastUpdated       time.Time   `json:"last_updated"`
+}
+
+type AdminBassineHistory struct {
+	ID          int       `json:"id"`
+	UserEmail   string    `json:"user_email"`
+	ScoreChange int       `json:"score_change"`
+	NewTotal    int       `json:"new_total"`
+	GameDate    time.Time `json:"game_date"`
+	Notes       *string   `json:"notes,omitempty"`
+	AdminEmail  *string   `json:"admin_email,omitempty"`
+}
+
+type UpdateScoreRequest struct {
+	UserEmail   string  `json:"userEmail" validate:"required,email"`
+	ScoreChange int     `json:"scoreChange" validate:"required"`
+	Notes       *string `json:"notes,omitempty"`
+}

@@ -1219,3 +1219,298 @@ func (h *AdminHandler) DeleteMenuItemReview(c *fiber.Ctx) error {
 	utils.LogFooter()
 	return c.SendStatus(fiber.StatusOK)
 }
+
+// ==================== BASSINE ADMIN HANDLERS ====================
+
+func (h *AdminHandler) GetBassineScores(c *fiber.Ctx) error {
+	utils.LogHeader("🍺 Get All Bassine Scores (Admin)")
+
+	query := `
+		SELECT 
+			ROW_NUMBER() OVER (ORDER BY bs.score DESC, n.email) as id,
+			n.email,
+			n.first_name,
+			n.last_name,
+			bs.score as current_score,
+			bs.score as total_games_played,
+			n.creation_date,
+			COALESCE((SELECT MAX(date) FROM bassine_history WHERE email = n.email), n.creation_date) as last_updated
+		FROM bassine_scores bs
+		JOIN newf n ON n.email = bs.email
+		ORDER BY bs.score DESC, n.email ASC
+	`
+
+	rows, err := h.DB.Query(query)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch bassine scores")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch bassine scores"})
+	}
+	defer rows.Close()
+
+	var scores []models.AdminBassineScore
+	for rows.Next() {
+		var score models.AdminBassineScore
+		err := rows.Scan(
+			&score.ID,
+			&score.UserEmail,
+			&score.UserFirstName,
+			&score.UserLastName,
+			&score.CurrentScore,
+			&score.TotalGamesPlayed,
+			&score.CreationDate,
+			&score.LastUpdated,
+		)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan bassine score")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+		scores = append(scores, score)
+	}
+
+	if err = rows.Err(); err != nil {
+		utils.LogMessage(utils.LevelError, "Row iteration error")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to process bassine scores"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully fetched bassine scores")
+	utils.LogLineKeyValue(utils.LevelInfo, "Score Count", len(scores))
+	utils.LogFooter()
+
+	return c.JSON(scores)
+}
+
+func (h *AdminHandler) UpdateBassineScore(c *fiber.Ctx) error {
+	utils.LogHeader("🍺 Update Bassine Score (Admin)")
+
+	adminEmail, ok := c.Locals("email").(string)
+	if !ok || adminEmail == "" {
+		utils.LogMessage(utils.LevelWarn, "Admin email not found in token")
+		utils.LogFooter()
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+
+	var req models.UpdateScoreRequest
+	if err := c.BodyParser(&req); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to parse request body")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	// Validate the request
+	if req.UserEmail == "" {
+		utils.LogMessage(utils.LevelWarn, "Missing user email in request")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "User email is required"})
+	}
+
+	if req.ScoreChange == 0 {
+		utils.LogMessage(utils.LevelWarn, "Score change cannot be zero")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Score change cannot be zero"})
+	}
+
+	utils.LogLineKeyValue(utils.LevelInfo, "User Email", req.UserEmail)
+	utils.LogLineKeyValue(utils.LevelInfo, "Score Change", req.ScoreChange)
+	utils.LogLineKeyValue(utils.LevelInfo, "Admin", adminEmail)
+
+	// Check if user exists
+	var userExists bool
+	err := h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM newf WHERE email = $1)", req.UserEmail).Scan(&userExists)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check if user exists")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to validate user"})
+	}
+
+	if !userExists {
+		utils.LogMessage(utils.LevelWarn, "User not found")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	// Begin transaction
+	tx, err := h.DB.Begin()
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to begin transaction")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update score"})
+	}
+	defer tx.Rollback()
+
+	// Get current score (or 0 if user has no history)
+	var currentScore int
+	err = tx.QueryRow("SELECT COALESCE((SELECT score FROM bassine_scores WHERE email = $1), 0)", req.UserEmail).Scan(&currentScore)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get current score")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get current score"})
+	}
+
+	newScore := currentScore + req.ScoreChange
+
+	// Ensure the new score doesn't go below 0
+	if newScore < 0 {
+		utils.LogMessage(utils.LevelWarn, "Score cannot go below zero")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Score cannot go below zero"})
+	}
+
+	// Apply the score change by adding or removing entries from bassine_history
+	if req.ScoreChange > 0 {
+		// Add entries
+		for i := 0; i < req.ScoreChange; i++ {
+			_, err = tx.Exec("INSERT INTO bassine_history (email, date) VALUES ($1, NOW())", req.UserEmail)
+			if err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to add bassine entry")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				utils.LogFooter()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update score"})
+			}
+		}
+	} else {
+		// Remove entries (scoreChange is negative)
+		for i := 0; i < -req.ScoreChange; i++ {
+			var deletedRows int64
+			result, err := tx.Exec(`
+				DELETE FROM bassine_history 
+				WHERE id_bassine_history = (
+					SELECT id_bassine_history 
+					FROM bassine_history 
+					WHERE email = $1 
+					ORDER BY date DESC 
+					LIMIT 1
+				)`, req.UserEmail)
+			if err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to remove bassine entry")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				utils.LogFooter()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update score"})
+			}
+			deletedRows, _ = result.RowsAffected()
+			if deletedRows == 0 {
+				utils.LogMessage(utils.LevelWarn, "No more bassine entries to remove")
+				utils.LogFooter()
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No more bassine entries to remove"})
+			}
+		}
+	}
+
+	// Commit the transaction
+	if err = tx.Commit(); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to commit transaction")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update score"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Bassine score updated successfully")
+	utils.LogLineKeyValue(utils.LevelInfo, "Old Score", currentScore)
+	utils.LogLineKeyValue(utils.LevelInfo, "New Score", newScore)
+	utils.LogFooter()
+
+	return c.JSON(fiber.Map{
+		"message": "Score updated successfully",
+		"old_score": currentScore,
+		"new_score": newScore,
+		"change": req.ScoreChange,
+	})
+}
+
+func (h *AdminHandler) GetBassineHistory(c *fiber.Ctx) error {
+	userEmail := c.Params("email")
+	if userEmail == "" {
+		utils.LogMessage(utils.LevelWarn, "Missing email parameter")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Email parameter is required"})
+	}
+
+	// URL decode the email
+	userEmail, err := url.QueryUnescape(userEmail)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to decode email")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid email format"})
+	}
+
+	utils.LogHeader("🍺 Get Bassine History (Admin)")
+	utils.LogLineKeyValue(utils.LevelInfo, "User Email", userEmail)
+
+	// Check if user exists
+	var userExists bool
+	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM newf WHERE email = $1)", userEmail).Scan(&userExists)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check if user exists")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to validate user"})
+	}
+
+	if !userExists {
+		utils.LogMessage(utils.LevelWarn, "User not found")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	// Get the bassine history for this user
+	query := `
+		SELECT 
+			id_bassine_history as id,
+			email as user_email,
+			1 as score_change,
+			(SELECT COUNT(*) FROM bassine_history bh2 WHERE bh2.email = bh.email AND bh2.date <= bh.date) as new_total,
+			date as game_date
+		FROM bassine_history bh
+		WHERE email = $1
+		ORDER BY date DESC
+	`
+
+	rows, err := h.DB.Query(query, userEmail)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch bassine history")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch bassine history"})
+	}
+	defer rows.Close()
+
+	var history []models.AdminBassineHistory
+	for rows.Next() {
+		var entry models.AdminBassineHistory
+		err := rows.Scan(
+			&entry.ID,
+			&entry.UserEmail,
+			&entry.ScoreChange,
+			&entry.NewTotal,
+			&entry.GameDate,
+		)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan history entry")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+		history = append(history, entry)
+	}
+
+	if err = rows.Err(); err != nil {
+		utils.LogMessage(utils.LevelError, "Row iteration error")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to process history"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully fetched bassine history")
+	utils.LogLineKeyValue(utils.LevelInfo, "History Count", len(history))
+	utils.LogFooter()
+
+	return c.JSON(history)
+}
