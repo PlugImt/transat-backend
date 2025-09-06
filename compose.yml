@@ -8,9 +8,31 @@ services:
       POSTGRES_USER: ${DB_USER}     # Variable du fichier .env
       POSTGRES_PASSWORD: ${DB_PASS} # Variable du fichier .env
     ports:
-      - "5432:5432" # Mappe le port 5432 du conteneur au port 5432 de l'hôte
+      - "${DB_PORT}:5432" # Mappe le port 5432 du conteneur au port 5432 de l'hôte
     volumes:
       - postgres_data:/var/lib/postgresql/data # Persiste les données de la base de données
+
+  transat-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: go run main.go
+    ports:
+      - "${PORT}:3000"
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+    develop:
+      watch:
+        - path: .
+          action: sync+restart
+          target: /app
+          ignore:
+            - .env
+            - .git
+            - .gitignore
+            - .idea
 
 volumes:
   postgres_data:
