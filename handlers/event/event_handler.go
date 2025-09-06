@@ -170,18 +170,19 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 			ORDER BY n.first_name, n.last_name
 			LIMIT 10
 		`
+		// Initialiser toujours un tableau vide pour member_photos sinon ça fait planter le mobile
+		memberPhotos := []string{}
 		photoRows, err := h.db.Query(photosQuery, id)
 		if err == nil {
 			defer photoRows.Close()
-			var memberPhotos []string
 			for photoRows.Next() {
 				var photo string
 				if err := photoRows.Scan(&photo); err == nil {
 					memberPhotos = append(memberPhotos, photo)
 				}
 			}
-			event["member_photos"] = memberPhotos
 		}
+		event["member_photos"] = memberPhotos
 
 		events = append(events, event)
 	}
@@ -328,18 +329,19 @@ func (h *EventHandler) GetEventByClubID(c *fiber.Ctx) error {
 			ORDER BY n.first_name, n.last_name
 			LIMIT 10
 		`
+		// Initialiser toujours un tableau vide pour member_photos sinon ça fait planter le mobile
+		memberPhotos := []string{}
 		photoRows, err := h.db.Query(photosQuery, id)
 		if err == nil {
 			defer photoRows.Close()
-			var memberPhotos []string
 			for photoRows.Next() {
 				var photo string
 				if err := photoRows.Scan(&photo); err == nil {
 					memberPhotos = append(memberPhotos, photo)
 				}
 			}
-			event["member_photos"] = memberPhotos
 		}
+		event["member_photos"] = memberPhotos
 
 		events = append(events, event)
 	}
