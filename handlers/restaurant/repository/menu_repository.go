@@ -99,7 +99,7 @@ func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 		FROM restaurant_articles ra
 		         LEFT JOIN (
 		    SELECT id_restaurant_articles,
-		           AVG(note) AS average_rating,
+				   ROUND(AVG(note), 1) AS average_rating,
 		           COUNT(note) AS total_ratings
 		    FROM restaurant_articles_notes
 		    GROUP BY id_restaurant_articles
@@ -329,7 +329,7 @@ func (r *MenuRepository) SaveDishReview(dishID int, userEmail string, rating int
 	var newAverageRating float64
 	var totalRatings int
 	err = r.DB.QueryRow(`
-		SELECT COALESCE(AVG(note), 0), COUNT(note)
+		SELECT COALESCE(ROUND(AVG(note), 1), 0), COUNT(note)
 		FROM restaurant_articles_notes 
 		WHERE id_restaurant_articles = $1
 	`, dishID).Scan(&newAverageRating, &totalRatings)
@@ -536,7 +536,7 @@ func (r *MenuRepository) GetTodaysMenuWithRatings() (*models.MenuResponse, error
 			rm.id_restaurant_articles,
 			ra.name,
 			rm.id_restaurant,
-			COALESCE(AVG(ran.note), 0) as average_rating
+			COALESCE(ROUND(AVG(ran.note), 1), 0) as average_rating
 		FROM restaurant_meals rm
 		JOIN restaurant_articles ra ON rm.id_restaurant_articles = ra.id_restaurant_articles
 		LEFT JOIN restaurant_articles_notes ran ON ra.id_restaurant_articles = ran.id_restaurant_articles
@@ -601,7 +601,7 @@ func (r *MenuRepository) GetTodaysMenuCategorized(email string) (*models.Categor
 			SELECT rm.id_restaurant_articles,
 			       ra.name,
 			       rm.id_restaurant,
-			       COALESCE(AVG(ran.note), 0)                                       AS average_rating,
+				   COALESCE(ROUND(AVG(ran.note), 1), 0)                            AS average_rating,
 			       EXISTS (SELECT 1
 			               FROM restaurant_articles_notes ran2
 			               WHERE ran2.id_restaurant_articles = rm.id_restaurant_articles
