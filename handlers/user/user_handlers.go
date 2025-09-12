@@ -16,15 +16,17 @@ import (
 
 // UserHandler handles user profile and related actions.
 type UserHandler struct {
-	DB           *sql.DB
-	NotifService *services.NotificationService // Inject if needed for notification handlers
+	DB                       *sql.DB
+	NotifService             *services.NotificationService
+	PhoneVerificationService *services.PhoneVerificationService
 }
 
 // NewUserHandler creates a new UserHandler.
-func NewUserHandler(db *sql.DB, notifService *services.NotificationService) *UserHandler {
+func NewUserHandler(db *sql.DB, notifService *services.NotificationService, phoneVerificationService *services.PhoneVerificationService) *UserHandler {
 	return &UserHandler{
-		DB:           db,
-		NotifService: notifService,
+		DB:                       db,
+		NotifService:             notifService,
+		PhoneVerificationService: phoneVerificationService,
 	}
 }
 
@@ -172,8 +174,55 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 	if req.LastName != "" {
 		updateFields["last_name"] = req.LastName
 	}
+	// cas spécial: si le numéro de téléphone change, on vérifie le numéro avec Whatsapp
 	if req.PhoneNumber != "" {
-		// Add validation for phone number format if needed
+		// il FAUT le préfixe international pour WA
+		if !strings.HasPrefix(req.PhoneNumber, "+") {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid phone number"})
+		}
+
+		var currentPhoneNumber sql.NullString
+		phoneQuery := `SELECT phone_number FROM newf WHERE email = $1`
+		err := h.DB.QueryRow(phoneQuery, email).Scan(&currentPhoneNumber)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to fetch current phone number")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		} else if !currentPhoneNumber.Valid || currentPhoneNumber.String != req.PhoneNumber {
+			utils.LogMessage(utils.LevelInfo, "Phone number changed, sending verification code")
+
+			// faut la langue pour wassap
+			languageCode, langErr := utils.GetLanguageCode(h.DB, email)
+			if langErr != nil {
+				utils.LogMessage(utils.LevelError, "Failed to get language code")
+				utils.LogLineKeyValue(utils.LevelError, "Error", langErr)
+				utils.LogFooter()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get language code"})
+			}
+
+			verificationCode, err := h.PhoneVerificationService.SendPhoneVerificationCode(req.PhoneNumber, languageCode)
+
+			if err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to send phone verification code")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			} else {
+				expirationTime := time.Now().Add(10 * time.Minute)
+				updateVerifQuery := `
+					UPDATE newf 
+					SET phone_number_verification_code = $1,
+					    phone_number_verification_code_expiration = $2,
+					    phone_number_verified = false
+					WHERE email = $3
+				`
+				_, err := h.DB.Exec(updateVerifQuery, verificationCode, expirationTime, email)
+				if err != nil {
+					utils.LogMessage(utils.LevelError, "Failed to update verification code in database")
+					utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				}
+			}
+		}
+
+		// on update tout de suite (une fois qu'on est sûr que le code est parti),
+		// mais il ne faut PAS afficher ce numéro dans l'appli car pas encore vérifié
 		updateFields["phone_number"] = req.PhoneNumber
 	}
 	if req.GraduationYear != 0 {
@@ -268,6 +317,33 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 	utils.LogMessage(utils.LevelInfo, "User profile updated successfully")
 	utils.LogLineKeyValue(utils.LevelInfo, "Fields Updated", updateFields) // Log only keys for brevity/privacy
 	utils.LogFooter()
+
+	// Vérifier si une vérification de téléphone est nécessaire
+	var phoneVerificationRequired bool
+	var phoneNumber string
+	if req.PhoneNumber != "" {
+		// Vérifier si le numéro a changé et n'est pas encore vérifié
+		verifQuery := `
+			SELECT phone_number, phone_number_verified 
+			FROM newf 
+			WHERE email = $1
+		`
+		err := h.DB.QueryRow(verifQuery, email).Scan(&phoneNumber, &phoneVerificationRequired)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to check phone verification status")
+		} else {
+			phoneVerificationRequired = !phoneVerificationRequired
+		}
+	}
+
+	// Retourner une réponse différente si une vérification est nécessaire
+	if phoneVerificationRequired && req.PhoneNumber != "" {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"message":                     "Profile updated successfully. Phone number verification required.",
+			"phone_verification_required": true,
+			"phone_number":                req.PhoneNumber,
+		})
+	}
 
 	return c.SendStatus(fiber.StatusOK)
 }
@@ -586,4 +662,169 @@ func (h *UserHandler) SendNotification(c *fiber.Ctx) error {
 	// Note: The SendNotification method in NotificationService is currently a placeholder.
 	// It needs to be implemented fully to handle parsing, target resolution, etc.
 	return h.NotifService.SendNotification(c)
+}
+
+// whatsapp
+func (h *UserHandler) VerifyPhoneNumber(c *fiber.Ctx) error {
+	email := c.Locals("email").(string)
+	var req struct {
+		VerificationCode string `json:"verification_code"`
+	}
+
+	utils.LogHeader("📱 Verifying Phone Number (avec whatsapp)")
+	utils.LogLineKeyValue(utils.LevelInfo, "User", email)
+
+	if err := c.BodyParser(&req); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to parse request body")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
+	}
+
+	if req.VerificationCode == "" {
+		utils.LogMessage(utils.LevelWarn, "Missing verification code")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Verification code is required"})
+	}
+
+	var storedCode, expirationTime string
+	var phoneNumber string
+	query := `
+		SELECT phone_number_verification_code, 
+		       phone_number_verification_code_expiration,
+		       phone_number
+		FROM newf 
+		WHERE email = $1
+	`
+
+	err := h.DB.QueryRow(query, email).Scan(&storedCode, &expirationTime, &phoneNumber)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.LogMessage(utils.LevelWarn, "User not found???")
+			utils.LogFooter()
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+		}
+		utils.LogMessage(utils.LevelError, "Failed to fetch verification data")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch verification data"})
+	}
+
+	if !h.PhoneVerificationService.ValidateVerificationCode(storedCode, req.VerificationCode, expirationTime) {
+		utils.LogMessage(utils.LevelWarn, "Invalid or expired verification code")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid or expired verification code"})
+	}
+
+	// marquer comme verified
+	updateQuery := `
+		UPDATE newf 
+		SET phone_number_verified = true,
+		    phone_number_verification_code = NULL,
+		    phone_number_verification_code_expiration = NULL
+		WHERE email = $1
+	`
+
+	_, err = h.DB.Exec(updateQuery, email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to update phone verification status")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to verify phone number"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Phone number verified successfully")
+	utils.LogLineKeyValue(utils.LevelInfo, "Phone", phoneNumber)
+	utils.LogFooter()
+
+	return c.JSON(fiber.Map{
+		"message":      "Phone number verified successfully",
+		"phone_number": phoneNumber,
+		"verified":     true,
+	})
+}
+
+func (h *UserHandler) ResendPhoneVerificationCode(c *fiber.Ctx) error {
+	email := c.Locals("email").(string)
+
+	utils.LogHeader("📱 Resend Phone Verification Code")
+	utils.LogLineKeyValue(utils.LevelInfo, "User", email)
+
+	// Récupérer le numéro de téléphone et la langue de l'utilisateur, et vérifier s'il est pas déjà vérifié
+	var phoneNumber string
+	var verified bool
+	query := `
+		SELECT n.phone_number, n.phone_number_verified
+		FROM newf n
+		WHERE n.email = $1
+	`
+
+	err := h.DB.QueryRow(query, email).Scan(&phoneNumber, &verified)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.LogMessage(utils.LevelWarn, "User not found")
+			utils.LogFooter()
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+		}
+		utils.LogMessage(utils.LevelError, "Failed to fetch user data")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch user data"})
+	}
+
+	if verified {
+		utils.LogMessage(utils.LevelWarn, "Phone number already verified")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Phone number already verified"})
+	}
+
+	if phoneNumber == "" {
+		utils.LogMessage(utils.LevelWarn, "No phone number found for user")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No phone number found"})
+	}
+
+	languageCode, langErr := utils.GetLanguageCode(h.DB, email)
+	if langErr != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get language code")
+		utils.LogLineKeyValue(utils.LevelError, "Error", langErr)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get language code"})
+	}
+
+	// Envoyer un nouveau code de vérification
+	verificationCode, err := h.PhoneVerificationService.SendPhoneVerificationCode(phoneNumber, languageCode)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to send verification code")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to send verification code"})
+	}
+
+	// Mettre à jour le code et l'expiration dans la base de données
+	expirationTime := time.Now().Add(10 * time.Minute)
+	updateQuery := `
+		UPDATE newf 
+		SET phone_number_verification_code = $1,
+		    phone_number_verification_code_expiration = $2,
+		    phone_number_verified = false
+		WHERE email = $3
+	`
+
+	_, err = h.DB.Exec(updateQuery, verificationCode, expirationTime, email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to update verification code in database")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save verification code"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Verification code resent successfully")
+	utils.LogLineKeyValue(utils.LevelInfo, "Phone", phoneNumber)
+	utils.LogFooter()
+
+	return c.JSON(fiber.Map{
+		"message":      "Verification code sent successfully",
+		"phone_number": phoneNumber,
+	})
 }
