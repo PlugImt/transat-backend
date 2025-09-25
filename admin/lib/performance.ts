@@ -143,7 +143,7 @@ export function useRenderTracker(componentName: string) {
 }
 
 // Image preloader for better UX
-export function preloadImages(urls: string[]): Promise<undefined[]> {
+export function preloadImages(urls: string[]): Promise<void[]> {
   return Promise.all(
     urls.map(
       (url) =>

@@ -9,6 +9,7 @@ interface TagAutocompleteProps {
   onChange: (tags: string[]) => void;
   placeholder?: string;
   className?: string;
+  id?: string;
 }
 
 export default function TagAutocomplete({
@@ -17,6 +18,7 @@ export default function TagAutocomplete({
   onChange,
   placeholder = "Rechercher et sélectionner...",
   className = "",
+  id,
 }: TagAutocompleteProps) {
   const [inputValue, setInputValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -119,6 +121,7 @@ export default function TagAutocomplete({
           <div className="flex-1 flex items-center min-w-[100px]">
             <input
               ref={inputRef}
+              id={id}
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
