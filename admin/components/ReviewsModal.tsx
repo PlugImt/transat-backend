@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useCallback } from "react";
-import { X, Star, Trash2, User, MessageSquare, Calendar } from "lucide-react";
-import { ApiError } from "@/lib/types";
-import { useMenuItemReviews, useDeleteMenuItemReview } from "@/lib/hooks";
-import { PageLoading } from "@/components/LoadingSpinner";
+import { Calendar, MessageSquare, Star, Trash2, User, X } from "lucide-react";
+import Image from "next/image";
+import { useCallback } from "react";
 import toast from "react-hot-toast";
+import { PageLoading } from "@/components/LoadingSpinner";
+import { useDeleteMenuItemReview, useMenuItemReviews } from "@/lib/hooks";
+import type { ApiError } from "@/lib/types";
 
 interface ReviewsModalProps {
   isOpen: boolean;
@@ -20,32 +21,22 @@ export default function ReviewsModal({
   menuItemId,
   menuItemName,
 }: ReviewsModalProps) {
-  const {
-    data: reviews = [],
-    isLoading,
-    error,
-  } = useMenuItemReviews(menuItemId);
+  const { data: reviews = [], isLoading, error } = useMenuItemReviews(menuItemId);
   const deleteReviewMutation = useDeleteMenuItemReview();
 
   const handleDeleteReview = useCallback(
     async (email: string, userName: string) => {
-      if (
-        !confirm(`Êtes-vous sûr de vouloir supprimer l'avis de ${userName} ?`)
-      )
-        return;
+      if (!confirm(`Êtes-vous sûr de vouloir supprimer l'avis de ${userName} ?`)) return;
 
       try {
         await deleteReviewMutation.mutateAsync({ menuItemId, email });
         toast.success("Avis supprimé avec succès");
       } catch (err) {
         const error = err as ApiError;
-        toast.error(
-          error.response?.data?.error ||
-            "Erreur lors de la suppression de l'avis"
-        );
+        toast.error(error.response?.data?.error || "Erreur lors de la suppression de l'avis");
       }
     },
-    [deleteReviewMutation, menuItemId]
+    [deleteReviewMutation, menuItemId],
   );
 
   const renderStars = (rating: number) => {
@@ -75,11 +66,10 @@ export default function ReviewsModal({
               <h2 className="text-xl font-semibold text-gray-900">
                 Avis pour &quot;{menuItemName}&quot;
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {reviews.length} avis au total
-              </p>
+              <p className="text-sm text-gray-500 mt-1">{reviews.length} avis au total</p>
             </div>
             <button
+              type="button"
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
@@ -104,12 +94,8 @@ export default function ReviewsModal({
           ) : reviews.length === 0 ? (
             <div className="text-center py-8">
               <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Aucun avis
-              </h3>
-              <p className="text-gray-500">
-                Ce plat n&apos;a pas encore reçu d&apos;avis.
-              </p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun avis</h3>
+              <p className="text-gray-500">Ce plat n&apos;a pas encore reçu d&apos;avis.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -124,9 +110,11 @@ export default function ReviewsModal({
                       <div className="flex items-center space-x-3 mb-3">
                         <div className="flex-shrink-0">
                           {review.profile_picture ? (
-                            <img
+                            <Image
                               src={review.profile_picture}
                               alt={`${review.first_name} ${review.last_name}`}
+                              width={40}
+                              height={40}
                               className="h-10 w-10 rounded-full object-cover"
                             />
                           ) : (
@@ -145,16 +133,13 @@ export default function ReviewsModal({
                           <div className="flex items-center space-x-1 text-sm text-gray-500 mt-1">
                             <Calendar className="h-3 w-3" />
                             <span>
-                              {new Date(review.date).toLocaleDateString(
-                                "fr-FR",
-                                {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )}
+                              {new Date(review.date).toLocaleDateString("fr-FR", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
                             </span>
                           </div>
                         </div>
@@ -170,11 +155,9 @@ export default function ReviewsModal({
 
                     {/* Delete Button */}
                     <button
+                      type="button"
                       onClick={() =>
-                        handleDeleteReview(
-                          review.email,
-                          `${review.first_name} ${review.last_name}`
-                        )
+                        handleDeleteReview(review.email, `${review.first_name} ${review.last_name}`)
                       }
                       disabled={deleteReviewMutation.isPending}
                       className="ml-4 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
@@ -193,6 +176,7 @@ export default function ReviewsModal({
         <div className="p-6 border-t border-gray-200">
           <div className="flex justify-end">
             <button
+              type="button"
               onClick={onClose}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
             >

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { X, ChevronDown } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface TagAutocompleteProps {
   options: { value: string; label: string }[];
@@ -28,17 +28,14 @@ export default function TagAutocomplete({
     const filtered = options.filter(
       (option) =>
         option.label.toLowerCase().includes(inputValue.toLowerCase()) &&
-        !selectedTags.includes(option.value)
+        !selectedTags.includes(option.value),
     );
     setFilteredOptions(filtered);
   }, [inputValue, options, selectedTags]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setInputValue("");
       }
@@ -82,9 +79,19 @@ export default function TagAutocomplete({
         className={`w-full min-h-[40px] px-2 sm:px-3 py-2 border border-gray-300 rounded-md focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 bg-white cursor-text ${
           isOpen ? "ring-2 ring-blue-500 border-blue-500" : ""
         }`}
+        role="combobox"
+        tabIndex={0}
+        aria-expanded={isOpen}
         onClick={() => {
           setIsOpen(true);
           inputRef.current?.focus();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsOpen(true);
+            inputRef.current?.focus();
+          }
         }}
       >
         <div className="flex flex-wrap items-center gap-1">
@@ -121,9 +128,7 @@ export default function TagAutocomplete({
               className="flex-1 border-none outline-none bg-transparent text-sm"
             />
             <ChevronDown
-              className={`h-4 w-4 text-gray-400 transition-transform ${
-                isOpen ? "rotate-180" : ""
-              }`}
+              className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
             />
           </div>
         </div>

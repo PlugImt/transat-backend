@@ -1,31 +1,20 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { type ColumnDef } from "@tanstack/react-table";
-import {
-  Users,
-  Mail,
-  Check,
-  X,
-  Edit,
-  Trash2,
-  Plus,
-  CheckCircle,
-  Phone,
-} from "lucide-react";
-import { User, ApiError } from "@/lib/types";
-import { useUsers, useDeleteUser, useValidateUser } from "@/lib/hooks";
-import LanguageFlag from "@/components/LanguageFlag";
-import { PageLoading } from "@/components/LoadingSpinner";
-import ErrorBoundary from "@/components/ErrorBoundary";
-import DataTable from "@/components/DataTable";
-import { UserModal } from "@/components/LazyComponents";
-import { useAppStore } from "@/lib/stores/appStore";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Check, CheckCircle, Edit, Mail, Phone, Plus, Trash2, Users, X } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import DataTable from "@/components/DataTable";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import LanguageFlag from "@/components/LanguageFlag";
+import { UserModal } from "@/components/LazyComponents";
+import { PageLoading } from "@/components/LoadingSpinner";
+import { useDeleteUser, useUsers, useValidateUser } from "@/lib/hooks";
+import { useAppStore } from "@/lib/stores/appStore";
+import type { ApiError, User } from "@/lib/types";
 
 function UsersPageContent() {
-  const { userModalOpen, editingUser, openUserModal, closeUserModal } =
-    useAppStore();
+  const { userModalOpen, editingUser, openUserModal, closeUserModal } = useAppStore();
   const [showUnverifiedOnly, setShowUnverifiedOnly] = useState(false);
 
   const { data: users = [], isLoading, error } = useUsers();
@@ -40,30 +29,28 @@ function UsersPageContent() {
     (user: User) => {
       openUserModal(user);
     },
-    [openUserModal]
+    [openUserModal],
   );
 
   const handleDeleteUser = useCallback(
     async (email: string) => {
-      if (!confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?"))
-        return;
+      if (!confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?")) return;
 
       toast.promise(deleteUserMutation.mutateAsync(email), {
         loading: "Suppression en cours...",
         success: "Utilisateur supprimé avec succès !",
         error: (err: ApiError) =>
-          err?.response?.data?.error ||
-          "Échec de la suppression de l'utilisateur",
+          err?.response?.data?.error || "Échec de la suppression de l'utilisateur",
       });
     },
-    [deleteUserMutation]
+    [deleteUserMutation],
   );
 
   const handleValidateUser = useCallback(
     async (email: string) => {
       if (
         !confirm(
-          "Êtes-vous sûr de vouloir valider cet utilisateur ? Cela changera son rôle VERIFYING en NEWF."
+          "Êtes-vous sûr de vouloir valider cet utilisateur ? Cela changera son rôle VERIFYING en NEWF.",
         )
       )
         return;
@@ -72,11 +59,10 @@ function UsersPageContent() {
         loading: "Validation en cours...",
         success: "Utilisateur validé avec succès !",
         error: (err: ApiError) =>
-          err?.response?.data?.error ||
-          "Échec de la validation de l'utilisateur",
+          err?.response?.data?.error || "Échec de la validation de l'utilisateur",
       });
     },
-    [validateUserMutation]
+    [validateUserMutation],
   );
 
   // Filter users based on verification status
@@ -156,9 +142,7 @@ function UsersPageContent() {
         accessorKey: "formation_name",
         header: "Formation",
         cell: ({ row }) => (
-          <span className="text-sm text-gray-900">
-            {row.original.formation_name || "-"}
-          </span>
+          <span className="text-sm text-gray-900">{row.original.formation_name || "-"}</span>
         ),
       },
       {
@@ -168,13 +152,8 @@ function UsersPageContent() {
           const user = row.original;
           return user.language ? (
             <div className="flex items-center space-x-1">
-              <LanguageFlag
-                languageCode={user.language}
-                className="text-base"
-              />
-              <span className="text-sm text-gray-900">
-                {user.language.toUpperCase()}
-              </span>
+              <LanguageFlag languageCode={user.language} className="text-base" />
+              <span className="text-sm text-gray-900">{user.language.toUpperCase()}</span>
             </div>
           ) : (
             <span className="text-sm text-gray-500">-</span>
@@ -192,9 +171,9 @@ function UsersPageContent() {
           const roles = row.original.roles || [];
           return roles.length > 0 ? (
             <div className="grid grid-cols-2 gap-1">
-              {roles.map((role: string, index: number) => (
+              {roles.map((role: string) => (
                 <span
-                  key={index}
+                  key={role}
                   className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                 >
                   {role}
@@ -219,6 +198,7 @@ function UsersPageContent() {
           return (
             <div className="flex items-center space-x-1">
               <button
+                type="button"
                 onClick={() => handleEditUser(user)}
                 className="p-2 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100"
                 title="Modifier l'utilisateur"
@@ -227,6 +207,7 @@ function UsersPageContent() {
               </button>
               {user.roles?.includes("VERIFYING") && (
                 <button
+                  type="button"
                   onClick={() => handleValidateUser(user.email)}
                   className="p-2 text-gray-400 hover:text-green-600 rounded-full hover:bg-gray-100"
                   title="Valider l'utilisateur (VERIFYING → NEWF)"
@@ -235,6 +216,7 @@ function UsersPageContent() {
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => handleDeleteUser(user.email)}
                 className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-gray-100"
                 title="Supprimer l'utilisateur"
@@ -247,16 +229,14 @@ function UsersPageContent() {
         enableSorting: false,
       },
     ],
-    [handleEditUser, handleValidateUser, handleDeleteUser]
+    [handleEditUser, handleValidateUser, handleDeleteUser],
   );
 
   if (isLoading) {
     return (
       <div className="p-4 sm:p-6 pt-16 lg:pt-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            Gestion des utilisateurs
-          </h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gestion des utilisateurs</h1>
         </div>
         <PageLoading text="Chargement des utilisateurs..." />
       </div>
@@ -268,8 +248,7 @@ function UsersPageContent() {
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
           <div className="text-sm text-red-700">
-            {(error as ApiError)?.message ||
-              "Échec de la récupération des utilisateurs"}
+            {(error as ApiError)?.message || "Échec de la récupération des utilisateurs"}
           </div>
         </div>
       </div>
@@ -279,9 +258,7 @@ function UsersPageContent() {
   return (
     <div className="p-4 sm:p-6 pt-16 lg:pt-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          Gestion des utilisateurs
-        </h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gestion des utilisateurs</h1>
         <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
           <div className="flex items-center space-x-2 text-gray-600">
             <Users className="h-5 w-5" />
@@ -294,6 +271,7 @@ function UsersPageContent() {
             </span>
           </div>
           <button
+            type="button"
             onClick={handleCreateUser}
             className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm sm:text-base"
           >

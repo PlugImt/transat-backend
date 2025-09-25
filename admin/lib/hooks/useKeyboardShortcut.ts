@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export interface KeyboardShortcut {
   key: string;
@@ -17,17 +17,11 @@ export interface KeyboardShortcut {
 export function useKeyboardShortcut(
   shortcut: KeyboardShortcut,
   callback: () => void,
-  dependencies: React.DependencyList = []
+  dependencies: React.DependencyList = [],
 ) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const {
-        key,
-        ctrlKey = false,
-        metaKey = false,
-        shiftKey = false,
-        altKey = false,
-      } = shortcut;
+      const { key, ctrlKey = false, metaKey = false, shiftKey = false, altKey = false } = shortcut;
 
       // Check if all modifiers match
       const modifiersMatch =
@@ -45,10 +39,19 @@ export function useKeyboardShortcut(
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shortcut.key, shortcut.ctrlKey, shortcut.metaKey, shortcut.shiftKey, shortcut.altKey, ...dependencies]);
+  }, [
+    shortcut.key,
+    shortcut.ctrlKey,
+    shortcut.metaKey,
+    shortcut.shiftKey,
+    shortcut.altKey,
+    ...dependencies,
+    callback,
+    shortcut,
+  ]);
 }
 
 /**
@@ -57,7 +60,7 @@ export function useKeyboardShortcut(
  */
 export function useKeyboardShortcuts(
   shortcuts: Array<KeyboardShortcut & { callback: () => void }>,
-  dependencies: React.DependencyList = []
+  dependencies: React.DependencyList = [],
 ) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -89,8 +92,12 @@ export function useKeyboardShortcuts(
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...shortcuts.map(s => [s.key, s.ctrlKey, s.metaKey, s.shiftKey, s.altKey]).flat(), ...dependencies]);
+  }, [
+    ...shortcuts.flatMap((s) => [s.key, s.ctrlKey, s.metaKey, s.shiftKey, s.altKey]),
+    ...dependencies,
+    shortcuts,
+  ]);
 }

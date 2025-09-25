@@ -1,13 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usersApi, eventsApi, clubsApi, statsApi, rolesApi, menuApi, bassineApi } from "./api";
-import { User, Event, Club } from "./types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { bassineApi, clubsApi, eventsApi, menuApi, rolesApi, statsApi, usersApi } from "./api";
+import type { Club, Event, User } from "./types";
 
+export * from "./hooks/useClickOutside";
 // Export utility hooks
 export * from "./hooks/useDebounce";
-export * from "./hooks/useLocalStorage";
 export * from "./hooks/useKeyboardShortcut";
+export * from "./hooks/useLocalStorage";
 export * from "./hooks/useToggle";
-export * from "./hooks/useClickOutside";
 
 // Users hooks
 export const useUsers = () => {
@@ -19,7 +19,7 @@ export const useUsers = () => {
 
 export const useCreateUser = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: usersApi.create,
     onSuccess: () => {
@@ -30,9 +30,9 @@ export const useCreateUser = () => {
 
 export const useUpdateUser = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ email, data }: { email: string; data: Partial<User> }) => 
+    mutationFn: ({ email, data }: { email: string; data: Partial<User> }) =>
       usersApi.update(email, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -42,7 +42,7 @@ export const useUpdateUser = () => {
 
 export const useDeleteUser = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: usersApi.deleteUser,
     onSuccess: () => {
@@ -53,7 +53,7 @@ export const useDeleteUser = () => {
 
 export const useValidateUser = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: usersApi.validateUser,
     onSuccess: () => {
@@ -72,7 +72,7 @@ export const useEvents = () => {
 
 export const useCreateEvent = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: eventsApi.create,
     onSuccess: () => {
@@ -83,10 +83,9 @@ export const useCreateEvent = () => {
 
 export const useUpdateEvent = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Event> }) => 
-      eventsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Event> }) => eventsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
@@ -95,7 +94,7 @@ export const useUpdateEvent = () => {
 
 export const useDeleteEvent = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: eventsApi.delete,
     onSuccess: () => {
@@ -114,7 +113,7 @@ export const useClubs = () => {
 
 export const useCreateClub = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: clubsApi.create,
     onSuccess: () => {
@@ -125,10 +124,9 @@ export const useCreateClub = () => {
 
 export const useUpdateClub = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Club> }) => 
-      clubsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Club> }) => clubsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clubs"] });
     },
@@ -137,7 +135,7 @@ export const useUpdateClub = () => {
 
 export const useDeleteClub = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: clubsApi.delete,
     onSuccess: () => {
@@ -172,7 +170,7 @@ export const useMenuItems = () => {
 
 export const useDeleteMenuItem = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: menuApi.delete,
     onSuccess: () => {
@@ -191,9 +189,9 @@ export const useMenuItemReviews = (menuItemId: number) => {
 
 export const useDeleteMenuItemReview = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ menuItemId, email }: { menuItemId: number; email: string }) => 
+    mutationFn: ({ menuItemId, email }: { menuItemId: number; email: string }) =>
       menuApi.deleteReview(menuItemId, email),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["menu-item-reviews", variables.menuItemId] });
@@ -220,7 +218,7 @@ export const useBassineHistory = (userEmail: string) => {
 
 export const useUpdateBassineScore = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: bassineApi.updateScore,
     onSuccess: () => {

@@ -1,20 +1,20 @@
 "use client";
 
 import {
+  type ColumnDef,
+  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getSortedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  useReactTable,
-  type ColumnDef,
+  getSortedRowModel,
   type SortingState,
-  type ColumnFiltersState,
-} from '@tanstack/react-table';
-import { useState, useMemo, memo, useEffect } from 'react';
-import { useDebounce } from '@/lib/hooks';
-import { ChevronUp, ChevronDown, Search, Filter } from 'lucide-react';
-import clsx from 'clsx';
+  useReactTable,
+} from "@tanstack/react-table";
+import clsx from "clsx";
+import { ChevronDown, ChevronUp, Filter, Search } from "lucide-react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { useDebounce } from "@/lib/hooks";
 
 interface DataTableProps<T> {
   data: T[];
@@ -47,8 +47,8 @@ function DataTable<T>({
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
 
   // Débounce la recherche pour améliorer les performances
   const debouncedSearchTerm = useDebounce(searchInput, 300);
@@ -59,33 +59,36 @@ function DataTable<T>({
   }, [debouncedSearchTerm]);
 
   // Memoize table configuration to avoid recreating on every render
-  const tableConfig = useMemo(() => ({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
-    // Utilise la fonction de filtrage par défaut pour rechercher dans toutes les colonnes
-    state: {
-      sorting,
-      columnFilters,
-      globalFilter,
-    },
-    initialState: {
-      pagination: {
-        pageSize: 10,
+  const tableConfig = useMemo(
+    () => ({
+      data,
+      columns,
+      getCoreRowModel: getCoreRowModel(),
+      getSortedRowModel: getSortedRowModel(),
+      getFilteredRowModel: getFilteredRowModel(),
+      getPaginationRowModel: getPaginationRowModel(),
+      onSortingChange: setSorting,
+      onColumnFiltersChange: setColumnFilters,
+      onGlobalFilterChange: setGlobalFilter,
+      // Utilise la fonction de filtrage par défaut pour rechercher dans toutes les colonnes
+      state: {
+        sorting,
+        columnFilters,
+        globalFilter,
       },
-    },
-  }), [data, columns, sorting, columnFilters, globalFilter]);
+      initialState: {
+        pagination: {
+          pageSize: 10,
+        },
+      },
+    }),
+    [data, columns, sorting, columnFilters, globalFilter],
+  );
 
   const table = useReactTable(tableConfig);
 
   return (
-    <div className={clsx('space-y-4', className)}>
+    <div className={clsx("space-y-4", className)}>
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
         <div className="relative flex-1 max-w-sm">
@@ -103,15 +106,16 @@ function DataTable<T>({
             </div>
           )}
         </div>
-        
+
         {/* Filter button */}
         {showFilter && onFilterToggle && (
           <button
+            type="button"
             onClick={onFilterToggle}
             className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
               filterActive
-                ? 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-50'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                ? "bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-50"
+                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
             }`}
             title={filterActive ? filterActiveLabel : filterLabel}
           >
@@ -122,7 +126,7 @@ function DataTable<T>({
           </button>
         )}
       </div>
-      
+
       {/* Active filter indicator */}
       {showFilter && filterActive && (
         <div className="mb-3">
@@ -149,22 +153,19 @@ function DataTable<T>({
                         <div
                           {...{
                             className: header.column.getCanSort()
-                              ? 'cursor-pointer select-none flex items-center space-x-1'
-                              : '',
+                              ? "cursor-pointer select-none flex items-center space-x-1"
+                              : "",
                             onClick: header.column.getToggleSortingHandler(),
                           }}
                         >
                           <span>
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
+                            {flexRender(header.column.columnDef.header, header.getContext())}
                           </span>
                           {header.column.getCanSort() && (
                             <span className="flex flex-col">
-                              {header.column.getIsSorted() === 'asc' ? (
+                              {header.column.getIsSorted() === "asc" ? (
                                 <ChevronUp className="h-4 w-4" />
-                              ) : header.column.getIsSorted() === 'desc' ? (
+                              ) : header.column.getIsSorted() === "desc" ? (
                                 <ChevronDown className="h-4 w-4" />
                               ) : (
                                 <div className="h-4 w-4 opacity-50">
@@ -185,21 +186,12 @@ function DataTable<T>({
               {table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className={clsx(
-                    'hover:bg-gray-50',
-                    onRowClick && 'cursor-pointer'
-                  )}
+                  className={clsx("hover:bg-gray-50", onRowClick && "cursor-pointer")}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
+                    <td key={cell.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
                 </tr>
@@ -212,15 +204,17 @@ function DataTable<T>({
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-700">
-          Affichage de {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} à{' '}
+          Affichage de{" "}
+          {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} à{" "}
           {Math.min(
             (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            table.getFilteredRowModel().rows.length
-          )}{' '}
+            table.getFilteredRowModel().rows.length,
+          )}{" "}
           sur {table.getFilteredRowModel().rows.length} résultats
         </div>
         <div className="flex items-center space-x-2">
           <button
+            type="button"
             className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
@@ -231,6 +225,7 @@ function DataTable<T>({
             Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
           </span>
           <button
+            type="button"
             className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}

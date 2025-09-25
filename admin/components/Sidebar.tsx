@@ -1,29 +1,28 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useMemo, memo } from "react";
 import {
-  Users,
-  Calendar,
-  Building,
   BarChart3,
+  Building,
+  Calendar,
+  Gamepad2,
   LogOut,
   Menu,
-  X,
   Search,
+  Users,
   UtensilsCrossed,
-  Gamepad2,
+  X,
 } from "lucide-react";
 import Image from "next/image";
-import { useAuthStore } from "@/lib/stores/authStore";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { memo, useMemo } from "react";
 import { useAppStore } from "@/lib/stores/appStore";
+import { useAuthStore } from "@/lib/stores/authStore";
 
 function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
-  const { sidebarOpen, setSidebarOpen, toggleSidebar, setCommandPaletteOpen } =
-    useAppStore();
+  const { sidebarOpen, setSidebarOpen, toggleSidebar, setCommandPaletteOpen } = useAppStore();
 
   // Memoize menu items to prevent recreation on every render
   const menuItems = useMemo(
@@ -35,7 +34,7 @@ function Sidebar() {
       { href: "/menu", label: "Menu du RU", icon: UtensilsCrossed },
       { href: "/games", label: "Jeux", icon: Gamepad2 },
     ],
-    []
+    [],
   );
 
   const handleLogout = () => {
@@ -47,6 +46,7 @@ function Sidebar() {
     <>
       {/* Mobile menu button */}
       <button
+        type="button"
         onClick={toggleSidebar}
         className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-gray-900 text-white rounded-md"
       >
@@ -55,9 +55,17 @@ function Sidebar() {
 
       {/* Mobile overlay */}
       {sidebarOpen && (
-        <div
+        <button
           className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          type="button"
+          tabIndex={0}
           onClick={() => setSidebarOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setSidebarOpen(false);
+            }
+          }}
         />
       )}
 
@@ -106,6 +114,7 @@ function Sidebar() {
             {/* Command Palette Button */}
             <li className="pt-2 border-t border-gray-700 mt-4">
               <button
+                type="button"
                 onClick={() => {
                   setCommandPaletteOpen(true);
                   setSidebarOpen(false);
@@ -127,6 +136,7 @@ function Sidebar() {
             Bienvenue {user?.email || "Utilisateur"}
           </p>
           <button
+            type="button"
             onClick={handleLogout}
             className="flex items-center space-x-3 px-4 py-2 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors w-full"
           >

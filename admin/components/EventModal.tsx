@@ -1,14 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Save } from "lucide-react";
-import { Event, ApiError } from "@/lib/types";
-import {
-  useCreateEvent,
-  useUpdateEvent,
-  useClubs,
-  useUsers,
-} from "@/lib/hooks";
+import { Save, X } from "lucide-react";
+import { useEffect, useId, useState } from "react";
+import { useClubs, useCreateEvent, useUpdateEvent, useUsers } from "@/lib/hooks";
+import type { ApiError, Event } from "@/lib/types";
 
 interface EventModalProps {
   isOpen: boolean;
@@ -17,12 +12,7 @@ interface EventModalProps {
   onSave: () => void;
 }
 
-export default function EventModal({
-  isOpen,
-  onClose,
-  event,
-  onSave,
-}: EventModalProps) {
+export default function EventModal({ isOpen, onClose, event, onSave }: EventModalProps) {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -42,12 +32,18 @@ export default function EventModal({
   const { data: users = [] } = useUsers();
   const createEventMutation = useCreateEvent();
   const updateEventMutation = useUpdateEvent();
+  const nameId = useId();
+  const descriptionId = useId();
+  const startDateId = useId();
+  const endDateId = useId();
+  const locationId = useId();
+  const clubId = useId();
+  const creatorId = useId();
+  const linkId = useId();
 
   // Filtrer les emails des utilisateurs selon la saisie
   const filteredEmails = users
-    .filter((user) =>
-      user.email.toLowerCase().includes(emailFilter.toLowerCase())
-    )
+    .filter((user) => user.email.toLowerCase().includes(emailFilter.toLowerCase()))
     .slice(0, 5); // Limiter à 5 suggestions
 
   const handleEmailSelect = (email: string) => {
@@ -68,12 +64,8 @@ export default function EventModal({
         name: event.name,
         description: event.description || "",
         link: event.link || "",
-        start_date: event.start_date
-          ? new Date(event.start_date).toISOString().slice(0, 16)
-          : "",
-        end_date: event.end_date
-          ? new Date(event.end_date).toISOString().slice(0, 16)
-          : "",
+        start_date: event.start_date ? new Date(event.start_date).toISOString().slice(0, 16) : "",
+        end_date: event.end_date ? new Date(event.end_date).toISOString().slice(0, 16) : "",
         location: event.location,
         picture: event.picture || "",
         creator: event.creator,
@@ -96,7 +88,7 @@ export default function EventModal({
     }
     setError("");
     setShowEmailSuggestions(false);
-  }, [event, isOpen]);
+  }, [event]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +97,7 @@ export default function EventModal({
     try {
       const eventData = {
         ...formData,
-        id_club: parseInt(formData.id_club),
+        id_club: parseInt(formData.id_club, 10),
       };
 
       if (event) {
@@ -119,9 +111,7 @@ export default function EventModal({
       onSave();
       onClose();
     } catch (err: unknown) {
-      setError(
-        (err as ApiError)?.response?.data?.error || "L'opération a échoué"
-      );
+      setError((err as ApiError)?.response?.data?.error || "L'opération a échoué");
     }
   };
 
@@ -134,10 +124,7 @@ export default function EventModal({
           <h2 className="text-xl font-bold text-gray-900">
             {event ? "Modifier l'événement" : "Créer un événement"}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -150,25 +137,25 @@ export default function EventModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={nameId} className="block text-sm font-medium text-gray-700 mb-1">
               Nom *
             </label>
             <input
+              id={nameId}
               type="text"
               required
               value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={descriptionId} className="block text-sm font-medium text-gray-700 mb-1">
               Description
             </label>
             <textarea
+              id={descriptionId}
               value={formData.description}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -183,10 +170,11 @@ export default function EventModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor={startDateId} className="block text-sm font-medium text-gray-700 mb-1">
                 Date de début *
               </label>
               <input
+                id={startDateId}
                 type="datetime-local"
                 required
                 value={formData.start_date}
@@ -201,45 +189,42 @@ export default function EventModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor={endDateId} className="block text-sm font-medium text-gray-700 mb-1">
                 Date de fin
               </label>
               <input
+                id={endDateId}
                 type="datetime-local"
                 value={formData.end_date}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, end_date: e.target.value }))
-                }
+                onChange={(e) => setFormData((prev) => ({ ...prev, end_date: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={locationId} className="block text-sm font-medium text-gray-700 mb-1">
               Localisation *
             </label>
             <input
+              id={locationId}
               type="text"
               required
               value={formData.location}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, location: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={clubId} className="block text-sm font-medium text-gray-700 mb-1">
               Club *
             </label>
             <select
+              id={clubId}
               required
               value={formData.id_club}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, id_club: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, id_club: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Sélectionner un club</option>
@@ -252,20 +237,17 @@ export default function EventModal({
           </div>
 
           <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={creatorId} className="block text-sm font-medium text-gray-700 mb-1">
               Email du créateur *
             </label>
             <input
+              id={creatorId}
               type="email"
               required
               value={formData.creator}
               onChange={(e) => handleEmailInputChange(e.target.value)}
-              onFocus={() =>
-                setShowEmailSuggestions(formData.creator.length > 0)
-              }
-              onBlur={() =>
-                setTimeout(() => setShowEmailSuggestions(false), 200)
-              }
+              onFocus={() => setShowEmailSuggestions(formData.creator.length > 0)}
+              onBlur={() => setTimeout(() => setShowEmailSuggestions(false), 200)}
               placeholder="Commencez à taper pour voir les suggestions..."
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -274,47 +256,47 @@ export default function EventModal({
             {showEmailSuggestions && filteredEmails.length > 0 && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
                 {filteredEmails.map((user) => (
-                  <div
+                  <button
                     key={user.id_newf}
-                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                    type="button"
+                    className="w-full text-left px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
                     onClick={() => handleEmailSelect(user.email)}
                   >
-                    <div className="font-medium text-gray-900">
-                      {user.email}
-                    </div>
+                    <div className="font-medium text-gray-900">{user.email}</div>
                     <div className="text-gray-500 text-xs">
                       {user.first_name} {user.last_name}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={linkId} className="block text-sm font-medium text-gray-700 mb-1">
               Lien
             </label>
             <input
+              id={linkId}
               type="url"
               value={formData.link}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, link: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, link: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor={`${nameId}-picture`}
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               URL de l&apos;image
             </label>
             <input
+              id={`${nameId}-picture`}
               type="url"
               value={formData.picture}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, picture: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, picture: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -329,17 +311,15 @@ export default function EventModal({
             </button>
             <button
               type="submit"
-              disabled={
-                createEventMutation.isPending || updateEventMutation.isPending
-              }
+              disabled={createEventMutation.isPending || updateEventMutation.isPending}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
             >
               <Save className="h-4 w-4 mr-2" />
               {createEventMutation.isPending || updateEventMutation.isPending
                 ? "Enregistrement..."
                 : event
-                ? "Mettre à jour"
-                : "Créer"}
+                  ? "Mettre à jour"
+                  : "Créer"}
             </button>
           </div>
         </form>

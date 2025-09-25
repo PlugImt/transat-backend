@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Save } from "lucide-react";
-import { Club, ApiError } from "@/lib/types";
+import { Save, X } from "lucide-react";
+import { useEffect, useId, useState } from "react";
 import { useCreateClub, useUpdateClub } from "@/lib/hooks";
+import type { ApiError, Club } from "@/lib/types";
 
 interface ClubModalProps {
   isOpen: boolean;
@@ -12,12 +12,7 @@ interface ClubModalProps {
   onSave: () => void;
 }
 
-export default function ClubModal({
-  isOpen,
-  onClose,
-  club,
-  onSave,
-}: ClubModalProps) {
+export default function ClubModal({ isOpen, onClose, club, onSave }: ClubModalProps) {
   const [formData, setFormData] = useState({
     name: "",
     picture: "",
@@ -29,6 +24,11 @@ export default function ClubModal({
 
   const createClubMutation = useCreateClub();
   const updateClubMutation = useUpdateClub();
+  const nameId = useId();
+  const pictureId = useId();
+  const descriptionId = useId();
+  const locationId = useId();
+  const linkId = useId();
 
   useEffect(() => {
     if (club) {
@@ -49,7 +49,7 @@ export default function ClubModal({
       });
     }
     setError("");
-  }, [club, isOpen]);
+  }, [club]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,9 +67,7 @@ export default function ClubModal({
       onSave();
       onClose();
     } catch (err: unknown) {
-      setError(
-        (err as ApiError)?.response?.data?.error || "L'opération a échoué"
-      );
+      setError((err as ApiError)?.response?.data?.error || "L'opération a échoué");
     }
   };
 
@@ -82,10 +80,7 @@ export default function ClubModal({
           <h2 className="text-xl font-bold text-gray-900">
             {club ? "Modifier le club" : "Créer un club"}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -98,40 +93,39 @@ export default function ClubModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={nameId} className="block text-sm font-medium text-gray-700 mb-1">
               Nom *
             </label>
             <input
+              id={nameId}
               type="text"
               required
               value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={pictureId} className="block text-sm font-medium text-gray-700 mb-1">
               URL de l&apos;image *
             </label>
             <input
+              id={pictureId}
               type="url"
               required
               value={formData.picture}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, picture: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, picture: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={descriptionId} className="block text-sm font-medium text-gray-700 mb-1">
               Description
             </label>
             <textarea
+              id={descriptionId}
               value={formData.description}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -145,29 +139,27 @@ export default function ClubModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={locationId} className="block text-sm font-medium text-gray-700 mb-1">
               Localisation
             </label>
             <input
+              id={locationId}
               type="text"
               value={formData.location}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, location: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={linkId} className="block text-sm font-medium text-gray-700 mb-1">
               Lien
             </label>
             <input
+              id={linkId}
               type="url"
               value={formData.link}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, link: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, link: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -182,17 +174,15 @@ export default function ClubModal({
             </button>
             <button
               type="submit"
-              disabled={
-                createClubMutation.isPending || updateClubMutation.isPending
-              }
+              disabled={createClubMutation.isPending || updateClubMutation.isPending}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
             >
               <Save className="h-4 w-4 mr-2" />
               {createClubMutation.isPending || updateClubMutation.isPending
                 ? "Enregistrement..."
                 : club
-                ? "Mettre à jour"
-                : "Créer"}
+                  ? "Mettre à jour"
+                  : "Créer"}
             </button>
           </div>
         </form>

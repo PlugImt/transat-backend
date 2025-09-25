@@ -1,11 +1,11 @@
 "use client";
 
+import { Calendar, History, TrendingDown, TrendingUp, User2 } from "lucide-react";
 import { useMemo } from "react";
-import { History, TrendingUp, TrendingDown, Calendar, User2 } from "lucide-react";
-import { ApiError } from "@/lib/types";
-import { useBassineHistory } from "@/lib/hooks";
-import Modal from "@/components/Modal";
 import { PageLoading } from "@/components/LoadingSpinner";
+import Modal from "@/components/Modal";
+import { useBassineHistory } from "@/lib/hooks";
+import type { ApiError } from "@/lib/types";
 
 interface BassineHistoryModalProps {
   isOpen: boolean;
@@ -27,10 +27,10 @@ export default function BassineHistoryModal({
     if (!history.length) return null;
 
     const totalChanges = history.length;
-    const positiveChanges = history.filter(h => h.score_change > 0).length;
-    const negativeChanges = history.filter(h => h.score_change < 0).length;
+    const positiveChanges = history.filter((h) => h.score_change > 0).length;
+    const negativeChanges = history.filter((h) => h.score_change < 0).length;
     const totalScoreChange = history.reduce((acc, h) => acc + h.score_change, 0);
-    
+
     return {
       totalChanges,
       positiveChanges,
@@ -92,7 +92,8 @@ export default function BassineHistoryModal({
                 <div className="bg-purple-50 rounded-lg p-4">
                   <p className="text-sm font-medium text-purple-600">Total changement</p>
                   <p className={`text-xl font-bold ${getChangeColor(stats.totalScoreChange)}`}>
-                    {stats.totalScoreChange > 0 ? '+' : ''}{stats.totalScoreChange}
+                    {stats.totalScoreChange > 0 ? "+" : ""}
+                    {stats.totalScoreChange}
                   </p>
                 </div>
               </div>
@@ -104,7 +105,10 @@ export default function BassineHistoryModal({
                 <h3 className="text-lg font-medium text-gray-900">Timeline des modifications</h3>
                 <div className="space-y-3">
                   {history.map((entry) => (
-                    <div key={entry.id} className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
+                    <div
+                      key={entry.id}
+                      className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg"
+                    >
                       <div className="flex-shrink-0 mt-0.5">
                         {getChangeIcon(entry.score_change)}
                       </div>
@@ -112,7 +116,8 @@ export default function BassineHistoryModal({
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <span className={`font-semibold ${getChangeColor(entry.score_change)}`}>
-                              {entry.score_change > 0 ? '+' : ''}{entry.score_change}
+                              {entry.score_change > 0 ? "+" : ""}
+                              {entry.score_change}
                             </span>
                             <span className="text-gray-600">→</span>
                             <span className="font-medium text-gray-900">{entry.new_total}</span>
@@ -122,9 +127,7 @@ export default function BassineHistoryModal({
                             <span>{formatDate(entry.game_date)}</span>
                           </div>
                         </div>
-                        {entry.notes && (
-                          <p className="mt-1 text-sm text-gray-600">{entry.notes}</p>
-                        )}
+                        {entry.notes && <p className="mt-1 text-sm text-gray-600">{entry.notes}</p>}
                         {entry.admin_email && (
                           <div className="mt-2 flex items-center space-x-1 text-xs text-gray-500">
                             <User2 className="h-3 w-3" />

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { Gamepad2 } from "lucide-react";
-import ErrorBoundary from "@/components/ErrorBoundary";
+import { useState } from "react";
 import BassineScores from "@/components/BassineScores";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 type GameTab = "bassine";
 
@@ -24,9 +24,7 @@ function GamesPageContent() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
         <div className="flex items-center space-x-3">
           <Gamepad2 className="h-6 w-6 text-purple-600" />
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            Jeux
-          </h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Jeux</h1>
         </div>
       </div>
 
@@ -37,10 +35,11 @@ function GamesPageContent() {
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
-              
+
               return (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     isActive
@@ -55,19 +54,17 @@ function GamesPageContent() {
             })}
           </nav>
         </div>
-        
+
         {/* Tab Description */}
         <div className="mt-4">
           <p className="text-sm text-gray-600">
-            {tabs.find(tab => tab.id === activeTab)?.description}
+            {tabs.find((tab) => tab.id === activeTab)?.description}
           </p>
         </div>
       </div>
 
       {/* Tab Content */}
-      <div className="min-h-[400px]">
-        {activeTab === "bassine" && <BassineScores />}
-      </div>
+      <div className="min-h-[400px]">{activeTab === "bassine" && <BassineScores />}</div>
     </div>
   );
 }

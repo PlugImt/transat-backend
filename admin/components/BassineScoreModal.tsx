@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Minus } from "lucide-react";
-import { BassineScore, ApiError } from "@/lib/types";
-import { useUpdateBassineScore } from "@/lib/hooks";
-import Modal from "@/components/Modal";
+import { Minus, Plus } from "lucide-react";
+import { useEffect, useId, useState } from "react";
 import toast from "react-hot-toast";
+import Modal from "@/components/Modal";
+import { useUpdateBassineScore } from "@/lib/hooks";
+import type { ApiError, BassineScore } from "@/lib/types";
 
 interface BassineScoreModalProps {
   isOpen: boolean;
@@ -13,13 +13,10 @@ interface BassineScoreModalProps {
   user: BassineScore;
 }
 
-export default function BassineScoreModal({
-  isOpen,
-  onClose,
-  user,
-}: BassineScoreModalProps) {
+export default function BassineScoreModal({ isOpen, onClose, user }: BassineScoreModalProps) {
   const [scoreChange, setScoreChange] = useState(0);
   const updateScoreMutation = useUpdateBassineScore();
+  const scoreInputId = useId();
 
   useEffect(() => {
     if (isOpen) {
@@ -40,15 +37,12 @@ export default function BassineScoreModal({
         userEmail: user.user_email,
         scoreChange,
       });
-      
+
       toast.success("Score mis à jour avec succès");
       onClose();
     } catch (err) {
       const error = err as ApiError;
-      toast.error(
-        error.response?.data?.error ||
-          "Erreur lors de la mise à jour du score"
-      );
+      toast.error(error.response?.data?.error || "Erreur lors de la mise à jour du score");
     }
   };
 
@@ -57,57 +51,60 @@ export default function BassineScoreModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Modifier le score">
       <form onSubmit={handleSubmit} className="space-y-6">
-          {/* User Info */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">
-              Joueur sélectionné
-            </h3>
-            <div className="text-sm text-gray-600">
-              <p className="font-medium">{user.user_first_name} {user.user_last_name}</p>
-              <p>{user.user_email}</p>
-              <p className="mt-1">Score actuel: <span className="font-bold text-yellow-600">{user.current_score}</span></p>
-            </div>
+        {/* User Info */}
+        <div className="bg-gray-50 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-gray-900 mb-2">Joueur sélectionné</h3>
+          <div className="text-sm text-gray-600">
+            <p className="font-medium">
+              {user.user_first_name} {user.user_last_name}
+            </p>
+            <p>{user.user_email}</p>
+            <p className="mt-1">
+              Score actuel: <span className="font-bold text-yellow-600">{user.current_score}</span>
+            </p>
           </div>
+        </div>
 
-          {/* Score Change */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Changement de score
-            </label>
-            <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => setScoreChange(prev => prev - 1)}
-                className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
-              >
-                <Minus size={16} />
-              </button>
-              <input
-                type="number"
-                value={scoreChange}
-                onChange={(e) => setScoreChange(parseInt(e.target.value) || 0)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
-                placeholder="0"
-              />
-              <button
-                type="button"
-                onClick={() => setScoreChange(prev => prev + 1)}
-                className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-            {scoreChange !== 0 && (
-              <p className="mt-2 text-sm text-gray-600">
-                Nouveau score: <span className="font-bold text-blue-600">{newScore}</span>
-                {scoreChange > 0 ? (
-                  <span className="text-green-600 ml-2">(+{scoreChange})</span>
-                ) : (
-                  <span className="text-red-600 ml-2">({scoreChange})</span>
-                )}
-              </p>
-            )}
+        {/* Score Change */}
+        <div>
+          <label htmlFor={scoreInputId} className="block text-sm font-medium text-gray-700 mb-2">
+            Changement de score
+          </label>
+          <div className="flex items-center space-x-3">
+            <button
+              type="button"
+              onClick={() => setScoreChange((prev) => prev - 1)}
+              className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
+            >
+              <Minus size={16} />
+            </button>
+            <input
+              id={scoreInputId}
+              type="number"
+              value={scoreChange}
+              onChange={(e) => setScoreChange(parseInt(e.target.value, 10) || 0)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
+              placeholder="0"
+            />
+            <button
+              type="button"
+              onClick={() => setScoreChange((prev) => prev + 1)}
+              className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200"
+            >
+              <Plus size={16} />
+            </button>
           </div>
+          {scoreChange !== 0 && (
+            <p className="mt-2 text-sm text-gray-600">
+              Nouveau score: <span className="font-bold text-blue-600">{newScore}</span>
+              {scoreChange > 0 ? (
+                <span className="text-green-600 ml-2">(+{scoreChange})</span>
+              ) : (
+                <span className="text-red-600 ml-2">({scoreChange})</span>
+              )}
+            </p>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="flex justify-end space-x-3 pt-4 border-t">

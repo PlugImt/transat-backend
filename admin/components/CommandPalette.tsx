@@ -1,26 +1,13 @@
 "use client";
 
-import { useEffect, useState, useMemo, memo } from "react";
 import { Command } from "cmdk";
+import { BarChart3, Building, Calendar, LogOut, Plus, Search, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
-import {
-  Users,
-  Calendar,
-  Building,
-  BarChart3,
-  Search,
-  Plus,
-  LogOut,
-} from "lucide-react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { useClubs, useEvents, useKeyboardShortcuts, useUsers } from "@/lib/hooks";
 import { useAppStore } from "@/lib/stores/appStore";
 import { useAuthStore } from "@/lib/stores/authStore";
-import {
-  useKeyboardShortcuts,
-  useUsers,
-  useClubs,
-  useEvents,
-} from "@/lib/hooks";
-import { User, Club, Event } from "@/lib/types";
+import type { Club, Event, User } from "@/lib/types";
 
 interface CommandItem {
   id: string;
@@ -53,9 +40,7 @@ function CommandPalette() {
     const userCommands: CommandItem[] = users.map((user: User) => ({
       id: `user-${user.email}`,
       label:
-        `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
-        user.email ||
-        "Utilisateur",
+        `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email || "Utilisateur",
       description: `Utilisateur • ${user.email}`,
       icon: Users,
       action: () => {
@@ -72,61 +57,49 @@ function CommandPalette() {
       ].filter(Boolean),
     }));
 
-    const clubCommands: CommandItem[] = clubs.map(
-      (club: Club, index: number) => ({
-        id: `club-${club.id_clubs || `unknown-${index}`}`,
-        label: club.name || "Club sans nom",
-        description: `Club • ${club.description || "Pas de description"}`,
-        icon: Building,
-        action: () => {
-          openClubModal(club);
-          router.push("/clubs");
-        },
-        keywords: [
-          club.name || "",
-          club.description || "",
-          club.location || "",
-          "club",
-          "association",
-        ].filter(Boolean),
-      })
-    );
+    const clubCommands: CommandItem[] = clubs.map((club: Club, index: number) => ({
+      id: `club-${club.id_clubs || `unknown-${index}`}`,
+      label: club.name || "Club sans nom",
+      description: `Club • ${club.description || "Pas de description"}`,
+      icon: Building,
+      action: () => {
+        openClubModal(club);
+        router.push("/clubs");
+      },
+      keywords: [
+        club.name || "",
+        club.description || "",
+        club.location || "",
+        "club",
+        "association",
+      ].filter(Boolean),
+    }));
 
-    const eventCommands: CommandItem[] = events.map(
-      (event: Event, index: number) => ({
-        id: `event-${event.id_events || `unknown-${index}`}`,
-        label: event.name || "Événement sans titre",
-        description: `Événement • ${
-          event.start_date
-            ? new Date(event.start_date).toLocaleDateString("fr-FR")
-            : "Date non définie"
-        }`,
-        icon: Calendar,
-        action: () => {
-          openEventModal(event);
-          router.push("/events");
-        },
-        keywords: [
-          event.name || "",
-          event.description || "",
-          event.location || "",
-          event.creator || "",
-          "event",
-          "evenement",
-        ].filter(Boolean),
-      })
-    );
+    const eventCommands: CommandItem[] = events.map((event: Event, index: number) => ({
+      id: `event-${event.id_events || `unknown-${index}`}`,
+      label: event.name || "Événement sans titre",
+      description: `Événement • ${
+        event.start_date
+          ? new Date(event.start_date).toLocaleDateString("fr-FR")
+          : "Date non définie"
+      }`,
+      icon: Calendar,
+      action: () => {
+        openEventModal(event);
+        router.push("/events");
+      },
+      keywords: [
+        event.name || "",
+        event.description || "",
+        event.location || "",
+        event.creator || "",
+        "event",
+        "evenement",
+      ].filter(Boolean),
+    }));
 
     return [...userCommands, ...clubCommands, ...eventCommands];
-  }, [
-    users,
-    clubs,
-    events,
-    router,
-    openUserModal,
-    openClubModal,
-    openEventModal,
-  ]);
+  }, [users, clubs, events, router, openUserModal, openClubModal, openEventModal]);
 
   // Static commands
   const staticCommands: CommandItem[] = useMemo(
@@ -211,7 +184,7 @@ function CommandPalette() {
         keywords: ["logout", "deconnexion", "disconnect", "exit", "sortir"],
       },
     ],
-    [router, logout, openUserModal, openClubModal, openEventModal]
+    [router, logout, openUserModal, openClubModal, openEventModal],
   );
 
   // Combine all commands
@@ -227,15 +200,9 @@ function CommandPalette() {
     return allCommands
       .filter(
         (command) =>
-          (command.label &&
-            command.label.toLowerCase().includes(searchLower)) ||
-          (command.description &&
-            command.description.toLowerCase().includes(searchLower)) ||
-          (command.keywords &&
-            command.keywords.some(
-              (keyword) =>
-                keyword && keyword.toLowerCase().includes(searchLower)
-            ))
+          command.label?.toLowerCase().includes(searchLower) ||
+          command.description?.toLowerCase().includes(searchLower) ||
+          command.keywords?.some((keyword) => keyword?.toLowerCase().includes(searchLower)),
       )
       .slice(0, 50); // Show more results since we include all data
   }, [allCommands, staticCommands, search]);
@@ -258,7 +225,7 @@ function CommandPalette() {
         callback: () => commandPaletteOpen && setCommandPaletteOpen(false),
       },
     ],
-    [commandPaletteOpen]
+    [commandPaletteOpen],
   );
 
   // Reset search when opening
@@ -290,9 +257,7 @@ function CommandPalette() {
             className="flex-1 py-3 text-lg bg-transparent border-none outline-none placeholder-gray-400"
             autoFocus
           />
-          <kbd className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-            ESC
-          </kbd>
+          <kbd className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">ESC</kbd>
         </div>
 
         <Command.List className="max-h-96 overflow-y-auto">
@@ -301,8 +266,7 @@ function CommandPalette() {
           </Command.Empty>
 
           {/* Render command groups dynamically */}
-          {filteredCommands.filter((cmd) => cmd.id.startsWith("nav-")).length >
-            0 && (
+          {filteredCommands.filter((cmd) => cmd.id.startsWith("nav-")).length > 0 && (
             <Command.Group heading="Navigation" className="p-2">
               {filteredCommands
                 .filter((cmd) => cmd.id.startsWith("nav-"))
@@ -316,8 +280,7 @@ function CommandPalette() {
             </Command.Group>
           )}
 
-          {filteredCommands.filter((cmd) => cmd.id.startsWith("action-"))
-            .length > 0 && (
+          {filteredCommands.filter((cmd) => cmd.id.startsWith("action-")).length > 0 && (
             <Command.Group heading="Actions" className="p-2">
               {filteredCommands
                 .filter((cmd) => cmd.id.startsWith("action-"))
@@ -331,8 +294,7 @@ function CommandPalette() {
             </Command.Group>
           )}
 
-          {filteredCommands.filter((cmd) => cmd.id.startsWith("user-")).length >
-            0 && (
+          {filteredCommands.filter((cmd) => cmd.id.startsWith("user-")).length > 0 && (
             <Command.Group heading="Utilisateurs" className="p-2">
               {filteredCommands
                 .filter((cmd) => cmd.id.startsWith("user-"))
@@ -346,8 +308,7 @@ function CommandPalette() {
             </Command.Group>
           )}
 
-          {filteredCommands.filter((cmd) => cmd.id.startsWith("club-")).length >
-            0 && (
+          {filteredCommands.filter((cmd) => cmd.id.startsWith("club-")).length > 0 && (
             <Command.Group heading="Clubs" className="p-2">
               {filteredCommands
                 .filter((cmd) => cmd.id.startsWith("club-"))
@@ -361,8 +322,7 @@ function CommandPalette() {
             </Command.Group>
           )}
 
-          {filteredCommands.filter((cmd) => cmd.id.startsWith("event-"))
-            .length > 0 && (
+          {filteredCommands.filter((cmd) => cmd.id.startsWith("event-")).length > 0 && (
             <Command.Group heading="Événements" className="p-2">
               {filteredCommands
                 .filter((cmd) => cmd.id.startsWith("event-"))
@@ -376,8 +336,7 @@ function CommandPalette() {
             </Command.Group>
           )}
 
-          {filteredCommands.filter((cmd) => cmd.id.startsWith("system-"))
-            .length > 0 && (
+          {filteredCommands.filter((cmd) => cmd.id.startsWith("system-")).length > 0 && (
             <Command.Group heading="Système" className="p-2">
               {filteredCommands
                 .filter((cmd) => cmd.id.startsWith("system-"))
@@ -394,15 +353,11 @@ function CommandPalette() {
 
         <div className="border-t px-4 py-2 text-xs text-gray-500 flex justify-between">
           <div>
-            <kbd className="bg-gray-100 px-1 py-0.5 rounded text-xs mr-1">
-              ↑↓
-            </kbd>
+            <kbd className="bg-gray-100 px-1 py-0.5 rounded text-xs mr-1">↑↓</kbd>
             pour naviguer
           </div>
           <div>
-            <kbd className="bg-gray-100 px-1 py-0.5 rounded text-xs mr-1">
-              ↵
-            </kbd>
+            <kbd className="bg-gray-100 px-1 py-0.5 rounded text-xs mr-1">↵</kbd>
             pour sélectionner
           </div>
           <div>
@@ -413,9 +368,17 @@ function CommandPalette() {
       </Command>
 
       {/* Background overlay to close on click */}
-      <div
+      <button
         className="absolute inset-0 -z-10"
+        type="button"
+        tabIndex={0}
         onClick={() => setCommandPaletteOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setCommandPaletteOpen(false);
+          }
+        }}
       />
     </div>
   );
@@ -437,13 +400,9 @@ const CommandItemComponent = memo<{
     >
       <Icon className="h-4 w-4 text-gray-500 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-gray-900 truncate">
-          {command.label}
-        </div>
+        <div className="text-sm font-medium text-gray-900 truncate">{command.label}</div>
         {command.description && (
-          <div className="text-xs text-gray-500 truncate">
-            {command.description}
-          </div>
+          <div className="text-xs text-gray-500 truncate">{command.description}</div>
         )}
       </div>
     </Command.Item>

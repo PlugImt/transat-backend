@@ -1,12 +1,12 @@
-import { create } from 'zustand';
-import { User, Club, Event } from '../types';
+import { create } from "zustand";
+import type { Club, Event, User } from "../types";
 
 interface AppState {
   // UI State
   sidebarOpen: boolean;
   commandPaletteOpen: boolean;
   currentPage: string;
-  
+
   // Modals
   userModalOpen: boolean;
   editingUser: User | null;
@@ -14,11 +14,11 @@ interface AppState {
   editingClub: Club | null;
   eventModalOpen: boolean;
   editingEvent: Event | null;
-  
+
   // Search & Filters
   globalSearch: string;
   activeFilters: Record<string, unknown>;
-  
+
   // Actions
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
@@ -28,7 +28,7 @@ interface AppState {
   setGlobalSearch: (search: string) => void;
   setFilter: (key: string, value: unknown) => void;
   clearFilters: () => void;
-  
+
   // Modal actions
   openUserModal: (user?: User) => void;
   closeUserModal: () => void;
@@ -42,8 +42,8 @@ export const useAppStore = create<AppState>((set) => ({
   // Initial state
   sidebarOpen: false,
   commandPaletteOpen: false,
-  currentPage: '',
-  
+  currentPage: "",
+
   // Modals
   userModalOpen: false,
   editingUser: null,
@@ -51,41 +51,46 @@ export const useAppStore = create<AppState>((set) => ({
   editingClub: null,
   eventModalOpen: false,
   editingEvent: null,
-  
-  globalSearch: '',
+
+  globalSearch: "",
   activeFilters: {},
-  
+
   // Actions
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
-  
-  toggleSidebar: () => set((state) => ({ 
-    sidebarOpen: !state.sidebarOpen 
-  })),
-  
-  setCommandPaletteOpen: (open) => set({ 
-    commandPaletteOpen: open 
-  }),
-  
-  toggleCommandPalette: () => set((state) => ({ 
-    commandPaletteOpen: !state.commandPaletteOpen 
-  })),
-  
+
+  toggleSidebar: () =>
+    set((state) => ({
+      sidebarOpen: !state.sidebarOpen,
+    })),
+
+  setCommandPaletteOpen: (open) =>
+    set({
+      commandPaletteOpen: open,
+    }),
+
+  toggleCommandPalette: () =>
+    set((state) => ({
+      commandPaletteOpen: !state.commandPaletteOpen,
+    })),
+
   setCurrentPage: (page) => set({ currentPage: page }),
-  
+
   setGlobalSearch: (search) => set({ globalSearch: search }),
-  
-  setFilter: (key, value) => set((state) => ({
-    activeFilters: { ...state.activeFilters, [key]: value }
-  })),
-  
+
+  setFilter: (key, value) =>
+    set((state) => ({
+      activeFilters: { ...state.activeFilters, [key]: value },
+    })),
+
   clearFilters: () => set({ activeFilters: {} }),
-  
+
   // Modal actions
-  openUserModal: (user) => set({ 
-    userModalOpen: true, 
-    editingUser: user || null 
-  }),
-  
+  openUserModal: (user) =>
+    set({
+      userModalOpen: true,
+      editingUser: user || null,
+    }),
+
   closeUserModal: () => {
     set({ userModalOpen: false });
     setTimeout(() => {
@@ -94,10 +99,11 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   // Club modal actions
-  openClubModal: (club) => set({ 
-    clubModalOpen: true, 
-    editingClub: club || null 
-  }),
+  openClubModal: (club) =>
+    set({
+      clubModalOpen: true,
+      editingClub: club || null,
+    }),
 
   closeClubModal: () => {
     set({ clubModalOpen: false });
@@ -107,10 +113,11 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   // Event modal actions
-  openEventModal: (event) => set({ 
-    eventModalOpen: true, 
-    editingEvent: event || null 
-  }),
+  openEventModal: (event) =>
+    set({
+      eventModalOpen: true,
+      editingEvent: event || null,
+    }),
 
   closeEventModal: () => {
     set({ eventModalOpen: false });

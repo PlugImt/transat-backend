@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export interface AuthUser {
   email: string;
@@ -11,7 +11,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  
+
   // Actions
   setAuth: (user: AuthUser, token: string) => void;
   logout: () => void;
@@ -26,27 +26,28 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: true,
-      
-      setAuth: (user, token) => set({ 
-        user, 
-        token, 
-        isAuthenticated: true,
-        isLoading: false 
-      }),
-      
+
+      setAuth: (user, token) =>
+        set({
+          user,
+          token,
+          isAuthenticated: true,
+          isLoading: false,
+        }),
+
       logout: () => {
-        set({ 
-          user: null, 
-          token: null, 
+        set({
+          user: null,
+          token: null,
           isAuthenticated: false,
-          isLoading: false 
+          isLoading: false,
         });
         // Clear localStorage
-        localStorage.removeItem('adminToken');
+        localStorage.removeItem("adminToken");
       },
-      
+
       setLoading: (loading) => set({ isLoading: loading }),
-      
+
       updateUser: (updates) => {
         const currentUser = get().user;
         if (currentUser) {
@@ -55,12 +56,12 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'admin-auth-storage',
-      partialize: (state) => ({ 
-        user: state.user, 
-        token: state.token, 
-        isAuthenticated: state.isAuthenticated 
+      name: "admin-auth-storage",
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
       }),
-    }
-  )
+    },
+  ),
 );

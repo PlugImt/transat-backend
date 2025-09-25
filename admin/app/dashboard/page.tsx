@@ -1,9 +1,9 @@
 "use client";
 
-import { Users, Calendar, Building, AlertCircle } from "lucide-react";
-import { useDashboardStats } from "@/lib/hooks";
+import { AlertCircle, Building, Calendar, Users } from "lucide-react";
 import UserGrowthChart from "@/components/UserGrowthChart";
-import { ApiError } from "@/lib/types";
+import { useDashboardStats } from "@/lib/hooks";
+import type { ApiError } from "@/lib/types";
 
 export default function DashboardPage() {
   const { data: stats, isLoading, error } = useDashboardStats();
@@ -28,8 +28,7 @@ export default function DashboardPage() {
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
           <div className="text-sm text-red-700">
-            {(error as ApiError)?.message ||
-              "Échec de la récupération des statistiques"}
+            {(error as ApiError)?.message || "Échec de la récupération des statistiques"}
           </div>
         </div>
       </div>
@@ -75,10 +74,7 @@ export default function DashboardPage() {
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div
-              key={stat.title}
-              className="bg-white overflow-hidden shadow rounded-lg"
-            >
+            <div key={stat.title} className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
@@ -88,9 +84,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        {stat.title}
-                      </dt>
+                      <dt className="text-sm font-medium text-gray-500 truncate">{stat.title}</dt>
                       <dd className="text-lg font-medium text-gray-900">
                         {stat.value.toLocaleString()}
                       </dd>
@@ -105,9 +99,7 @@ export default function DashboardPage() {
 
       {stats?.userGrowth && stats.userGrowth.length > 0 && (
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
-            Compte créés
-          </h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Compte créés</h2>
           <div className="h-64">
             <UserGrowthChart data={stats.userGrowth} />
           </div>

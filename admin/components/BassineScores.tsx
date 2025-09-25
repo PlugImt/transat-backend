@@ -1,21 +1,14 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { type ColumnDef } from "@tanstack/react-table";
-import {
-  Edit,
-  History,
-  User,
-  TrendingUp,
-  Calendar,
-  Award,
-} from "lucide-react";
-import { BassineScore, ApiError } from "@/lib/types";
-import { useBassineScores } from "@/lib/hooks";
-import { PageLoading } from "@/components/LoadingSpinner";
-import DataTable from "@/components/DataTable";
-import BassineScoreModal from "@/components/BassineScoreModal";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Award, Calendar, Edit, History, TrendingUp, User } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import BassineHistoryModal from "@/components/BassineHistoryModal";
+import BassineScoreModal from "@/components/BassineScoreModal";
+import DataTable from "@/components/DataTable";
+import { PageLoading } from "@/components/LoadingSpinner";
+import { useBassineScores } from "@/lib/hooks";
+import type { ApiError, BassineScore } from "@/lib/types";
 
 export default function BassineScores() {
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
@@ -34,7 +27,6 @@ export default function BassineScores() {
     setHistoryModalOpen(true);
   }, []);
 
-
   const handleCloseScoreModal = useCallback(() => {
     setScoreModalOpen(false);
     setSelectedUser(null);
@@ -52,8 +44,8 @@ export default function BassineScores() {
     const totalPlayers = scores.length;
     const totalGames = scores.reduce((acc, score) => acc + score.total_games_played, 0);
     const averageScore = scores.reduce((acc, score) => acc + score.current_score, 0) / totalPlayers;
-    const topScore = Math.max(...scores.map(score => score.current_score));
-    
+    const topScore = Math.max(...scores.map((score) => score.current_score));
+
     return { totalPlayers, totalGames, averageScore, topScore };
   }, [scores]);
 
@@ -89,9 +81,7 @@ export default function BassineScores() {
         header: "Score actuel",
         cell: ({ row }) => (
           <div className="flex items-center space-x-2">
-            <span className="text-lg font-bold text-gray-900">
-              {row.original.current_score}
-            </span>
+            <span className="text-lg font-bold text-gray-900">{row.original.current_score}</span>
           </div>
         ),
       },
@@ -113,6 +103,7 @@ export default function BassineScores() {
         cell: ({ row }) => (
           <div className="flex space-x-2">
             <button
+              type="button"
               onClick={() => handleEditScore(row.original)}
               className="p-1 text-blue-600 hover:bg-blue-50 rounded"
               title="Modifier le score"
@@ -120,6 +111,7 @@ export default function BassineScores() {
               <Edit size={16} />
             </button>
             <button
+              type="button"
               onClick={() => handleViewHistory(row.original)}
               className="p-1 text-purple-600 hover:bg-purple-50 rounded"
               title="Voir l'historique"
@@ -130,7 +122,7 @@ export default function BassineScores() {
         ),
       },
     ],
-    [handleEditScore, handleViewHistory]
+    [handleEditScore, handleViewHistory],
   );
 
   if (isLoading) {
@@ -141,8 +133,7 @@ export default function BassineScores() {
     return (
       <div className="bg-red-50 border border-red-200 rounded-md p-4">
         <div className="text-sm text-red-700">
-          {(error as ApiError)?.message ||
-            "Échec de la récupération des scores"}
+          {(error as ApiError)?.message || "Échec de la récupération des scores"}
         </div>
       </div>
     );
@@ -161,7 +152,7 @@ export default function BassineScores() {
               color: "text-blue-600",
               bgColor: "bg-blue-50",
             },
-            { 
+            {
               title: "Bassines bues en tout",
               value: stats.totalGames,
               icon: TrendingUp,
@@ -185,10 +176,7 @@ export default function BassineScores() {
           ].map((stat) => {
             const Icon = stat.icon;
             return (
-              <div
-                key={stat.title}
-                className="bg-white overflow-hidden shadow rounded-lg"
-              >
+              <div key={stat.title} className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="p-5">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
@@ -198,12 +186,10 @@ export default function BassineScores() {
                     </div>
                     <div className="ml-5 w-0 flex-1">
                       <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          {stat.title}
-                        </dt>
+                        <dt className="text-sm font-medium text-gray-500 truncate">{stat.title}</dt>
                         <dd className="text-lg font-medium text-gray-900">
-                          {typeof stat.value === 'number' && stat.title !== 'Score moyen' 
-                            ? stat.value.toLocaleString() 
+                          {typeof stat.value === "number" && stat.title !== "Score moyen"
+                            ? stat.value.toLocaleString()
                             : stat.value}
                         </dd>
                       </dl>

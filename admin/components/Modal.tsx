@@ -1,29 +1,23 @@
 "use client";
 
-import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
-import { X } from 'lucide-react';
-import { Fragment } from 'react';
+import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from "@headlessui/react";
+import { X } from "lucide-react";
+import { Fragment } from "react";
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  maxWidth?: "sm" | "md" | "lg" | "xl";
 }
 
-export default function Modal({ 
-  isOpen, 
-  onClose, 
-  title, 
-  children, 
-  maxWidth = 'md' 
-}: ModalProps) {
+export default function Modal({ isOpen, onClose, title, children, maxWidth = "md" }: ModalProps) {
   const maxWidthClasses = {
-    sm: 'sm:max-w-sm',
-    md: 'sm:max-w-md',
-    lg: 'sm:max-w-lg',
-    xl: 'sm:max-w-xl',
+    sm: "sm:max-w-sm",
+    md: "sm:max-w-md",
+    lg: "sm:max-w-lg",
+    xl: "sm:max-w-xl",
   };
 
   return (
@@ -52,7 +46,9 @@ export default function Modal({
               leaveFrom="opacity-100 translate-y-0 sm:scale-100"
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <DialogPanel className={`w-full ${maxWidthClasses[maxWidth]} transform overflow-hidden rounded-lg bg-white p-4 sm:p-6 text-left align-middle shadow-xl transition-all`}>
+              <DialogPanel
+                className={`w-full ${maxWidthClasses[maxWidth]} transform overflow-hidden rounded-lg bg-white p-4 sm:p-6 text-left align-middle shadow-xl transition-all`}
+              >
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <DialogTitle as="h3" className="text-lg sm:text-xl font-bold text-gray-900">
                     {title}

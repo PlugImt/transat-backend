@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  LineChart,
+  CartesianGrid,
   Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from "recharts";
 
 interface UserGrowthChartProps {
@@ -39,17 +39,9 @@ export default function UserGrowthChart({ data }: UserGrowthChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart
-        data={data}
-        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-      >
+      <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis
-          dataKey="date"
-          tickFormatter={formatDate}
-          stroke="#6b7280"
-          fontSize={12}
-        />
+        <XAxis dataKey="date" tickFormatter={formatDate} stroke="#6b7280" fontSize={12} />
         <YAxis stroke="#6b7280" fontSize={12} />
         <Tooltip
           labelFormatter={formatTooltipDate}

@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Calendar,
-  MapPin,
-  Users,
-  Filter,
-} from "lucide-react";
-import { Event, EventWithClubName } from "@/lib/types";
-import { useEvents, useDeleteEvent } from "@/lib/hooks";
-import { useAppStore } from "@/lib/stores/appStore";
+import { Calendar, Edit, Filter, MapPin, Plus, Trash2, Users } from "lucide-react";
+import Image from "next/image";
+import { useCallback, useMemo, useState } from "react";
 import EventModal from "@/components/EventModal";
+import { useDeleteEvent, useEvents } from "@/lib/hooks";
+import { useAppStore } from "@/lib/stores/appStore";
+import type { Event, EventWithClubName } from "@/lib/types";
 
 type DateFilter = "all" | "past" | "future";
 
@@ -23,16 +16,15 @@ export default function EventsPage() {
   const { data: events = [], isLoading } = useEvents();
   const deleteEventMutation = useDeleteEvent();
 
-  const { eventModalOpen, editingEvent, openEventModal, closeEventModal } =
-    useAppStore();
+  const { eventModalOpen, editingEvent, openEventModal, closeEventModal } = useAppStore();
 
   // Fonction pour vérifier si un événement est en cours
-  const isEventOngoing = (event: Event) => {
+  const isEventOngoing = useCallback((event: Event) => {
     const now = new Date();
     const startDate = new Date(event.start_date);
     const endDate = new Date(event.end_date);
     return now >= startDate && now <= endDate;
-  };
+  }, []);
 
   // Filtrer les événements selon le filtre de date sélectionné
   const filteredEvents = useMemo(() => {
@@ -51,7 +43,7 @@ export default function EventsPage() {
 
       return true;
     });
-  }, [events, dateFilter]);
+  }, [events, dateFilter, isEventOngoing]);
 
   const handleCreateEvent = () => {
     openEventModal();
@@ -102,9 +94,7 @@ export default function EventsPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Gestion des événements
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900">Gestion des événements</h1>
         <div className="flex items-center space-x-4">
           {/* Sélecteur de filtre par date */}
           <div className="flex items-center space-x-2">
@@ -121,6 +111,7 @@ export default function EventsPage() {
           </div>
 
           <button
+            type="button"
             onClick={handleCreateEvent}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
@@ -144,9 +135,7 @@ export default function EventsPage() {
               )}
             </span>
             {dateFilter !== "all" && (
-              <span className="text-xs text-gray-500">
-                sur {events.length} au total
-              </span>
+              <span className="text-xs text-gray-500">sur {events.length} au total</span>
             )}
           </div>
         </div>
@@ -179,86 +168,84 @@ export default function EventsPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEvents &&
-                filteredEvents.map((event) => (
-                  <tr
-                    key={event.id_events}
-                    className={`hover:bg-gray-50 ${
-                      isEventOngoing(event) ? "bg-orange-50" : ""
-                    }`}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {event.picture && (
-                          <img
-                            src={event.picture}
-                            alt={event.name}
-                            className="h-10 w-10 rounded object-cover mr-3"
-                          />
-                        )}
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 flex items-center">
-                            {event.name}
-                            {isEventOngoing(event) && (
-                              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                En cours
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-500 flex items-center">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            {event.location}
-                          </div>
+              {filteredEvents?.map((event) => (
+                <tr
+                  key={event.id_events}
+                  className={`hover:bg-gray-50 ${isEventOngoing(event) ? "bg-orange-50" : ""}`}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      {event.picture && (
+                        <Image
+                          src={event.picture}
+                          alt={event.name}
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 rounded object-cover mr-3"
+                        />
+                      )}
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 flex items-center">
+                          {event.name}
+                          {isEventOngoing(event) && (
+                            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                              En cours
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500 flex items-center">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {event.location}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {(event as EventWithClubName).club_name ||
-                          `Club ${event.id_club}`}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {event.creator}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-gray-900">
-                        <Calendar className="h-4 w-4 mr-1" />
-                        {formatDate(event.start_date)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-gray-900">
-                        <Calendar className="h-4 w-4 mr-1" />
-                        {formatDate(event.end_date)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-gray-900">
-                        <Users className="h-4 w-4 mr-1" />
-                        {event.attendee_count || 0}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEditEvent(event)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteEvent(event)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {(event as EventWithClubName).club_name || `Club ${event.id_club}`}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{event.creator}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center text-sm text-gray-900">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      {formatDate(event.start_date)}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center text-sm text-gray-900">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      {formatDate(event.end_date)}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center text-sm text-gray-900">
+                      <Users className="h-4 w-4 mr-1" />
+                      {event.attendee_count || 0}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => handleEditEvent(event)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteEvent(event)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -270,8 +257,8 @@ export default function EventsPage() {
               {dateFilter === "all"
                 ? "Aucun événement"
                 : dateFilter === "future"
-                ? "Aucun événement futur ou en cours"
-                : "Aucun événement passé"}
+                  ? "Aucun événement futur ou en cours"
+                  : "Aucun événement passé"}
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               {dateFilter === "all"

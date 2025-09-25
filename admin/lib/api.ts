@@ -1,7 +1,17 @@
-import axios from 'axios';
-import { User, Event, Club, DashboardStats, MenuItem, MenuItemReview, BassineScore, BassineScoreHistory, UpdateBassineScoreRequest } from './types';
+import axios from "axios";
+import type {
+  BassineScore,
+  BassineScoreHistory,
+  Club,
+  DashboardStats,
+  Event,
+  MenuItem,
+  MenuItemReview,
+  UpdateBassineScoreRequest,
+  User,
+} from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,7 +19,7 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem("adminToken");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -18,12 +28,12 @@ api.interceptors.request.use((config) => {
 
 export const authApi = {
   login: async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
+    const response = await api.post("/auth/login", { email, password });
     return response.data;
   },
   verify: async (token: string) => {
-    const response = await api.get('/newf/me', {
-      headers: { Authorization: `Bearer ${token}` }
+    const response = await api.get("/newf/me", {
+      headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
   },
@@ -31,16 +41,16 @@ export const authApi = {
 
 export const usersApi = {
   getAll: async (): Promise<User[]> => {
-    const response = await api.get('/admin/users');
+    const response = await api.get("/admin/users");
     return response.data;
   },
   create: async (user: Partial<User>) => {
     const filteredUser = Object.fromEntries(
-      Object.entries(user).filter(([, value]) => 
-        value !== '' && value !== null && value !== undefined
-      )
+      Object.entries(user).filter(
+        ([, value]) => value !== "" && value !== null && value !== undefined,
+      ),
     );
-    const response = await api.post('/admin/users', filteredUser);
+    const response = await api.post("/admin/users", filteredUser);
     return response.data;
   },
   update: async (email: string, user: Partial<User>) => {
@@ -48,7 +58,7 @@ export const usersApi = {
       const response = await api.patch(`/admin/users/${email}`, user);
       return response.data;
     } catch (error: unknown) {
-      console.error('Error updating user:', error);
+      console.error("Error updating user:", error);
       throw error;
     }
   },
@@ -68,16 +78,18 @@ export const usersApi = {
 
 export const eventsApi = {
   getAll: async (): Promise<Event[]> => {
-    const response = await api.get('/admin/events');
-    return response.data.sort((a: Event, b: Event) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+    const response = await api.get("/admin/events");
+    return response.data.sort(
+      (a: Event, b: Event) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+    );
   },
   create: async (event: Partial<Event>) => {
     const filteredEvent = Object.fromEntries(
-      Object.entries(event).filter(([, value]) => 
-        value !== '' && value !== null && value !== undefined
-      )
+      Object.entries(event).filter(
+        ([, value]) => value !== "" && value !== null && value !== undefined,
+      ),
     );
-    const response = await api.post('/admin/events', filteredEvent);
+    const response = await api.post("/admin/events", filteredEvent);
     return response.data;
   },
   update: async (id: number, event: Partial<Event>) => {
@@ -92,16 +104,16 @@ export const eventsApi = {
 
 export const clubsApi = {
   getAll: async (): Promise<Club[]> => {
-    const response = await api.get('/admin/clubs');
+    const response = await api.get("/admin/clubs");
     return response.data;
   },
   create: async (club: Partial<Club>) => {
     const filteredClub = Object.fromEntries(
-      Object.entries(club).filter(([, value]) => 
-        value !== '' && value !== null && value !== undefined
-      )
+      Object.entries(club).filter(
+        ([, value]) => value !== "" && value !== null && value !== undefined,
+      ),
     );
-    const response = await api.post('/admin/clubs', filteredClub);
+    const response = await api.post("/admin/clubs", filteredClub);
     return response.data;
   },
   update: async (id: number, club: Partial<Club>) => {
@@ -116,21 +128,21 @@ export const clubsApi = {
 
 export const statsApi = {
   getDashboard: async (): Promise<DashboardStats> => {
-    const response = await api.get('/statistics/dashboard');
+    const response = await api.get("/statistics/dashboard");
     return response.data;
   },
 };
 
 export const rolesApi = {
-  getAll: async (): Promise<{id_roles: number, name: string}[]> => {
-    const response = await api.get('/admin/roles');
+  getAll: async (): Promise<{ id_roles: number; name: string }[]> => {
+    const response = await api.get("/admin/roles");
     return response.data;
   },
 };
 
 export const menuApi = {
   getAll: async (): Promise<MenuItem[]> => {
-    const response = await api.get('/admin/menu');
+    const response = await api.get("/admin/menu");
     return response.data;
   },
   delete: async (id: number) => {
@@ -149,11 +161,11 @@ export const menuApi = {
 
 export const bassineApi = {
   getScores: async (): Promise<BassineScore[]> => {
-    const response = await api.get('/admin/bassine/scores');
+    const response = await api.get("/admin/bassine/scores");
     return response.data;
   },
   updateScore: async (request: UpdateBassineScoreRequest) => {
-    const response = await api.post('/admin/bassine/update-score', request);
+    const response = await api.post("/admin/bassine/update-score", request);
     return response.data;
   },
   getHistory: async (email: string): Promise<BassineScoreHistory[]> => {

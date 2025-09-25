@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { authApi } from "@/lib/api";
 import { CheckCircle } from "lucide-react";
-import { ApiError } from "@/lib/types";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useId, useState } from "react";
+import { authApi } from "@/lib/api";
+import type { ApiError } from "@/lib/types";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,6 +14,8 @@ export default function LoginPage() {
   const [showVerifiedMessage, setShowVerifiedMessage] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const emailId = useId();
+  const passwordId = useId();
 
   useEffect(() => {
     const verified = searchParams.get("verified");
@@ -37,9 +39,7 @@ export default function LoginPage() {
         setError("Échec de la connexion - aucun token reçu");
       }
     } catch (err: unknown) {
-      setError(
-        (err as ApiError)?.response?.data?.error || "Échec de la connexion"
-      );
+      setError((err as ApiError)?.response?.data?.error || "Échec de la connexion");
     } finally {
       setLoading(false);
     }
@@ -48,9 +48,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Transat Admin
-        </h2>
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Transat Admin</h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           Connectez-vous à votre compte administrateur
         </p>
@@ -64,8 +62,7 @@ export default function LoginPage() {
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="h-5 w-5 text-green-500" />
                   <div className="text-sm text-green-700">
-                    Compte vérifié avec succès ! Vous pouvez maintenant vous
-                    connecter.
+                    Compte vérifié avec succès ! Vous pouvez maintenant vous connecter.
                   </div>
                 </div>
               </div>
@@ -78,15 +75,12 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
+              <label htmlFor={emailId} className="block text-sm font-medium text-gray-700">
                 Adresse email
               </label>
               <div className="mt-1">
                 <input
-                  id="email"
+                  id={emailId}
                   name="email"
                   type="email"
                   autoComplete="email"
@@ -99,15 +93,12 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
+              <label htmlFor={passwordId} className="block text-sm font-medium text-gray-700">
                 Mot de passe
               </label>
               <div className="mt-1">
                 <input
-                  id="password"
+                  id={passwordId}
                   name="password"
                   type="password"
                   autoComplete="current-password"
