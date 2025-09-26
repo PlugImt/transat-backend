@@ -86,10 +86,10 @@ export default function UserModal({ isOpen, onClose, user, onSave }: UserModalPr
     try {
       const userData = {
         ...formData,
-        graduation_year:
-          formData.graduation_year && parseInt(formData.graduation_year, 10) !== 0
-            ? parseInt(formData.graduation_year, 10)
-            : 0,
+        graduation_year: (() => {
+          const parsed = parseInt(formData.graduation_year, 10);
+          return Number.isNaN(parsed) ? undefined : parsed;
+        })(),
         // Convertir les chaînes vides en undefined pour les champs optionnels
         phone_number: formData.phone_number || undefined,
         formation_name: formData.formation_name || undefined,

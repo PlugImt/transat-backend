@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 interface TagAutocompleteProps {
   options: { value: string; label: string }[];
@@ -59,7 +59,7 @@ export default function TagAutocomplete({
     onChange(selectedTags.filter((tag) => tag !== value));
   };
 
-  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+  const handleInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace" && inputValue === "" && selectedTags.length > 0) {
       removeTag(selectedTags[selectedTags.length - 1]);
     }

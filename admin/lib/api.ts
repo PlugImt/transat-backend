@@ -19,9 +19,11 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("adminToken");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("adminToken");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
   }
   return config;
 });
@@ -55,7 +57,7 @@ export const usersApi = {
   },
   update: async (email: string, user: Partial<User>) => {
     try {
-      const response = await api.patch(`/admin/users/${email}`, user);
+      const response = await api.patch(`/admin/users/${encodeURIComponent(email)}`, user);
       return response.data;
     } catch (error: unknown) {
       console.error("Error updating user:", error);
@@ -63,15 +65,15 @@ export const usersApi = {
     }
   },
   updateRoles: async (email: string, roles: string[]) => {
-    const response = await api.patch(`/admin/users/${email}/roles`, { roles });
+    const response = await api.patch(`/admin/users/${encodeURIComponent(email)}/roles`, { roles });
     return response.data;
   },
   deleteUser: async (email: string) => {
-    const response = await api.delete(`/admin/users/${email}`);
+    const response = await api.delete(`/admin/users/${encodeURIComponent(email)}`);
     return response.data;
   },
   validateUser: async (email: string) => {
-    const response = await api.post(`/admin/users/${email}/validate`);
+    const response = await api.post(`/admin/users/${encodeURIComponent(email)}/validate`);
     return response.data;
   },
 };

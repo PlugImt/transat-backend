@@ -109,9 +109,7 @@ export default function BassineHistoryModal({
                       key={entry.id}
                       className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg"
                     >
-                      <div className="flex-shrink-0 mt-0.5">
-                        {getChangeIcon(entry.score_change)}
-                      </div>
+                      <div className="shrink-0 mt-0.5">{getChangeIcon(entry.score_change)}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">

@@ -136,26 +136,73 @@ func (h *AdminHandler) GetAllUsers(c *fiber.Ctx) error {
 
 func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 	email := c.Params("email")
+	email, err := url.QueryUnescape(email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to unescape email")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid email"})
+	}
 	utils.LogHeader("🗑️ Delete User (Admin)")
 	utils.LogLineKeyValue(utils.LevelInfo, "Target Email", email)
 
-	query := `DELETE FROM newf WHERE email = $1`
-	result, err := h.DB.Exec(query, email)
+	// Begin transaction
+	tx, err := h.DB.Begin()
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to delete user")
+		utils.LogMessage(utils.LevelError, "Failed to begin transaction")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to begin transaction"})
+	}
+
+	// Ensure transaction is closed properly
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			utils.LogMessage(utils.LevelError, "Transaction rolled back due to panic")
+			utils.LogLineKeyValue(utils.LevelError, "Panic", r)
+		}
+	}()
+
+	// Delete user (CASCADE will handle dependent rows automatically)
+	query := `DELETE FROM newf WHERE email = $1`
+	result, err := tx.Exec(query, email)
+	if err != nil {
+		tx.Rollback()
+		utils.LogMessage(utils.LevelError, "Failed to delete user - transaction rolled back")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete user"})
 	}
 
-	rowsAffected, _ := result.RowsAffected()
+	// Check if user was found and deleted
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		tx.Rollback()
+		utils.LogMessage(utils.LevelError, "Failed to get rows affected - transaction rolled back")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to verify deletion"})
+	}
+
 	if rowsAffected == 0 {
-		utils.LogMessage(utils.LevelWarn, "User not found for deletion")
+		tx.Rollback()
+		utils.LogMessage(utils.LevelWarn, "User not found for deletion - transaction rolled back")
 		utils.LogFooter()
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
 	}
 
-	utils.LogMessage(utils.LevelInfo, "User deleted successfully")
+	// Commit transaction
+	err = tx.Commit()
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to commit transaction")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to commit deletion"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "User deleted successfully within transaction")
+	utils.LogLineKeyValue(utils.LevelInfo, "Rows Affected", rowsAffected)
 	utils.LogFooter()
 	return c.SendStatus(fiber.StatusOK)
 }
@@ -272,6 +319,13 @@ func (h *AdminHandler) CreateUser(c *fiber.Ctx) error {
 
 func (h *AdminHandler) UpdateUser(c *fiber.Ctx) error {
 	email := c.Params("email")
+	email, err := url.QueryUnescape(email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to unescape email")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid email"})
+	}
 	utils.LogHeader("✏️ Update User (Admin)")
 	utils.LogLineKeyValue(utils.LevelInfo, "Target Email", email)
 
@@ -682,7 +736,7 @@ func (h *AdminHandler) GetAllClubs(c *fiber.Ctx) error {
 			)
 			JOIN roles r ON nr.id_roles = r.id_roles
 			JOIN newf n ON nr.email = n.email
-			WHERE r.name LIKE CONCAT(LOWER(REPLACE(c.name, ' ', '')), '_respo')
+			WHERE r.name = CONCAT(LOWER(REPLACE(c.name, ' ', '')), '_respo')
 		) respo ON c.id_clubs = respo.id_clubs
 		ORDER BY c.name
 	`
@@ -919,6 +973,13 @@ func (h *AdminHandler) GetAllRoles(c *fiber.Ctx) error {
 
 func (h *AdminHandler) ValidateUser(c *fiber.Ctx) error {
 	email := c.Params("email")
+	email, err := url.QueryUnescape(email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to unescape email")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid email"})
+	}
 	utils.LogHeader("✅ Validate User (Admin)")
 	utils.LogLineKeyValue(utils.LevelInfo, "Target Email", email)
 
@@ -1418,10 +1479,10 @@ func (h *AdminHandler) UpdateBassineScore(c *fiber.Ctx) error {
 	utils.LogFooter()
 
 	return c.JSON(fiber.Map{
-		"message": "Score updated successfully",
+		"message":   "Score updated successfully",
 		"old_score": currentScore,
 		"new_score": newScore,
-		"change": req.ScoreChange,
+		"change":    req.ScoreChange,
 	})
 }
 

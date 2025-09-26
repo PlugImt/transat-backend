@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 export interface AuthUser {
   email: string;
@@ -43,7 +43,9 @@ export const useAuthStore = create<AuthState>()(
           isLoading: false,
         });
         // Clear localStorage
-        localStorage.removeItem("adminToken");
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("adminToken");
+        }
       },
 
       setLoading: (loading) => set({ isLoading: loading }),
@@ -62,6 +64,7 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
+      storage: createJSONStorage(() => localStorage),
     },
   ),
 );

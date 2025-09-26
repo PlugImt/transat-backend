@@ -77,7 +77,7 @@ export default function DashboardPage() {
             <div key={stat.title} className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0">
+                  <div className="shrink-0">
                     <div className={`p-3 rounded-md ${stat.bgColor}`}>
                       <Icon className={`h-6 w-6 ${stat.color}`} />
                     </div>
@@ -99,7 +99,7 @@ export default function DashboardPage() {
 
       {stats?.userGrowth && stats.userGrowth.length > 0 && (
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Compte créés</h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Comptes créés</h2>
           <div className="h-64">
             <UserGrowthChart data={stats.userGrowth} />
           </div>

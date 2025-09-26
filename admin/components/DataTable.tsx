@@ -204,13 +204,15 @@ function DataTable<T>({
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-700">
-          Affichage de{" "}
-          {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} à{" "}
-          {Math.min(
-            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            table.getFilteredRowModel().rows.length,
-          )}{" "}
-          sur {table.getFilteredRowModel().rows.length} résultats
+          {(() => {
+            const pageIndex = table.getState().pagination.pageIndex;
+            const pageSize = table.getState().pagination.pageSize;
+            const totalRows = table.getFilteredRowModel().rows.length;
+            const start = totalRows === 0 ? 0 : pageIndex * pageSize + 1;
+            const end = Math.min((pageIndex + 1) * pageSize, totalRows);
+
+            return `Affichage de ${start} à ${end} sur ${totalRows} résultats`;
+          })()}
         </div>
         <div className="flex items-center space-x-2">
           <button

@@ -61,7 +61,7 @@ export default function BassineScores() {
           const score = row.original;
           return (
             <div className="flex items-center space-x-3">
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
                   <User className="h-5 w-5 text-purple-600" />
                 </div>
@@ -179,7 +179,7 @@ export default function BassineScores() {
               <div key={stat.title} className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="p-5">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       <div className={`p-3 rounded-md ${stat.bgColor}`}>
                         <Icon className={`h-6 w-6 ${stat.color}`} />
                       </div>

@@ -394,11 +394,11 @@ const CommandItemComponent = memo<{
   return (
     <Command.Item
       key={command.id}
-      value={command.id}
+      value={`${command.label} ${command.description ?? ""} ${(command.keywords ?? []).join(" ")}`}
       onSelect={() => onSelect(command.id)}
       className="flex items-center space-x-3 px-3 py-3 cursor-pointer hover:bg-gray-100 rounded-md"
     >
-      <Icon className="h-4 w-4 text-gray-500 flex-shrink-0" />
+      <Icon className="h-4 w-4 text-gray-500 shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-gray-900 truncate">{command.label}</div>
         {command.description && (

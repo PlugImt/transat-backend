@@ -9,8 +9,15 @@ import (
 
 func AdminAuthMiddleware(db *sql.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		email := c.Locals("email").(string)
-		
+		// Safe type assertion to prevent panic
+		email, ok := c.Locals("email").(string)
+		if !ok || email == "" {
+			utils.LogHeader("🔐 Admin Auth Check")
+			utils.LogMessage(utils.LevelError, "Missing or invalid email in context")
+			utils.LogFooter()
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
+		}
+
 		utils.LogHeader("🔐 Admin Auth Check")
 		utils.LogLineKeyValue(utils.LevelInfo, "User", email)
 
@@ -21,7 +28,7 @@ func AdminAuthMiddleware(db *sql.DB) fiber.Handler {
 				WHERE nr.email = $1 AND r.name = 'ADMIN'
 			)
 		`
-		
+
 		var isAdmin bool
 		err := db.QueryRow(query, email).Scan(&isAdmin)
 		if err != nil {

@@ -47,7 +47,7 @@ export default function UserGrowthChart({ data }: UserGrowthChartProps) {
           labelFormatter={formatTooltipDate}
           formatter={(value: number, name: string) => [
             value,
-            name === "cumulativeCount" ? "Total Users" : "Daily Registrations",
+            name === "cumulativeCount" ? "Nombre de comptes" : "Compte créés quotidiennement",
           ]}
           contentStyle={{
             backgroundColor: "#fff",
@@ -66,7 +66,7 @@ export default function UserGrowthChart({ data }: UserGrowthChartProps) {
         />
         <Line
           type="monotone"
-          dataKey="dailyRegistrations"
+          dataKey="count"
           stroke="#059669"
           strokeWidth={2}
           strokeDasharray="5 5"

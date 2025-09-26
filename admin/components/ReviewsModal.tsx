@@ -108,7 +108,7 @@ export default function ReviewsModal({
                     <div className="flex-1">
                       {/* User Info */}
                       <div className="flex items-center space-x-3 mb-3">
-                        <div className="flex-shrink-0">
+                        <div className="shrink-0">
                           {review.profile_picture ? (
                             <Image
                               src={review.profile_picture}

@@ -4,6 +4,7 @@ import { Save, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { useClubs, useCreateEvent, useUpdateEvent, useUsers } from "@/lib/hooks";
 import type { ApiError, Event } from "@/lib/types";
+import { toLocalDateTimeInputValue } from "@/lib/utils";
 
 interface EventModalProps {
   isOpen: boolean;
@@ -64,8 +65,8 @@ export default function EventModal({ isOpen, onClose, event, onSave }: EventModa
         name: event.name,
         description: event.description || "",
         link: event.link || "",
-        start_date: event.start_date ? new Date(event.start_date).toISOString().slice(0, 16) : "",
-        end_date: event.end_date ? new Date(event.end_date).toISOString().slice(0, 16) : "",
+        start_date: event.start_date ? toLocalDateTimeInputValue(new Date(event.start_date)) : "",
+        end_date: event.end_date ? toLocalDateTimeInputValue(new Date(event.end_date)) : "",
         location: event.location,
         picture: event.picture || "",
         creator: event.creator,
