@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/handlers/statistics"
+	"github.com/plugimt/transat-backend/middlewares"
 	"github.com/plugimt/transat-backend/services"
 )
 
@@ -20,4 +21,8 @@ func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *s
 	statsGroup.Get("/endpoints", statsHandler.GetEndpointStatistics)
 	statsGroup.Get("/global", statsHandler.GetGlobalStatistics)
 	statsGroup.Get("/top-users", statsHandler.GetTopUserStatistics)
+	
+	// Admin endpoints
+	adminStatsGroup := router.Group("/statistics", middlewares.JWTMiddleware, middlewares.AdminAuthMiddleware(db))
+	adminStatsGroup.Get("/dashboard", statsHandler.GetDashboardStatistics)
 }
