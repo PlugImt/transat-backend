@@ -14,7 +14,7 @@ type Newf struct {
 	PhoneNumber       string `json:"phone_number"`
 	ProfilePicture    string `json:"profile_picture"`
 	NotificationToken string `json:"notification_token"`
-	GraduationYear    int    `json:"graduation_year"`
+	GraduationYear    *int   `json:"graduation_year,omitempty"`
 	FormationName     string `json:"formation_name"`
 	Campus            string `json:"campus"`
 	TotalUsers        int    `json:"total_newf"`
