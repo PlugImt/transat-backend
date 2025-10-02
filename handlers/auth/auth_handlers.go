@@ -662,9 +662,10 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 			if errGy := h.DB.QueryRow(gradQuery, strings.ToLower(req.Email)).Scan(&graduationYear); errGy != nil {
 				graduationYear.Valid = false
 			}
-			gy := 0
+			var gy *int
 			if graduationYear.Valid {
-				gy = int(graduationYear.Int64)
+				year := int(graduationYear.Int64)
+				gy = &year
 			}
 			userForDiscord := models.Newf{
 				Email:          email,
