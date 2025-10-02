@@ -1,5 +1,6 @@
 "use client";
 
+import { Building, Edit, ExternalLink, MapPin, Plus, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { Building, Edit, ExternalLink, MapPin, Plus, Settings2, Trash2, Users, Calendar } from "lucide-react";
 import Image from "next/image";
@@ -221,7 +222,7 @@ export default function ClubsPage() {
         isOpen={clubModalOpen}
         onClose={closeClubModal}
         club={editingClub}
-        onSave={() => { }}
+        onSave={() => {}}
       />
       <ClubOwnersModal
         isOpen={ownersModalOpen}

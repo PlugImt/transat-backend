@@ -1909,7 +1909,7 @@ func (h *AdminHandler) UpdateReservationItemMessages(c *fiber.Ctx) error {
 
 	updateValues = append(updateValues, itemIDInt)
 	updateQuery := fmt.Sprintf(`
-		UPDATE reservation_element 
+		UPDATE reservation_element
 		SET %s
 		WHERE id_reservation_element = $%d
 	`, strings.Join(updateFields, ", "), paramCount)
@@ -1959,7 +1959,7 @@ func (h *AdminHandler) GetReservationTree(c *fiber.Ctx) error {
 
 	// Get all categories with their hierarchy
 	categoriesQuery := `
-		SELECT 
+		SELECT
 			rc.id_reservation_category,
 			rc.name,
 			rc.id_parent_category,
@@ -2029,7 +2029,7 @@ func (h *AdminHandler) GetReservationTree(c *fiber.Ctx) error {
 
 	// Get all items
 	itemsQuery := `
-		SELECT 
+		SELECT
 			re.id_reservation_element,
 			re.name,
 			re.slot,
@@ -2109,7 +2109,7 @@ func (h *AdminHandler) GetReservationTree(c *fiber.Ctx) error {
 
 	// Also get items without categories, grouped by club
 	itemsWithoutCategoryQuery := `
-		SELECT 
+		SELECT
 			re.id_reservation_element,
 			re.name,
 			re.slot,
@@ -2466,7 +2466,7 @@ func (h *AdminHandler) UpdateReservationItemAdmin(c *fiber.Ctx) error {
 
 	updateValues = append(updateValues, itemIDInt)
 	updateQuery := fmt.Sprintf(`
-		UPDATE reservation_element 
+		UPDATE reservation_element
 		SET %s
 		WHERE id_reservation_element = $%d
 	`, strings.Join(updateFields, ", "), paramCount)
