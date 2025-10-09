@@ -19,7 +19,16 @@ import type {
   UpdateItemRequest,
   UpdateReservationItemMessagesRequest,
 } from "./api";
-import { bassineApi, clubsApi, eventsApi, menuApi, rolesApi, statsApi, usersApi } from "./api";
+import {
+  bassineApi,
+  clubsApi,
+  eventsApi,
+  menuApi,
+  reviewsApi,
+  rolesApi,
+  statsApi,
+  usersApi,
+} from "./api";
 import type { Club, Event, User } from "./types";
 
 export * from "./hooks/useClickOutside";
