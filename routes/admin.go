@@ -41,6 +41,9 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminGroup.Get("/menu/:id/reviews", adminHandler.GetMenuItemReviews)
 	adminGroup.Delete("/menu/:id/reviews/:email", adminHandler.DeleteMenuItemReview)
 
+	// Reviews management
+	adminGroup.Get("/reviews", adminHandler.GetAllReviews)
+
 	// Bassine management
 	adminGroup.Get("/bassine/scores", adminHandler.GetBassineScores)
 	adminGroup.Post("/bassine/update-score", adminHandler.UpdateBassineScore)

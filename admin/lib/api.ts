@@ -161,6 +161,14 @@ export const menuApi = {
   },
 };
 
+export const reviewsApi = {
+  getAll: async (userEmail?: string): Promise<MenuItemReview[]> => {
+    const params = userEmail ? `?user_email=${encodeURIComponent(userEmail)}` : "";
+    const response = await api.get(`/admin/reviews${params}`);
+    return response.data;
+  },
+};
+
 export const bassineApi = {
   getScores: async (): Promise<BassineScore[]> => {
     const response = await api.get("/admin/bassine/scores");

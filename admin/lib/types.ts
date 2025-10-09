@@ -90,6 +90,8 @@ export interface MenuItemReview {
   first_name: string;
   last_name: string;
   profile_picture: string;
+  dish_id?: number;
+  dish_name?: string;
 }
 
 // Bassine/Games types

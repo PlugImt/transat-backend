@@ -1,5 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { bassineApi, clubsApi, eventsApi, menuApi, rolesApi, statsApi, usersApi } from "./api";
+import {
+  bassineApi,
+  clubsApi,
+  eventsApi,
+  menuApi,
+  reviewsApi,
+  rolesApi,
+  statsApi,
+  usersApi,
+} from "./api";
 import type { Club, Event, User } from "./types";
 
 export * from "./hooks/useClickOutside";
@@ -196,7 +205,16 @@ export const useDeleteMenuItemReview = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["menu-item-reviews", variables.menuItemId] });
       queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+      queryClient.invalidateQueries({ queryKey: ["all-reviews"] });
     },
+  });
+};
+
+// Reviews hooks
+export const useAllReviews = (userEmail?: string) => {
+  return useQuery({
+    queryKey: ["all-reviews", userEmail],
+    queryFn: () => reviewsApi.getAll(userEmail),
   });
 };
 

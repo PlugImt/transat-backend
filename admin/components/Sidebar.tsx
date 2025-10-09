@@ -31,7 +31,7 @@ function Sidebar() {
       { href: "/users", label: "Utilisateurs", icon: Users },
       { href: "/events", label: "Événements", icon: Calendar },
       { href: "/clubs", label: "Clubs", icon: Building },
-      { href: "/menu", label: "Menu du RU", icon: UtensilsCrossed },
+      { href: "/menu", label: "RU", icon: UtensilsCrossed },
       { href: "/games", label: "Jeux", icon: Gamepad2 },
     ],
     [],

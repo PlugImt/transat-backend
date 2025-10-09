@@ -1244,6 +1244,83 @@ func (h *AdminHandler) GetMenuItemReviews(c *fiber.Ctx) error {
 	return c.JSON(reviews)
 }
 
+func (h *AdminHandler) GetAllReviews(c *fiber.Ctx) error {
+	userEmail := c.Query("user_email")
+	utils.LogHeader("📝 Get All Reviews (Admin)")
+	if userEmail != "" {
+		utils.LogLineKeyValue(utils.LevelInfo, "User Email Filter", userEmail)
+	}
+
+	query := `
+		SELECT
+			ran.email,
+			ran.note,
+			ran.comment,
+			ran.date,
+			ran.id_restaurant_articles,
+			ra.name as dish_name,
+			n.first_name,
+			n.last_name,
+			COALESCE(n.profile_picture, '') as profile_picture
+		FROM restaurant_articles_notes ran
+		JOIN restaurant_articles ra ON ran.id_restaurant_articles = ra.id_restaurant_articles
+		JOIN newf n ON ran.email = n.email`
+
+	var args []interface{}
+	if userEmail != "" {
+		query += ` WHERE ran.email = $1`
+		args = append(args, userEmail)
+	}
+
+	query += ` ORDER BY ran.date DESC`
+
+	rows, err := h.DB.Query(query, args...)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch all reviews")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch reviews"})
+	}
+	defer rows.Close()
+
+	var reviews []map[string]interface{}
+	for rows.Next() {
+		var review map[string]interface{} = make(map[string]interface{})
+		var email, comment, dishName, firstName, lastName, profilePicture string
+		var note, dishID int
+		var date time.Time
+
+		err := rows.Scan(&email, &note, &comment, &date, &dishID, &dishName, &firstName, &lastName, &profilePicture)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan review")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+
+		review["email"] = email
+		review["note"] = note
+		review["comment"] = comment
+		review["date"] = date
+		review["dish_id"] = dishID
+		review["dish_name"] = dishName
+		review["first_name"] = firstName
+		review["last_name"] = lastName
+		review["profile_picture"] = profilePicture
+
+		reviews = append(reviews, review)
+	}
+
+	if reviews == nil {
+		reviews = []map[string]interface{}{}
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully fetched all reviews")
+	utils.LogLineKeyValue(utils.LevelInfo, "Review Count", len(reviews))
+	utils.LogFooter()
+
+	return c.JSON(reviews)
+}
+
 func (h *AdminHandler) DeleteMenuItemReview(c *fiber.Ctx) error {
 	itemID := c.Params("id")
 	email := c.Params("email")
