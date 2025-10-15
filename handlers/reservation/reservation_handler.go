@@ -9,16 +9,19 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/handlers/reservation/repository"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 )
 
 type ReservationHandler struct {
 	ReservationRepository *repository.ReservationRepository
+	DiscordService        *services.DiscordService
 }
 
-func NewReservationHandler(db *sql.DB) *ReservationHandler {
+func NewReservationHandler(db *sql.DB, discordService *services.DiscordService) *ReservationHandler {
 	return &ReservationHandler{
 		ReservationRepository: repository.NewReservationRepository(db),
+		DiscordService:        discordService,
 	}
 }
 
@@ -440,6 +443,24 @@ func (h *ReservationHandler) UpdateReservationItem(c *fiber.Ctx) error {
 				"error": "Failed to create reservation",
 			})
 		}
+
+		if h.DiscordService != nil && res.User != nil {
+			itemName, err := h.ReservationRepository.GetItemName(itemID)
+			if err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to get item name for Discord notification: %v", err))
+				itemName = "Unknown Item"
+			}
+
+			startDate := reservationItemTime.StartDate.Format("2006-01-02 15:04:05")
+			var endDate string
+			if reservationItemTime.EndDate != nil {
+				endDate = reservationItemTime.EndDate.Format("2006-01-02 15:04:05")
+			}
+
+			if err := h.DiscordService.SendReservationCreated(itemName, startDate, endDate, ItemPerSlot, *res.User); err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to send Discord notification for reservation creation: %v", err))
+			}
+		}
 	} else if reservationRequest.EndDate != nil {
 		res, err = h.ReservationRepository.EndReservation(reservationItemTime, itemID, ItemPerSlot, c.Locals("email").(string))
 		if err != nil {
@@ -455,6 +476,21 @@ func (h *ReservationHandler) UpdateReservationItem(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to end reservation",
 			})
+		}
+
+		if h.DiscordService != nil && res.User != nil {
+			itemName, err := h.ReservationRepository.GetItemName(itemID)
+			if err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to get item name for Discord notification: %v", err))
+				itemName = "Unknown Item"
+			}
+
+			var startDate string
+			endDate := reservationItemTime.EndDate.Format("2006-01-02 15:04:05")
+
+			if err := h.DiscordService.SendReservationCancelled(itemName, startDate, endDate, ItemPerSlot, *res.User); err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to send Discord notification for reservation cancellation: %v", err))
+			}
 		}
 	}
 
@@ -668,6 +704,38 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "No reservation found to delete or you are not the owner of the reservation",
 		})
+	}
+
+	if h.DiscordService != nil && deleted {
+		itemName, err := h.ReservationRepository.GetItemName(itemID)
+		if err != nil {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to get item name for Discord notification: %v", err))
+			itemName = "Unknown Item"
+		}
+
+		userEmail := c.Locals("email").(string)
+		userInfo := models.ReservationUser{
+			Email: userEmail,
+		}
+
+		// Try to get user details from database
+		query := "SELECT first_name, last_name, COALESCE(profile_picture, '') FROM newf WHERE email = $1"
+		row := h.ReservationRepository.DB.QueryRow(query, userEmail)
+		if err := row.Scan(&userInfo.FirstName, &userInfo.LastName, &userInfo.ProfilePicture); err != nil {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to get user details for Discord notification: %v", err))
+			userInfo.FirstName = "Unknown"
+			userInfo.LastName = "User"
+		}
+
+		startDate := reservationItemTime.StartDate.Format("2006-01-02 15:04:05")
+		var endDate string
+		if ItemPerSlot {
+			endDate = reservationItemTime.StartDate.Add(time.Hour).Format("2006-01-02 15:04:05")
+		}
+
+		if err := h.DiscordService.SendReservationCancelled(itemName, startDate, endDate, ItemPerSlot, userInfo); err != nil {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to send Discord notification for reservation deletion: %v", err))
+		}
 	}
 
 	utils.LogMessage(utils.LevelInfo, "Reservation deleted successfully")

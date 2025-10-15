@@ -168,7 +168,7 @@ func main() {
 	routes.SetupWashingMachineRoutes(app)
 	routes.SetupWeatherRoutes(app, weatherHandler)
 	routes.SetupEventRoutes(app, eventHandler)
-	routes.SetupReservationRoutes(app, db)
+	routes.SetupReservationRoutes(app, db, discordService)
 	routes.SetupBassineRoutes(app, db)
 	routes.SetupAdminRoutes(app, db)
 

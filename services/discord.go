@@ -111,3 +111,69 @@ func (ds *DiscordService) SendUserVerified(user models.Newf, numberOfAccounts in
 	}
 	return ds.sendEmbed(embed)
 }
+
+func (ds *DiscordService) SendReservationCreated(itemName, startDate, endDate string, isSlot bool, user models.ReservationUser) error {
+	var slotType string
+	if isSlot {
+		slotType = "Slot-based"
+	} else {
+		slotType = "Open-ended"
+	}
+
+	fields := []discordEmbedField{
+		{Name: "Item", Value: safe(itemName, "N/A"), Inline: false},
+		{Name: "Type", Value: slotType, Inline: true},
+		{Name: "Start Date", Value: safe(startDate, "N/A"), Inline: true},
+		{Name: "User", Value: fmt.Sprintf("%s %s", safe(user.FirstName, ""), safe(user.LastName, "")), Inline: true},
+		{Name: "Email", Value: safe(user.Email, "N/A"), Inline: true},
+	}
+
+	if endDate != "" {
+		fields = append(fields, discordEmbedField{Name: "End Date", Value: endDate, Inline: true})
+	}
+
+	if user.ProfilePicture != "" {
+		fields = append(fields, discordEmbedField{Name: "Profile Picture", Value: user.ProfilePicture, Inline: false})
+	}
+
+	embed := discordEmbed{
+		Title:     "New Reservation Created",
+		Color:     0x4CAF50, // green
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Fields:    fields,
+	}
+	return ds.sendEmbed(embed)
+}
+
+func (ds *DiscordService) SendReservationCancelled(itemName, startDate, endDate string, isSlot bool, user models.ReservationUser) error {
+	var slotType string
+	if isSlot {
+		slotType = "Slot-based"
+	} else {
+		slotType = "Open-ended"
+	}
+
+	fields := []discordEmbedField{
+		{Name: "Item", Value: safe(itemName, "N/A"), Inline: false},
+		{Name: "Type", Value: slotType, Inline: true},
+		{Name: "Start Date", Value: safe(startDate, "N/A"), Inline: true},
+		{Name: "User", Value: fmt.Sprintf("%s %s", safe(user.FirstName, ""), safe(user.LastName, "")), Inline: true},
+		{Name: "Email", Value: safe(user.Email, "N/A"), Inline: true},
+	}
+
+	if endDate != "" {
+		fields = append(fields, discordEmbedField{Name: "End Date", Value: endDate, Inline: true})
+	}
+
+	if user.ProfilePicture != "" {
+		fields = append(fields, discordEmbedField{Name: "Profile Picture", Value: user.ProfilePicture, Inline: false})
+	}
+
+	embed := discordEmbed{
+		Title:     "Reservation Cancelled",
+		Color:     0xF44336, // red
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Fields:    fields,
+	}
+	return ds.sendEmbed(embed)
+}
