@@ -82,6 +82,8 @@ func main() {
 
 	// Discord webhook notifications
 	discordService := services.NewDiscordService(os.Getenv("DISCORD_WEBHOOK_URL"))
+	// Discord reservation-specific webhook (falls back to default if unset)
+	reservationDiscordService := services.NewDiscordService(os.Getenv("DISCORD_RESERVATION_ALERT_WEBHOOK"))
 
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
 
@@ -168,7 +170,7 @@ func main() {
 	routes.SetupWashingMachineRoutes(app)
 	routes.SetupWeatherRoutes(app, weatherHandler)
 	routes.SetupEventRoutes(app, eventHandler)
-	routes.SetupReservationRoutes(app, db, discordService)
+	routes.SetupReservationRoutes(app, db, reservationDiscordService)
 	routes.SetupBassineRoutes(app, db)
 	routes.SetupAdminRoutes(app, db)
 
