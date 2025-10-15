@@ -6,11 +6,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/handlers/reservation" // Import the reservation handlers
 	"github.com/plugimt/transat-backend/middlewares"
+	"github.com/plugimt/transat-backend/services"
 )
 
-func SetupReservationRoutes(router fiber.Router, db *sql.DB) {
+func SetupReservationRoutes(router fiber.Router, db *sql.DB, discordService *services.DiscordService) {
 	// Initialize Reservation Handler
-	reservationHandler := reservation.NewReservationHandler(db)
+	reservationHandler := reservation.NewReservationHandler(db, discordService)
 
 	reservationGroup := router.Group("/reservation", middlewares.JWTMiddleware)
 

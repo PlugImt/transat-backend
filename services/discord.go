@@ -34,11 +34,21 @@ type discordEmbedField struct {
 }
 
 type discordEmbed struct {
-	Title       string              `json:"title"`
-	Description string              `json:"description,omitempty"`
-	Color       int                 `json:"color,omitempty"`
-	Fields      []discordEmbedField `json:"fields,omitempty"`
-	Timestamp   string              `json:"timestamp,omitempty"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description,omitempty"`
+	Color       int                    `json:"color,omitempty"`
+	Fields      []discordEmbedField    `json:"fields,omitempty"`
+	Timestamp   string                 `json:"timestamp,omitempty"`
+	Thumbnail   *discordEmbedThumbnail `json:"thumbnail,omitempty"`
+	Image       *discordEmbedImage     `json:"image,omitempty"`
+}
+
+type discordEmbedThumbnail struct {
+	URL string `json:"url"`
+}
+
+type discordEmbedImage struct {
+	URL string `json:"url"`
 }
 
 type discordPayload struct {
@@ -108,6 +118,70 @@ func (ds *DiscordService) SendUserVerified(user models.Newf, numberOfAccounts in
 			{Name: "Created At", Value: safe(user.CreationDate, "N/A"), Inline: true},
 			{Name: "Number of Accounts", Value: strconv.Itoa(numberOfAccounts), Inline: true},
 		},
+	}
+	return ds.sendEmbed(embed)
+}
+
+func (ds *DiscordService) SendReservationCreated(itemName, startDate, endDate string, isSlot bool, user models.ReservationUser) error {
+	var slotType string
+	if isSlot {
+		slotType = "Slot-based"
+	} else {
+		slotType = "Open-ended"
+	}
+
+	fields := []discordEmbedField{
+		{Name: "Item", Value: safe(itemName, "N/A"), Inline: false},
+		{Name: "Type", Value: slotType, Inline: true},
+		{Name: "Start Date", Value: safe(startDate, "N/A"), Inline: true},
+		{Name: "User", Value: fmt.Sprintf("%s %s", safe(user.FirstName, ""), safe(user.LastName, "")), Inline: true},
+		{Name: "Email", Value: safe(user.Email, "N/A"), Inline: true},
+	}
+
+	if endDate != "" {
+		fields = append(fields, discordEmbedField{Name: "End Date", Value: endDate, Inline: true})
+	}
+
+	embed := discordEmbed{
+		Title:     "New Reservation Created",
+		Color:     0x4CAF50, // green
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Fields:    fields,
+	}
+	if user.ProfilePicture != "" {
+		embed.Thumbnail = &discordEmbedThumbnail{URL: user.ProfilePicture}
+	}
+	return ds.sendEmbed(embed)
+}
+
+func (ds *DiscordService) SendReservationCancelled(itemName, startDate, endDate string, isSlot bool, user models.ReservationUser) error {
+	var slotType string
+	if isSlot {
+		slotType = "Slot-based"
+	} else {
+		slotType = "Open-ended"
+	}
+
+	fields := []discordEmbedField{
+		{Name: "Item", Value: safe(itemName, "N/A"), Inline: false},
+		{Name: "Type", Value: slotType, Inline: true},
+		{Name: "Start Date", Value: safe(startDate, "N/A"), Inline: true},
+		{Name: "User", Value: fmt.Sprintf("%s %s", safe(user.FirstName, ""), safe(user.LastName, "")), Inline: true},
+		{Name: "Email", Value: safe(user.Email, "N/A"), Inline: true},
+	}
+
+	if endDate != "" {
+		fields = append(fields, discordEmbedField{Name: "End Date", Value: endDate, Inline: true})
+	}
+
+	embed := discordEmbed{
+		Title:     "Reservation Cancelled",
+		Color:     0xF44336, // red
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Fields:    fields,
+	}
+	if user.ProfilePicture != "" {
+		embed.Thumbnail = &discordEmbedThumbnail{URL: user.ProfilePicture}
 	}
 	return ds.sendEmbed(embed)
 }
