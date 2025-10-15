@@ -485,7 +485,7 @@ func (h *ReservationHandler) UpdateReservationItem(c *fiber.Ctx) error {
 				itemName = "Unknown Item"
 			}
 
-			var startDate string
+			startDate := reservationItemTime.StartDate.Format("2006-01-02 15:04:05")
 			endDate := reservationItemTime.EndDate.Format("2006-01-02 15:04:05")
 
 			if err := h.DiscordService.SendReservationCancelled(itemName, startDate, endDate, ItemPerSlot, *res.User); err != nil {
