@@ -34,11 +34,21 @@ type discordEmbedField struct {
 }
 
 type discordEmbed struct {
-	Title       string              `json:"title"`
-	Description string              `json:"description,omitempty"`
-	Color       int                 `json:"color,omitempty"`
-	Fields      []discordEmbedField `json:"fields,omitempty"`
-	Timestamp   string              `json:"timestamp,omitempty"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description,omitempty"`
+	Color       int                    `json:"color,omitempty"`
+	Fields      []discordEmbedField    `json:"fields,omitempty"`
+	Timestamp   string                 `json:"timestamp,omitempty"`
+	Thumbnail   *discordEmbedThumbnail `json:"thumbnail,omitempty"`
+	Image       *discordEmbedImage     `json:"image,omitempty"`
+}
+
+type discordEmbedThumbnail struct {
+	URL string `json:"url"`
+}
+
+type discordEmbedImage struct {
+	URL string `json:"url"`
 }
 
 type discordPayload struct {
@@ -132,15 +142,14 @@ func (ds *DiscordService) SendReservationCreated(itemName, startDate, endDate st
 		fields = append(fields, discordEmbedField{Name: "End Date", Value: endDate, Inline: true})
 	}
 
-	if user.ProfilePicture != "" {
-		fields = append(fields, discordEmbedField{Name: "Profile Picture", Value: user.ProfilePicture, Inline: false})
-	}
-
 	embed := discordEmbed{
 		Title:     "New Reservation Created",
 		Color:     0x4CAF50, // green
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Fields:    fields,
+	}
+	if user.ProfilePicture != "" {
+		embed.Thumbnail = &discordEmbedThumbnail{URL: user.ProfilePicture}
 	}
 	return ds.sendEmbed(embed)
 }
@@ -165,15 +174,14 @@ func (ds *DiscordService) SendReservationCancelled(itemName, startDate, endDate 
 		fields = append(fields, discordEmbedField{Name: "End Date", Value: endDate, Inline: true})
 	}
 
-	if user.ProfilePicture != "" {
-		fields = append(fields, discordEmbedField{Name: "Profile Picture", Value: user.ProfilePicture, Inline: false})
-	}
-
 	embed := discordEmbed{
 		Title:     "Reservation Cancelled",
 		Color:     0xF44336, // red
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Fields:    fields,
+	}
+	if user.ProfilePicture != "" {
+		embed.Thumbnail = &discordEmbedThumbnail{URL: user.ProfilePicture}
 	}
 	return ds.sendEmbed(embed)
 }
