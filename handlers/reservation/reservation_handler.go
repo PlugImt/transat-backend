@@ -730,7 +730,11 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 		startDate := reservationItemTime.StartDate.Format("2006-01-02 15:04:05")
 		var endDate string
 		if ItemPerSlot {
-			endDate = reservationItemTime.StartDate.Add(time.Hour).Format("2006-01-02 15:04:05")
+			var slotDuration time.Duration = time.Hour // default to 1 hour if not set
+			if reservationItemTime.SlotDuration > 0 {
+				slotDuration = reservationItemTime.SlotDuration
+			}
+			endDate = reservationItemTime.StartDate.Add(slotDuration).Format("2006-01-02 15:04:05")
 		}
 
 		if err := h.DiscordService.SendReservationCancelled(itemName, startDate, endDate, ItemPerSlot, userInfo); err != nil {
