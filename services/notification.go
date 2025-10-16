@@ -198,6 +198,40 @@ func (ns *NotificationService) GetSubscribedUsersWithLanguage(serviceName string
 	return targets, nil
 }
 
+// GetUsersWithLanguageByEmails resolves a list of emails to their notification tokens and language codes.
+// Users without a valid notification token are excluded.
+func (ns *NotificationService) GetUsersWithLanguageByEmails(emails []string) ([]models.NotificationTargetWithLanguage, error) {
+	if len(emails) == 0 {
+		return []models.NotificationTargetWithLanguage{}, nil
+	}
+
+	query := `
+        SELECT n.email, COALESCE(n.notification_token, '') AS notification_token, l.code AS language_code
+        FROM newf n
+        JOIN languages l ON n.language = l.id_languages
+        WHERE n.email = ANY($1) AND n.notification_token IS NOT NULL AND n.notification_token != '';
+    `
+	rows, err := ns.db.Query(query, pq.Array(emails))
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users by emails for notifications: %w", err)
+	}
+	defer rows.Close()
+
+	var targets []models.NotificationTargetWithLanguage
+	for rows.Next() {
+		var t models.NotificationTargetWithLanguage
+		if err := rows.Scan(&t.Email, &t.NotificationToken, &t.LanguageCode); err != nil {
+			log.Printf("Error scanning user language/notification token: %v", err)
+			continue
+		}
+		targets = append(targets, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate users with language rows: %w", err)
+	}
+	return targets, nil
+}
+
 // SendPushNotification sends a push notification via Expo.
 func (ns *NotificationService) SendPushNotification(payload models.NotificationPayload) error {
 	var tokens []string

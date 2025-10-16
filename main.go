@@ -61,6 +61,7 @@ func main() {
 	app.Use(utils.SentryHandler)
 
 	notificationService := services.NewNotificationService(db)
+	eventNotifier := services.NewEventNotificationService(db, notificationService)
 	translationService, err := services.NewTranslationService()
 	if err != nil {
 		log.Fatalf("💥 Failed to create Translation Service: %v", err)
@@ -100,7 +101,7 @@ func main() {
 
 	clubsHandler := club.NewclubHandler(db)
 
-	eventHandler := event.NewEventHandler(db)
+	eventHandler := event.NewEventHandler(db, eventNotifier)
 
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
@@ -109,6 +110,10 @@ func main() {
 	// Cron Jobs - Requires access to handlers/services
 	c := cron.New()
 
+	// Add periodic job to send 1-hour event reminders every 5 minutes
+	_, _ = c.AddFunc("CRON_TZ=Europe/Paris */5 * * * *", func() {
+		_ = eventNotifier.SendDueOneHourReminders()
+	})
 	c.Start()
 	defer c.Stop()
 

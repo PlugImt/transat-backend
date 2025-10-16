@@ -1,3 +1,10 @@
+[event.created]
+title = "📅 Nouvel évènement créé"
+message = "L'évènement '{{.Name}}' est créé pour le {{.StartTime}}."
+
+[event.reminder]
+title = "⏰ L'évènement commence dans 1 heure"
+message = "'{{.Name}}' commence dans 1 heure."
 [email_verification]
 title = "Ton code de vérification Transat"
 subject = "🔐 Ton code de vérification Transat : {{.VerificationCode}}"

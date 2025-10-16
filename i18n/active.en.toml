@@ -51,6 +51,14 @@ open_restaurant = "View menu"
 download_app = "Download app"
 open_profile = "Access my profile"
 
+[event.created]
+title = "📅 New event created"
+message = "Event '{{.Name}}' created for {{.StartTime}}."
+
+[event.reminder]
+title = "⏰ Event starts in 1 hour"
+message = "'{{.Name}}' starts in 1 hour."
+
 [weather]
 thunderstorm = "Thunderstorm"
 drizzle = "Drizzle"

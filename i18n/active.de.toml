@@ -1,3 +1,10 @@
+[event.created]
+title = "📅 Neues Ereignis erstellt"
+message = "Das Ereignis '{{.Name}}' wurde für {{.StartTime}} erstellt."
+
+[event.reminder]
+title = "⏰ Ereignis beginnt in 1 Stunde"
+message = "'{{.Name}}' beginnt in 1 Stunde."
 [restaurant_notification]
 title = "🍽️ NEUES MENÜ VERFÜGBAR!"
 message = "Ein köstliches neues Menü erwartet Sie im RU! Entdecken Sie die Tagesgerichte und hinterlassen Sie Ihre Kommentare. Guten Appetit!"

@@ -9,16 +9,19 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 )
 
 type EventHandler struct {
-	db *sql.DB
+	db       *sql.DB
+	notifier *services.EventNotificationService
 }
 
-func NewEventHandler(db *sql.DB) *EventHandler {
+func NewEventHandler(db *sql.DB, notifier *services.EventNotificationService) *EventHandler {
 	return &EventHandler{
-		db: db,
+		db:       db,
+		notifier: notifier,
 	}
 }
 
@@ -777,6 +780,13 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 	utils.LogMessage(utils.LevelInfo, "Event created successfully")
 	utils.LogLineKeyValue(utils.LevelInfo, "Event ID", eventID)
 	utils.LogFooter()
+
+	// Fire-and-forget creation notification (non-blocking)
+	if h.notifier != nil {
+		go func(id int) {
+			_ = h.notifier.SendEventCreated(id)
+		}(eventID)
+	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Event created successfully",
