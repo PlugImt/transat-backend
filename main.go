@@ -111,7 +111,7 @@ func main() {
 	c := cron.New()
 
 	// Add periodic job to send 1-hour event reminders every 5 minutes
-	_, _ = c.AddFunc("*/5 * * * *", func() {
+	_, _ = c.AddFunc("CRON_TZ=Europe/Paris */5 * * * *", func() {
 		_ = eventNotifier.SendDueOneHourReminders()
 	})
 	c.Start()

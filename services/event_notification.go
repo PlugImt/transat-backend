@@ -198,12 +198,13 @@ func (s *EventNotificationService) SendEventCreated(eventID int) error {
 // SendDueOneHourReminders scans for events starting within the next hour and sends reminders if not already sent
 func (s *EventNotificationService) SendDueOneHourReminders() error {
 	now := utils.Now()
-	upper := now.Add(1 * time.Hour)
+	lower := now.Add(1 * time.Hour)
+	upper := lower.Add(5 * time.Minute)
 
 	rows, err := s.db.Query(`
         SELECT id_events FROM events
-        WHERE start_date > $1 AND start_date <= $2
-    `, now, upper)
+        WHERE start_date >= $1 AND start_date < $2
+    `, lower, upper)
 	if err != nil {
 		return fmt.Errorf("failed to query upcoming events: %w", err)
 	}
