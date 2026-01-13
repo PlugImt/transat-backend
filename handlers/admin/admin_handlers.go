@@ -1803,7 +1803,7 @@ func (h *AdminHandler) UpdateReservationItemMessages(c *fiber.Ctx) error {
 	userEmail := c.Locals("email").(string)
 
 	var req struct {
-		WarningMessage     *string `json:"warning_message"`
+		WarningMessage      *string `json:"warning_message"`
 		ConfirmationMessage *string `json:"confirmation_message"`
 	}
 
@@ -1930,6 +1930,562 @@ func (h *AdminHandler) UpdateReservationItemMessages(c *fiber.Ctx) error {
 	}
 
 	utils.LogMessage(utils.LevelInfo, "Reservation item messages updated successfully")
+	utils.LogFooter()
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+type categoryNode struct {
+	ID       int                      `json:"id"`
+	Name     string                   `json:"name"`
+	ParentID *int                     `json:"parent_id"`
+	ClubID   int                      `json:"club_id"`
+	ClubName string                   `json:"club_name"`
+	Children []*categoryNode          `json:"children"`
+	Items    []map[string]interface{} `json:"items"`
+}
+
+// GetReservationTree gets the full reservation tree structure (categories and items)
+func (h *AdminHandler) GetReservationTree(c *fiber.Ctx) error {
+	utils.LogHeader("📅 Get Reservation Tree (Admin)")
+
+	defer func() {
+		if r := recover(); r != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Panic in GetReservationTree: %v", r))
+			utils.LogFooter()
+			c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+		}
+	}()
+
+	// Get all categories with their hierarchy
+	categoriesQuery := `
+		SELECT 
+			rc.id_reservation_category,
+			rc.name,
+			rc.id_parent_category,
+			rc.id_clubs,
+			c.name as club_name
+		FROM reservation_category rc
+		LEFT JOIN clubs c ON rc.id_clubs = c.id_clubs
+		ORDER BY rc.id_clubs, rc.id_parent_category NULLS FIRST, rc.name
+	`
+
+	rows, err := h.DB.Query(categoriesQuery)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch categories")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch categories"})
+	}
+	defer rows.Close()
+
+	categories := make(map[int]*categoryNode)
+	var allCategories []*categoryNode
+
+	// First pass: create all category nodes
+	categoryCount := 0
+	for rows.Next() {
+		categoryCount++
+		var cat categoryNode
+		var parentID sql.NullInt64
+		var clubName sql.NullString
+
+		err := rows.Scan(&cat.ID, &cat.Name, &parentID, &cat.ClubID, &clubName)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan category")
+			continue
+		}
+
+		if parentID.Valid {
+			cat.ParentID = new(int)
+			*cat.ParentID = int(parentID.Int64)
+		}
+		if clubName.Valid {
+			cat.ClubName = clubName.String
+		}
+		cat.Children = []*categoryNode{}
+		cat.Items = []map[string]interface{}{}
+
+		categories[cat.ID] = &cat
+		allCategories = append(allCategories, &cat)
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Found %d categories in database", categoryCount))
+
+	// Second pass: build parent-child relationships
+	var rootCategories []*categoryNode
+	for _, cat := range allCategories {
+		if cat.ParentID == nil {
+			rootCategories = append(rootCategories, cat)
+		} else {
+			if parent, exists := categories[*cat.ParentID]; exists {
+				parent.Children = append(parent.Children, cat)
+			} else {
+				// Parent not found, treat as root (shouldn't happen but handle gracefully)
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Parent category %d not found for category %d, treating as root", *cat.ParentID, cat.ID))
+				rootCategories = append(rootCategories, cat)
+			}
+		}
+	}
+
+	// Get all items
+	itemsQuery := `
+		SELECT 
+			re.id_reservation_element,
+			re.name,
+			re.slot,
+			re.description,
+			re.location,
+			re.id_clubs,
+			re.id_reservation_category,
+			re.warning_message,
+			re.confirmation_message,
+			c.name as club_name
+		FROM reservation_element re
+		LEFT JOIN clubs c ON re.id_clubs = c.id_clubs
+		ORDER BY re.id_clubs, re.id_reservation_category NULLS FIRST, re.name
+	`
+
+	itemRows, err := h.DB.Query(itemsQuery)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch items")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch items"})
+	}
+	defer itemRows.Close()
+
+	for itemRows.Next() {
+		var itemID int
+		var name string
+		var slot bool
+		var description, location sql.NullString
+		var clubID int
+		var categoryID sql.NullInt64
+		var warningMessage, confirmationMessage sql.NullString
+		var clubName sql.NullString
+
+		err := itemRows.Scan(&itemID, &name, &slot, &description, &location, &clubID, &categoryID, &warningMessage, &confirmationMessage, &clubName)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan item")
+			continue
+		}
+
+		item := map[string]interface{}{
+			"id":   itemID,
+			"name": name,
+			"slot": slot,
+		}
+		if description.Valid {
+			item["description"] = description.String
+		}
+		if location.Valid {
+			item["location"] = location.String
+		}
+		if warningMessage.Valid {
+			item["warning_message"] = warningMessage.String
+		}
+		if confirmationMessage.Valid {
+			item["confirmation_message"] = confirmationMessage.String
+		}
+		if clubName.Valid {
+			item["club_name"] = clubName.String
+		}
+		item["club_id"] = clubID
+
+		if categoryID.Valid {
+			if cat, exists := categories[int(categoryID.Int64)]; exists {
+				cat.Items = append(cat.Items, item)
+			}
+		} else {
+			// Item without category - add to root level by club
+			// We'll organize by club in the response
+		}
+	}
+
+	// Convert map to slice for JSON
+	result := make([]map[string]interface{}, 0, len(rootCategories))
+	for _, cat := range rootCategories {
+		result = append(result, h.categoryToMap(cat))
+	}
+
+	// Also get items without categories, grouped by club
+	itemsWithoutCategoryQuery := `
+		SELECT 
+			re.id_reservation_element,
+			re.name,
+			re.slot,
+			re.description,
+			re.location,
+			re.id_clubs,
+			re.warning_message,
+			re.confirmation_message,
+			c.name as club_name
+		FROM reservation_element re
+		LEFT JOIN clubs c ON re.id_clubs = c.id_clubs
+		WHERE re.id_reservation_category IS NULL
+		ORDER BY re.id_clubs, re.name
+	`
+
+	itemRows2, err := h.DB.Query(itemsWithoutCategoryQuery)
+	if err == nil {
+		defer itemRows2.Close()
+		clubItems := make(map[int][]map[string]interface{})
+
+		for itemRows2.Next() {
+			var itemID int
+			var name string
+			var slot bool
+			var description, location sql.NullString
+			var clubID int
+			var warningMessage, confirmationMessage sql.NullString
+			var clubName sql.NullString
+
+			err := itemRows2.Scan(&itemID, &name, &slot, &description, &location, &clubID, &warningMessage, &confirmationMessage, &clubName)
+			if err != nil {
+				continue
+			}
+
+			item := map[string]interface{}{
+				"id":   itemID,
+				"name": name,
+				"slot": slot,
+			}
+			if description.Valid {
+				item["description"] = description.String
+			}
+			if location.Valid {
+				item["location"] = location.String
+			}
+			if warningMessage.Valid {
+				item["warning_message"] = warningMessage.String
+			}
+			if confirmationMessage.Valid {
+				item["confirmation_message"] = confirmationMessage.String
+			}
+			if clubName.Valid {
+				item["club_name"] = clubName.String
+			}
+			item["club_id"] = clubID
+
+			clubItems[clubID] = append(clubItems[clubID], item)
+		}
+
+		// Add items without categories to result
+		for clubID, items := range clubItems {
+			result = append(result, map[string]interface{}{
+				"type":      "club_items",
+				"club_id":   clubID,
+				"club_name": items[0]["club_name"],
+				"items":     items,
+			})
+		}
+	}
+
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Successfully fetched reservation tree: %d root categories, %d total categories", len(rootCategories), len(categories)))
+	utils.LogLineKeyValue(utils.LevelInfo, "Total result items", len(result))
+	if len(result) == 0 {
+		utils.LogMessage(utils.LevelWarn, "No categories or items found in reservation tree")
+		utils.LogLineKeyValue(utils.LevelWarn, "Category count from DB", categoryCount)
+		utils.LogLineKeyValue(utils.LevelWarn, "Root categories", len(rootCategories))
+	}
+	utils.LogFooter()
+
+	return c.JSON(result)
+}
+
+func (h *AdminHandler) categoryToMap(cat *categoryNode) map[string]interface{} {
+	if cat == nil {
+		return map[string]interface{}{}
+	}
+
+	result := map[string]interface{}{
+		"type":      "category",
+		"id":        cat.ID,
+		"name":      cat.Name,
+		"club_id":   cat.ClubID,
+		"club_name": cat.ClubName,
+		"items":     cat.Items,
+	}
+
+	if cat.ParentID != nil {
+		result["parent_id"] = *cat.ParentID
+	}
+
+	if cat.Children != nil && len(cat.Children) > 0 {
+		children := make([]map[string]interface{}, 0, len(cat.Children))
+		for _, child := range cat.Children {
+			if child != nil {
+				children = append(children, h.categoryToMap(child))
+			}
+		}
+		if len(children) > 0 {
+			result["children"] = children
+		}
+	}
+
+	return result
+}
+
+// DeleteReservationCategory deletes a reservation category
+func (h *AdminHandler) DeleteReservationCategory(c *fiber.Ctx) error {
+	utils.LogHeader("🗑️ Delete Reservation Category (Admin)")
+
+	categoryID := c.Params("id")
+	categoryIDInt, err := strconv.Atoi(categoryID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Invalid category ID")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid category ID"})
+	}
+
+	// Check if category has children or items
+	var hasChildren bool
+	var hasItems bool
+
+	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM reservation_category WHERE id_parent_category = $1)", categoryIDInt).Scan(&hasChildren)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check category children")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to check category"})
+	}
+
+	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM reservation_element WHERE id_reservation_category = $1)", categoryIDInt).Scan(&hasItems)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check category items")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to check category"})
+	}
+
+	if hasChildren || hasItems {
+		utils.LogMessage(utils.LevelWarn, "Category has children or items, cannot delete")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Cannot delete category with subcategories or items. Please remove them first.",
+		})
+	}
+
+	result, err := h.DB.Exec("DELETE FROM reservation_category WHERE id_reservation_category = $1", categoryIDInt)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete category")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete category"})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, "Category not found")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Category not found"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Category deleted successfully")
+	utils.LogFooter()
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+// UpdateReservationCategory updates a reservation category
+func (h *AdminHandler) UpdateReservationCategory(c *fiber.Ctx) error {
+	utils.LogHeader("✏️ Update Reservation Category (Admin)")
+
+	categoryID := c.Params("id")
+	categoryIDInt, err := strconv.Atoi(categoryID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Invalid category ID")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid category ID"})
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to parse request body")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
+	}
+
+	if req.Name == "" {
+		utils.LogMessage(utils.LevelError, "Category name is required")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Category name is required"})
+	}
+
+	result, err := h.DB.Exec("UPDATE reservation_category SET name = $1 WHERE id_reservation_category = $2", req.Name, categoryIDInt)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to update category")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update category"})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, "Category not found")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Category not found"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Category updated successfully")
+	utils.LogFooter()
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+// DeleteReservationItemAdmin deletes a reservation item (admin endpoint)
+func (h *AdminHandler) DeleteReservationItemAdmin(c *fiber.Ctx) error {
+	utils.LogHeader("🗑️ Delete Reservation Item (Admin)")
+
+	itemID := c.Params("id")
+	itemIDInt, err := strconv.Atoi(itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Invalid item ID")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid item ID"})
+	}
+
+	// Check if item has active reservations
+	var hasReservations bool
+	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM reservation WHERE id_reservation_element = $1 AND end_date IS NULL)", itemIDInt).Scan(&hasReservations)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check item reservations")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to check item"})
+	}
+
+	if hasReservations {
+		utils.LogMessage(utils.LevelWarn, "Item has active reservations, cannot delete")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Cannot delete item with active reservations. Please end all reservations first.",
+		})
+	}
+
+	result, err := h.DB.Exec("DELETE FROM reservation_element WHERE id_reservation_element = $1", itemIDInt)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to delete item")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete item"})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, "Item not found")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Item not found"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Item deleted successfully")
+	utils.LogFooter()
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+// UpdateReservationItemAdmin updates a reservation item (admin endpoint)
+func (h *AdminHandler) UpdateReservationItemAdmin(c *fiber.Ctx) error {
+	utils.LogHeader("✏️ Update Reservation Item (Admin)")
+
+	itemID := c.Params("id")
+	itemIDInt, err := strconv.Atoi(itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Invalid item ID")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid item ID"})
+	}
+
+	var req struct {
+		Name                *string `json:"name"`
+		Description         *string `json:"description"`
+		Location            *string `json:"location"`
+		Slot                *bool   `json:"slot"`
+		WarningMessage      *string `json:"warning_message"`
+		ConfirmationMessage *string `json:"confirmation_message"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to parse request body")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
+	}
+
+	var updateFields []string
+	var updateValues []interface{}
+	paramCount := 1
+
+	if req.Name != nil {
+		updateFields = append(updateFields, fmt.Sprintf("name = $%d", paramCount))
+		updateValues = append(updateValues, *req.Name)
+		paramCount++
+	}
+	if req.Description != nil {
+		if *req.Description == "" {
+			updateFields = append(updateFields, "description = NULL")
+		} else {
+			updateFields = append(updateFields, fmt.Sprintf("description = $%d", paramCount))
+			updateValues = append(updateValues, *req.Description)
+			paramCount++
+		}
+	}
+	if req.Location != nil {
+		if *req.Location == "" {
+			updateFields = append(updateFields, "location = NULL")
+		} else {
+			updateFields = append(updateFields, fmt.Sprintf("location = $%d", paramCount))
+			updateValues = append(updateValues, *req.Location)
+			paramCount++
+		}
+	}
+	if req.Slot != nil {
+		updateFields = append(updateFields, fmt.Sprintf("slot = $%d", paramCount))
+		updateValues = append(updateValues, *req.Slot)
+		paramCount++
+	}
+	if req.WarningMessage != nil {
+		if *req.WarningMessage == "" {
+			updateFields = append(updateFields, "warning_message = NULL")
+		} else {
+			updateFields = append(updateFields, fmt.Sprintf("warning_message = $%d", paramCount))
+			updateValues = append(updateValues, *req.WarningMessage)
+			paramCount++
+		}
+	}
+	if req.ConfirmationMessage != nil {
+		if *req.ConfirmationMessage == "" {
+			updateFields = append(updateFields, "confirmation_message = NULL")
+		} else {
+			updateFields = append(updateFields, fmt.Sprintf("confirmation_message = $%d", paramCount))
+			updateValues = append(updateValues, *req.ConfirmationMessage)
+			paramCount++
+		}
+	}
+
+	if len(updateFields) == 0 {
+		utils.LogMessage(utils.LevelWarn, "No fields to update")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No fields to update"})
+	}
+
+	updateValues = append(updateValues, itemIDInt)
+	updateQuery := fmt.Sprintf(`
+		UPDATE reservation_element 
+		SET %s
+		WHERE id_reservation_element = $%d
+	`, strings.Join(updateFields, ", "), paramCount)
+
+	result, err := h.DB.Exec(updateQuery, updateValues...)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to update item")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update item"})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, "Item not found")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Item not found"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Item updated successfully")
 	utils.LogFooter()
 
 	return c.SendStatus(fiber.StatusOK)

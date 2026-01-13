@@ -12,8 +12,13 @@ import {
 } from "./api";
 import type {
   Club,
+  CreateCategoryRequest,
+  CreateItemRequest,
   Event,
   ReservationItem,
+  ReservationTreeItem,
+  UpdateCategoryRequest,
+  UpdateItemRequest,
   UpdateReservationItemMessagesRequest,
   User,
 } from "./api";
@@ -311,6 +316,82 @@ export const useUpdateReservationItemMessages = () => {
       // Invalidate the reservation items query for the club
       // We need to find which club this item belongs to, but for simplicity, invalidate all
       queryClient.invalidateQueries({ queryKey: ["reservation-items"] });
+    },
+  });
+};
+
+// Reservation tree hooks
+export const useReservationTree = () => {
+  return useQuery({
+    queryKey: ["reservation-tree"],
+    queryFn: reservationApi.getTree,
+  });
+};
+
+export const useCreateReservationCategory = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (category: CreateCategoryRequest) => reservationApi.createCategory(category),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reservation-tree"] });
+    },
+  });
+};
+
+export const useUpdateReservationCategory = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateCategoryRequest }) =>
+      reservationApi.updateCategory(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reservation-tree"] });
+    },
+  });
+};
+
+export const useDeleteReservationCategory = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: reservationApi.deleteCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reservation-tree"] });
+    },
+  });
+};
+
+export const useCreateReservationItem = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (item: CreateItemRequest) => reservationApi.createItem(item),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reservation-tree"] });
+    },
+  });
+};
+
+export const useUpdateReservationItem = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateItemRequest }) =>
+      reservationApi.updateItem(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reservation-tree"] });
+    },
+  });
+};
+
+export const useDeleteReservationItem = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: reservationApi.deleteItem,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reservation-tree"] });
     },
   });
 };
