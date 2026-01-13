@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1651,4 +1652,285 @@ func (h *AdminHandler) GetBassineHistory(c *fiber.Ctx) error {
 	utils.LogFooter()
 
 	return c.JSON(history)
+}
+
+// GetReservationItemsForClubAdmin gets all reservation items for a club (admin/club owner access)
+func (h *AdminHandler) GetReservationItemsForClubAdmin(c *fiber.Ctx) error {
+	utils.LogHeader("📅 Get Reservation Items for Club (Admin)")
+
+	clubID := c.Params("id")
+	if clubID == "" {
+		utils.LogMessage(utils.LevelError, "Club ID is required")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Club ID is required"})
+	}
+
+	clubIDInt, err := strconv.Atoi(clubID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Invalid club ID: %v", err))
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid club ID"})
+	}
+
+	userEmail := c.Locals("email").(string)
+
+	// Check if user is ADMIN or club owner
+	var isAdmin bool
+	var isClubOwner bool
+
+	adminQuery := `
+		SELECT EXISTS(
+			SELECT 1 FROM newf_roles nr
+			JOIN roles r ON nr.id_roles = r.id_roles
+			WHERE nr.email = $1 AND r.name = 'ADMIN'
+		)
+	`
+	err = h.DB.QueryRow(adminQuery, userEmail).Scan(&isAdmin)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check admin status")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to check permissions"})
+	}
+
+	if !isAdmin {
+		// Check if user is club owner
+		var clubName string
+		err = h.DB.QueryRow("SELECT name FROM clubs WHERE id_clubs = $1", clubIDInt).Scan(&clubName)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to get club name")
+			utils.LogFooter()
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Club not found"})
+		}
+
+		roleName := fmt.Sprintf("%s_respo", strings.ToLower(strings.ReplaceAll(clubName, " ", "")))
+		ownerQuery := `
+			SELECT EXISTS(
+				SELECT 1 FROM newf_roles nr
+				JOIN roles r ON nr.id_roles = r.id_roles
+				WHERE nr.email = $1 AND r.name = $2
+			)
+		`
+		err = h.DB.QueryRow(ownerQuery, userEmail, roleName).Scan(&isClubOwner)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to check club owner status")
+			utils.LogFooter()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to check permissions"})
+		}
+
+		if !isClubOwner {
+			utils.LogMessage(utils.LevelWarn, "User not authorized to access club reservation items")
+			utils.LogFooter()
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+		}
+	}
+
+	query := `
+		SELECT
+			re.id_reservation_element,
+			re.name,
+			re.slot,
+			re.description,
+			re.location,
+			re.warning_message,
+			re.confirmation_message
+		FROM reservation_element re
+		WHERE re.id_clubs = $1
+		ORDER BY re.name
+	`
+
+	rows, err := h.DB.Query(query, clubIDInt)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch reservation items")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch reservation items"})
+	}
+	defer rows.Close()
+
+	var items []map[string]interface{}
+	for rows.Next() {
+		var item map[string]interface{} = make(map[string]interface{})
+		var id int
+		var name string
+		var slot bool
+		var description, location, warningMessage, confirmationMessage sql.NullString
+
+		err := rows.Scan(&id, &name, &slot, &description, &location, &warningMessage, &confirmationMessage)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan item")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+
+		item["id"] = id
+		item["name"] = name
+		item["slot"] = slot
+		if description.Valid {
+			item["description"] = description.String
+		}
+		if location.Valid {
+			item["location"] = location.String
+		}
+		if warningMessage.Valid {
+			item["warning_message"] = warningMessage.String
+		}
+		if confirmationMessage.Valid {
+			item["confirmation_message"] = confirmationMessage.String
+		}
+
+		items = append(items, item)
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully fetched reservation items for club")
+	utils.LogLineKeyValue(utils.LevelInfo, "Item Count", len(items))
+	utils.LogFooter()
+
+	return c.JSON(items)
+}
+
+// UpdateReservationItemMessages updates custom warning and confirmation messages for a reservation item
+func (h *AdminHandler) UpdateReservationItemMessages(c *fiber.Ctx) error {
+	utils.LogHeader("📝 Update Reservation Item Messages (Admin)")
+
+	itemID := c.Params("id")
+	itemIDInt, err := strconv.Atoi(itemID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Invalid item ID")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid item ID"})
+	}
+
+	userEmail := c.Locals("email").(string)
+
+	var req struct {
+		WarningMessage     *string `json:"warning_message"`
+		ConfirmationMessage *string `json:"confirmation_message"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to parse request body")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
+	}
+
+	// Get club ID for this item
+	var clubID int
+	err = h.DB.QueryRow("SELECT id_clubs FROM reservation_element WHERE id_reservation_element = $1", itemIDInt).Scan(&clubID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.LogMessage(utils.LevelWarn, "Reservation item not found")
+			utils.LogFooter()
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Reservation item not found"})
+		}
+		utils.LogMessage(utils.LevelError, "Failed to get club ID")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get item information"})
+	}
+
+	// Check if user is ADMIN or club owner
+	var isAdmin bool
+	adminQuery := `
+		SELECT EXISTS(
+			SELECT 1 FROM newf_roles nr
+			JOIN roles r ON nr.id_roles = r.id_roles
+			WHERE nr.email = $1 AND r.name = 'ADMIN'
+		)
+	`
+	err = h.DB.QueryRow(adminQuery, userEmail).Scan(&isAdmin)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check admin status")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to check permissions"})
+	}
+
+	if !isAdmin {
+		// Check if user is club owner
+		var clubName string
+		err = h.DB.QueryRow("SELECT name FROM clubs WHERE id_clubs = $1", clubID).Scan(&clubName)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to get club name")
+			utils.LogFooter()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get club information"})
+		}
+
+		roleName := fmt.Sprintf("%s_respo", strings.ToLower(strings.ReplaceAll(clubName, " ", "")))
+		var isClubOwner bool
+		ownerQuery := `
+			SELECT EXISTS(
+				SELECT 1 FROM newf_roles nr
+				JOIN roles r ON nr.id_roles = r.id_roles
+				WHERE nr.email = $1 AND r.name = $2
+			)
+		`
+		err = h.DB.QueryRow(ownerQuery, userEmail, roleName).Scan(&isClubOwner)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to check club owner status")
+			utils.LogFooter()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to check permissions"})
+		}
+
+		if !isClubOwner {
+			utils.LogMessage(utils.LevelWarn, "User not authorized to update reservation item messages")
+			utils.LogFooter()
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+		}
+	}
+
+	// Build update query dynamically
+	var updateFields []string
+	var updateValues []interface{}
+	paramCount := 1
+
+	if req.WarningMessage != nil {
+		if *req.WarningMessage == "" {
+			updateFields = append(updateFields, "warning_message = NULL")
+		} else {
+			updateFields = append(updateFields, fmt.Sprintf("warning_message = $%d", paramCount))
+			updateValues = append(updateValues, *req.WarningMessage)
+			paramCount++
+		}
+	}
+
+	if req.ConfirmationMessage != nil {
+		if *req.ConfirmationMessage == "" {
+			updateFields = append(updateFields, "confirmation_message = NULL")
+		} else {
+			updateFields = append(updateFields, fmt.Sprintf("confirmation_message = $%d", paramCount))
+			updateValues = append(updateValues, *req.ConfirmationMessage)
+			paramCount++
+		}
+	}
+
+	if len(updateFields) == 0 {
+		utils.LogMessage(utils.LevelWarn, "No fields to update")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No fields to update"})
+	}
+
+	updateValues = append(updateValues, itemIDInt)
+	updateQuery := fmt.Sprintf(`
+		UPDATE reservation_element 
+		SET %s
+		WHERE id_reservation_element = $%d
+	`, strings.Join(updateFields, ", "), paramCount)
+
+	result, err := h.DB.Exec(updateQuery, updateValues...)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to update reservation item messages")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update messages"})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, "Reservation item not found for update")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Reservation item not found"})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Reservation item messages updated successfully")
+	utils.LogFooter()
+
+	return c.SendStatus(fiber.StatusOK)
 }

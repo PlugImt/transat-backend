@@ -4,12 +4,20 @@ import {
   clubsApi,
   eventsApi,
   menuApi,
+  reservationApi,
   reviewsApi,
   rolesApi,
   statsApi,
   usersApi,
 } from "./api";
-import type { Club, Event, User } from "./types";
+import type {
+  Club,
+  Event,
+  ReservationItem,
+  UpdateReservationItemMessagesRequest,
+  User,
+} from "./api";
+import type { Club as ClubType } from "./types";
 
 export * from "./hooks/useClickOutside";
 // Export utility hooks
@@ -275,6 +283,34 @@ export const useUpdateBassineScore = () => {
     mutationFn: bassineApi.updateScore,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bassine-scores"] });
+    },
+  });
+};
+
+// Reservation items hooks
+export const useReservationItemsForClub = (clubId: number, options?: { enabled?: boolean }) => {
+  return useQuery({
+    queryKey: ["reservation-items", clubId],
+    queryFn: () => reservationApi.getItemsForClub(clubId),
+    enabled: options?.enabled ?? true,
+  });
+};
+
+export const useUpdateReservationItemMessages = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      itemId,
+      messages,
+    }: {
+      itemId: number;
+      messages: UpdateReservationItemMessagesRequest;
+    }) => reservationApi.updateItemMessages(itemId, messages),
+    onSuccess: (_data, variables) => {
+      // Invalidate the reservation items query for the club
+      // We need to find which club this item belongs to, but for simplicity, invalidate all
+      queryClient.invalidateQueries({ queryKey: ["reservation-items"] });
     },
   });
 };

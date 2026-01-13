@@ -204,3 +204,32 @@ export const bassineApi = {
     return response.data;
   },
 };
+
+export interface ReservationItem {
+  id: number;
+  name: string;
+  slot: boolean;
+  description?: string;
+  location?: string;
+  warning_message?: string;
+  confirmation_message?: string;
+}
+
+export interface UpdateReservationItemMessagesRequest {
+  warning_message?: string | null;
+  confirmation_message?: string | null;
+}
+
+export const reservationApi = {
+  getItemsForClub: async (clubId: number): Promise<ReservationItem[]> => {
+    const response = await api.get(`/admin/clubs/${clubId}/reservation-items`);
+    return response.data;
+  },
+  updateItemMessages: async (
+    itemId: number,
+    messages: UpdateReservationItemMessagesRequest,
+  ) => {
+    const response = await api.patch(`/admin/reservation-items/${itemId}/messages`, messages);
+    return response.data;
+  },
+};

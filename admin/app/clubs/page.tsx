@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Building, Edit, ExternalLink, MapPin, Plus, Settings2, Trash2, Users } from "lucide-react";
+import { Building, Edit, ExternalLink, MapPin, Plus, Settings2, Trash2, Users, Calendar } from "lucide-react";
 import Image from "next/image";
 import ClubModal from "@/components/ClubModal";
 import ClubOwnersModal from "@/components/ClubOwnersModal";
+import { ReservationItemsModal } from "@/components/ReservationItemsModal";
 import { useClubs, useDeleteClub } from "@/lib/hooks";
 import { useAppStore } from "@/lib/stores/appStore";
 import type { Club, ClubWithResponsible } from "@/lib/types";
@@ -17,6 +18,7 @@ export default function ClubsPage() {
   const [ownersModalOpen, setOwnersModalOpen] = useState(false);
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null);
   const [selectedClubName, setSelectedClubName] = useState("");
+  const [reservationItemsModalOpen, setReservationItemsModalOpen] = useState(false);
 
   const handleCreateClub = () => {
     openClubModal();
@@ -30,6 +32,12 @@ export default function ClubsPage() {
     setSelectedClubId(club.id_clubs);
     setSelectedClubName(club.name);
     setOwnersModalOpen(true);
+  };
+
+  const handleManageReservationItems = (club: Club) => {
+    setSelectedClubId(club.id_clubs);
+    setSelectedClubName(club.name);
+    setReservationItemsModalOpen(true);
   };
 
   const handleDeleteClub = async (club: Club) => {
@@ -155,9 +163,8 @@ export default function ClubsPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
                       {(club as ClubWithResponsible).responsible
-                        ? `${(club as ClubWithResponsible).responsible?.first_name} ${
-                            (club as ClubWithResponsible).responsible?.last_name
-                          }`
+                        ? `${(club as ClubWithResponsible).responsible?.first_name} ${(club as ClubWithResponsible).responsible?.last_name
+                        }`
                         : "Aucun"}
                     </div>
                   </td>
@@ -170,6 +177,14 @@ export default function ClubsPage() {
                         title="Gérer les responsables"
                       >
                         <Settings2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleManageReservationItems(club)}
+                        className="text-green-600 hover:text-green-800"
+                        title="Gérer les messages de réservation"
+                      >
+                        <Calendar className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
@@ -206,7 +221,7 @@ export default function ClubsPage() {
         isOpen={clubModalOpen}
         onClose={closeClubModal}
         club={editingClub}
-        onSave={() => {}}
+        onSave={() => { }}
       />
       <ClubOwnersModal
         isOpen={ownersModalOpen}
@@ -214,6 +229,14 @@ export default function ClubsPage() {
         clubId={selectedClubId}
         clubName={selectedClubName}
       />
+      {selectedClubId && (
+        <ReservationItemsModal
+          clubId={selectedClubId}
+          clubName={selectedClubName}
+          isOpen={reservationItemsModalOpen}
+          onClose={() => setReservationItemsModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

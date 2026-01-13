@@ -18,10 +18,12 @@ type ReservationCategory struct {
 
 // ReservationItem represents an item that can be reserved
 type ReservationItem struct {
-	ID   int              `json:"id"`
-	Name string           `json:"name"`
-	Slot bool             `json:"slot"`
-	User *ReservationUser `json:"user,omitempty"` // Optional: only shown when item is reserved
+	ID                 int              `json:"id"`
+	Name               string            `json:"name"`
+	Slot               bool              `json:"slot"`
+	User               *ReservationUser  `json:"user,omitempty"` // Optional: only shown when item is reserved
+	WarningMessage     *string           `json:"warning_message,omitempty"`     // Custom warning message for reservation dialog
+	ConfirmationMessage *string           `json:"confirmation_message,omitempty"` // Custom confirmation message for reservation dialog
 }
 
 // ReservationOverviewResponse represents the response for /reservation
@@ -53,12 +55,14 @@ type ReservationSlotDetail struct {
 
 // ReservationItemDetailResponse represents the response for /reservation/items/{id}
 type ReservationItemDetailResponse struct {
-	ID                int                     `json:"id"`
-	Name              string                  `json:"name"`
-	Slot              bool                    `json:"slot"`
-	Reservation       []ReservationSlotDetail `json:"reservation"`
-	ReservationBefore []ReservationSlotDetail `json:"reservation_before"`
-	ReservationAfter  []ReservationSlotDetail `json:"reservation_after"`
+	ID                 int                     `json:"id"`
+	Name               string                  `json:"name"`
+	Slot               bool                    `json:"slot"`
+	Reservation        []ReservationSlotDetail `json:"reservation"`
+	ReservationBefore  []ReservationSlotDetail `json:"reservation_before"`
+	ReservationAfter   []ReservationSlotDetail `json:"reservation_after"`
+	WarningMessage     *string                 `json:"warning_message,omitempty"`     // Custom warning message for reservation dialog
+	ConfirmationMessage *string                 `json:"confirmation_message,omitempty"` // Custom confirmation message for reservation dialog
 }
 
 // ReservationManagementRequest is used to start a reservation
