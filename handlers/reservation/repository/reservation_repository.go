@@ -114,25 +114,28 @@ func (r *ReservationRepository) CreateCategory(category models.ReservationCreate
 		return res, fmt.Errorf("category name is required")
 	}
 
-	query := `
-		INSERT INTO reservation_category 
-			(name, id_clubs%s)
-		VALUES 
-			($1, $2%s)
-		RETURNING id_reservation_category
-	`
-
-	args := []interface{}{category.Name, category.IDClubParent}
-	extraCols, extraVals := "", ""
+	// Build query dynamically with correct parameter numbering
+	columns := []string{"name", "id_clubs"}
+	placeholders := []string{"$1", "$2"}
+	args := []interface{}{category.Name, *category.IDClubParent}
+	paramNum := 3
 
 	if category.IDCategoryParent != nil {
-		extraCols = ", id_parent_category"
-		extraVals = ", $3"
+		columns = append(columns, "id_parent_category")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", paramNum))
 		args = append(args, *category.IDCategoryParent)
+		paramNum++
 	}
 
-	finalQuery := fmt.Sprintf(query, extraCols, extraVals)
-	row := r.DB.QueryRow(finalQuery, args...)
+	query := fmt.Sprintf(`
+		INSERT INTO reservation_category 
+			(%s)
+		VALUES 
+			(%s)
+		RETURNING id_reservation_category
+	`, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+
+	row := r.DB.QueryRow(query, args...)
 
 	if err := row.Scan(&res.ID); err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create category: %v", err))
@@ -154,36 +157,40 @@ func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequ
 		return res, fmt.Errorf("item name is required")
 	}
 
-	query := `
-		INSERT INTO reservation_element 
-			(name, slot, id_clubs%s) 
-		VALUES 
-			($1, $2, $3%s)
-		RETURNING id_reservation_element
-	`
-
+	// Build query dynamically with correct parameter numbering
+	columns := []string{"name", "slot", "id_clubs"}
+	placeholders := []string{"$1", "$2", "$3"}
 	args := []interface{}{item.Name, item.Slot, *item.IDClubParent}
-	extraCols, extraVals := "", ""
+	paramNum := 4
 
 	if item.IDCategoryParent != nil {
-		extraCols = ", id_reservation_category"
-		extraVals = ", $4"
+		columns = append(columns, "id_reservation_category")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", paramNum))
 		args = append(args, *item.IDCategoryParent)
+		paramNum++
 	}
 	if item.Description != nil {
-		extraCols += ", description"
-		extraVals += ", $5"
+		columns = append(columns, "description")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", paramNum))
 		args = append(args, *item.Description)
+		paramNum++
 	}
 	if item.Location != nil {
-		extraCols += ", location"
-		extraVals += ", $6"
+		columns = append(columns, "location")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", paramNum))
 		args = append(args, *item.Location)
+		paramNum++
 	}
 
-	finalQuery := fmt.Sprintf(fmt.Sprintf(query, extraCols, extraVals) + ";")
+	query := fmt.Sprintf(`
+		INSERT INTO reservation_element 
+			(%s) 
+		VALUES 
+			(%s)
+		RETURNING id_reservation_element
+	`, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
 
-	row := r.DB.QueryRow(finalQuery, args...)
+	row := r.DB.QueryRow(query, args...)
 
 	if err := row.Scan(&res.ID); err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create item: %v", err))
