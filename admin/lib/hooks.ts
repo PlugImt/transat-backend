@@ -153,6 +153,40 @@ export const useDeleteClub = () => {
   });
 };
 
+export const useClubOwners = (clubId: number, options?: { enabled?: boolean }) => {
+  return useQuery({
+    queryKey: ["club-owners", clubId],
+    queryFn: () => clubsApi.getOwners(clubId),
+    enabled: options?.enabled ?? true,
+  });
+};
+
+export const useAddClubOwner = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ clubId, email }: { clubId: number; email: string }) =>
+      clubsApi.addOwner(clubId, email),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["club-owners", variables.clubId] });
+      queryClient.invalidateQueries({ queryKey: ["clubs"] });
+    },
+  });
+};
+
+export const useRemoveClubOwner = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ clubId, email }: { clubId: number; email: string }) =>
+      clubsApi.removeOwner(clubId, email),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["club-owners", variables.clubId] });
+      queryClient.invalidateQueries({ queryKey: ["clubs"] });
+    },
+  });
+};
+
 // Dashboard stats hook
 export const useDashboardStats = () => {
   return useQuery({

@@ -869,6 +869,140 @@ func (h *ClubHandler) AddClubRespo(c *fiber.Ctx) error {
 	})
 }
 
+// RemoveClubRespo removes an existing responsible from a club
+func (h *ClubHandler) RemoveClubRespo(c *fiber.Ctx) error {
+	utils.LogHeader("👑 Remove Club Responsible")
+
+	clubID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		utils.LogMessage(utils.LevelWarn, "Invalid club ID")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid club ID",
+		})
+	}
+
+	userEmail := c.Locals("email").(string)
+	utils.LogLineKeyValue(utils.LevelInfo, "Club ID", clubID)
+	utils.LogLineKeyValue(utils.LevelInfo, "Current User", userEmail)
+
+	// Get club name first
+	var clubName string
+	err = h.db.QueryRow("SELECT name FROM clubs WHERE id_clubs = $1", clubID).Scan(&clubName)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.LogMessage(utils.LevelWarn, "Club not found")
+			utils.LogFooter()
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Club not found",
+			})
+		}
+		utils.LogMessage(utils.LevelError, "Failed to get club")
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get club information",
+		})
+	}
+
+	// Check permissions directly from database - more secure!
+	roleName := fmt.Sprintf("%s_respo", strings.ToLower(strings.ReplaceAll(clubName, " ", "")))
+	utils.LogLineKeyValue(utils.LevelInfo, "Expected Role Name", roleName)
+
+	// Check if user has permission (ADMIN or current responsible) in one efficient query
+	var hasPermission bool
+	permissionQuery := `
+		SELECT EXISTS(
+			SELECT 1 FROM newf n
+			JOIN newf_roles nr ON n.email = nr.email
+			JOIN roles r ON nr.id_roles = r.id_roles
+			WHERE n.email = $1 AND (r.name = 'ADMIN' OR r.name = $2)
+		)`
+	err = h.db.QueryRow(permissionQuery, userEmail, roleName).Scan(&hasPermission)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to check permissions")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check permissions",
+		})
+	}
+
+	utils.LogLineKeyValue(utils.LevelInfo, "Has Permission (ADMIN or Respo)", hasPermission)
+
+	if !hasPermission {
+		utils.LogMessage(utils.LevelWarn, "User not authorized to change responsible")
+		utils.LogLineKeyValue(utils.LevelWarn, "Has Permission", hasPermission)
+		utils.LogLineKeyValue(utils.LevelWarn, "Expected Role", roleName)
+		utils.LogFooter()
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Only admins or current responsibles can change club responsible",
+		})
+	}
+
+	var req models.AddRespoRequest
+	if err := c.BodyParser(&req); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to parse request body")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if req.Email == "" {
+		utils.LogMessage(utils.LevelWarn, "Email is required")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Email is required",
+		})
+	}
+
+	// Get role ID for this club's responsible role
+	var roleID int
+	err = h.db.QueryRow("SELECT id_roles FROM roles WHERE name = $1", roleName).Scan(&roleID)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get role ID")
+		utils.LogLineKeyValue(utils.LevelError, "Role Name", roleName)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get role information",
+		})
+	}
+
+	// Remove responsible mapping
+	result, err := h.db.Exec(
+		"DELETE FROM newf_roles WHERE email = $1 AND id_roles = $2",
+		req.Email,
+		roleID,
+	)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to remove responsible")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to remove responsible",
+		})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		utils.LogMessage(utils.LevelWarn, "No responsible mapping found to remove")
+		utils.LogFooter()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Responsible not found for this club",
+		})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Club responsible removed successfully")
+	utils.LogFooter()
+
+	return c.JSON(fiber.Map{
+		"message":         "Club responsible removed successfully",
+		"removed_account": req.Email,
+	})
+}
+
 // JoinClub adds the user to a club
 func (h *ClubHandler) JoinClub(c *fiber.Ctx) error {
 	utils.LogHeader("🤝 Join Club")

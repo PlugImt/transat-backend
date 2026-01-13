@@ -1,8 +1,10 @@
 "use client";
 
-import { Building, Edit, ExternalLink, MapPin, Plus, Trash2, Users } from "lucide-react";
+import { useState } from "react";
+import { Building, Edit, ExternalLink, MapPin, Plus, Settings2, Trash2, Users } from "lucide-react";
 import Image from "next/image";
 import ClubModal from "@/components/ClubModal";
+import ClubOwnersModal from "@/components/ClubOwnersModal";
 import { useClubs, useDeleteClub } from "@/lib/hooks";
 import { useAppStore } from "@/lib/stores/appStore";
 import type { Club, ClubWithResponsible } from "@/lib/types";
@@ -12,6 +14,9 @@ export default function ClubsPage() {
   const deleteClubMutation = useDeleteClub();
 
   const { clubModalOpen, editingClub, openClubModal, closeClubModal } = useAppStore();
+  const [ownersModalOpen, setOwnersModalOpen] = useState(false);
+  const [selectedClubId, setSelectedClubId] = useState<number | null>(null);
+  const [selectedClubName, setSelectedClubName] = useState("");
 
   const handleCreateClub = () => {
     openClubModal();
@@ -19,6 +24,12 @@ export default function ClubsPage() {
 
   const handleEditClub = (club: Club) => {
     openClubModal(club);
+  };
+
+  const handleManageOwners = (club: Club) => {
+    setSelectedClubId(club.id_clubs);
+    setSelectedClubName(club.name);
+    setOwnersModalOpen(true);
   };
 
   const handleDeleteClub = async (club: Club) => {
@@ -81,7 +92,7 @@ export default function ClubsPage() {
                   Membres
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Responsable
+                  Responsable(s)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -147,11 +158,19 @@ export default function ClubsPage() {
                         ? `${(club as ClubWithResponsible).responsible?.first_name} ${
                             (club as ClubWithResponsible).responsible?.last_name
                           }`
-                        : "-"}
+                        : "Aucun"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleManageOwners(club)}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="Gérer les responsables"
+                      >
+                        <Settings2 className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleEditClub(club)}
@@ -188,6 +207,12 @@ export default function ClubsPage() {
         onClose={closeClubModal}
         club={editingClub}
         onSave={() => {}}
+      />
+      <ClubOwnersModal
+        isOpen={ownersModalOpen}
+        onClose={() => setOwnersModalOpen(false)}
+        clubId={selectedClubId}
+        clubName={selectedClubName}
       />
     </div>
   );

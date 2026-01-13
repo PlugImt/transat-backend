@@ -11,7 +11,7 @@ import type {
   User,
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -109,6 +109,17 @@ export const clubsApi = {
     const response = await api.get("/admin/clubs");
     return response.data;
   },
+  getOwners: async (id: number): Promise<User[]> => {
+    const response = await api.get(`/club/${id}`);
+    const data = response.data;
+    if (Array.isArray(data.responsibles)) {
+      return data.responsibles;
+    }
+    if (data.responsible) {
+      return [data.responsible];
+    }
+    return [];
+  },
   create: async (club: Partial<Club>) => {
     const filteredClub = Object.fromEntries(
       Object.entries(club).filter(
@@ -124,6 +135,16 @@ export const clubsApi = {
   },
   delete: async (id: number) => {
     const response = await api.delete(`/admin/clubs/${id}`);
+    return response.data;
+  },
+  addOwner: async (clubId: number, email: string) => {
+    const response = await api.post(`/club/${clubId}/respo`, { email });
+    return response.data;
+  },
+  removeOwner: async (clubId: number, email: string) => {
+    const response = await api.delete(`/club/${clubId}/respo`, {
+      data: { email },
+    });
     return response.data;
   },
 };
