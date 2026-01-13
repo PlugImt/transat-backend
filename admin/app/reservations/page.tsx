@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { Folder, FolderOpen, Plus, Edit, Trash2, MessageSquare } from "lucide-react";
 import {
   useReservationTree,
@@ -93,7 +93,7 @@ export default function ReservationsPage() {
     setMessageModalOpen(true);
   };
 
-  const renderTree = (nodes: ReservationTreeItem[], level = 0): JSX.Element[] => {
+  const renderTree = (nodes: ReservationTreeItem[], level = 0): ReactElement[] => {
     return nodes.map((node) => {
       const nodeId = node.type === "category" ? `cat-${node.id}` : `club-${node.club_id}`;
       const isExpanded = expandedNodes.has(nodeId);
