@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactElement } from "react";
-import { Folder, FolderOpen, Plus, Edit, Trash2, MessageSquare } from "lucide-react";
+import { Folder, FolderOpen, FolderPlus, PackagePlus, Edit, Trash2, MessageSquare } from "lucide-react";
 import {
   useReservationTree,
   useDeleteReservationCategory,
@@ -133,14 +133,14 @@ export default function ReservationsPage() {
                     className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                     title="Ajouter une sous-catégorie"
                   >
-                    <Plus size={16} />
+                    <FolderPlus size={16} />
                   </button>
                   <button
                     onClick={() => handleCreateItem(node.id, node.club_id)}
                     className="p-1 text-green-600 hover:bg-green-50 rounded"
                     title="Ajouter un élément"
                   >
-                    <Plus size={16} />
+                    <PackagePlus size={16} />
                   </button>
                   <button
                     onClick={() => handleEditCategory(node)}
@@ -162,7 +162,21 @@ export default function ReservationsPage() {
 
             {node.type === "club_items" && (
               <>
-                <div className="w-[18px]" />
+                <button
+                  onClick={() => toggleNode(nodeId)}
+                  className="flex items-center"
+                  disabled={!hasItems}
+                >
+                  {hasItems ? (
+                    isExpanded ? (
+                      <FolderOpen size={18} className="text-gray-500" />
+                    ) : (
+                      <Folder size={18} className="text-gray-400" />
+                    )
+                  ) : (
+                    <div className="w-[18px]" />
+                  )}
+                </button>
                 <span className="flex-1 font-medium text-gray-600">
                   Éléments sans catégorie - {node.club_name}
                 </span>
@@ -171,7 +185,7 @@ export default function ReservationsPage() {
                   className="p-1 text-green-600 hover:bg-green-50 rounded"
                   title="Ajouter un élément"
                 >
-                  <Plus size={16} />
+                  <PackagePlus size={16} />
                 </button>
               </>
             )}
@@ -191,6 +205,11 @@ export default function ReservationsPage() {
                   {item.slot && (
                     <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                       Créneau
+                    </span>
+                  )}
+                  {item.description && (
+                    <span className="text-xs text-gray-500 truncate max-w-xs">
+                      {item.description}
                     </span>
                   )}
                   <div className="flex gap-1">
@@ -259,7 +278,7 @@ export default function ReservationsPage() {
           onClick={() => handleCreateCategory()}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <FolderPlus className="h-4 w-4 mr-2" />
           Nouvelle catégorie
         </button>
       </div>
