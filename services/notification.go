@@ -38,10 +38,9 @@ func (ns *NotificationService) GetNotificationTargets(userEmails []string, group
 
 	if len(userEmails) > 0 {
 		query := `
-            SELECT email, notification_token 
-            FROM newf 
-            WHERE email = ANY($1) 
-            AND notification_token IS NOT NULL
+            SELECT unt.email, unt.token 
+            FROM user_notification_tokens unt
+            WHERE unt.email = ANY($1)
         `
 		rows, err := ns.db.Query(query, pq.Array(userEmails))
 		if err != nil {
@@ -70,12 +69,11 @@ func (ns *NotificationService) GetNotificationTargets(userEmails []string, group
 
 	if len(groups) > 0 {
 		query := `
-            SELECT DISTINCT n.email, nf.notification_token 
+            SELECT DISTINCT n.email, unt.token 
             FROM notifications n
-            JOIN newf nf ON n.email = nf.email
+            JOIN user_notification_tokens unt ON n.email = unt.email
             JOIN services s ON n.id_services = s.id_services
             WHERE s.name = ANY($1)
-            AND nf.notification_token IS NOT NULL
         `
 
 		stmt, err := ns.db.Prepare(query)
@@ -132,11 +130,11 @@ func (ns *NotificationService) GetNotificationTargets(userEmails []string, group
 // GetSubscribedUsers retrieves users subscribed to a specific service.
 func (ns *NotificationService) GetSubscribedUsers(serviceName string) ([]models.NotificationTarget, error) {
 	query := `
-		SELECT n.email, COALESCE(newf.notification_token, '') as notification_token
+		SELECT n.email, unt.token as notification_token
 		FROM notifications n
-		JOIN newf ON n.email = newf.email
+		JOIN user_notification_tokens unt ON n.email = unt.email
 		JOIN services s ON n.id_services = s.id_services
-		WHERE s.name = $1 AND newf.notification_token IS NOT NULL AND newf.notification_token != '';
+		WHERE s.name = $1;
 	`
 	rows, err := ns.db.Query(query, serviceName)
 	if err != nil {
@@ -166,12 +164,13 @@ func (ns *NotificationService) GetSubscribedUsers(serviceName string) ([]models.
 // GetSubscribedUsersWithLanguage retrieves users subscribed to a specific service with their language preferences.
 func (ns *NotificationService) GetSubscribedUsersWithLanguage(serviceName string) ([]models.NotificationTargetWithLanguage, error) {
 	query := `
-		SELECT n.email, COALESCE(newf.notification_token, '') as notification_token, l.code as language_code
+		SELECT n.email, unt.token as notification_token, l.code as language_code
 		FROM notifications n
-		JOIN newf ON n.email = newf.email
+		JOIN user_notification_tokens unt ON n.email = unt.email
 		JOIN services s ON n.id_services = s.id_services
+		JOIN newf ON n.email = newf.email
 		JOIN languages l ON newf.language = l.id_languages
-		WHERE s.name = $1 AND newf.notification_token IS NOT NULL AND newf.notification_token != '';
+		WHERE s.name = $1;
 	`
 	rows, err := ns.db.Query(query, serviceName)
 	if err != nil {
@@ -207,7 +206,7 @@ func (ns *NotificationService) SendPushNotification(payload models.NotificationP
 		tokens = payload.NotificationTokens
 	} else if len(payload.UserEmails) > 0 {
 		// Fallback to resolving tokens from emails if needed
-		request := `SELECT notification_token FROM newf WHERE email = ANY($1)`
+		request := `SELECT token FROM user_notification_tokens WHERE email = ANY($1)`
 		rows, err := ns.db.Query(request, pq.Array(payload.UserEmails))
 		if err != nil {
 			log.Printf("Error querying tokens from db: %v", err)

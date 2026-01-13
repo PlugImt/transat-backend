@@ -212,8 +212,18 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 		// Potentially validate the picture URL/path format
 		updateFields["profile_picture"] = req.ProfilePicture
 	}
-	if req.NotificationToken != "" { // Allow updating push token
-		updateFields["notification_token"] = req.NotificationToken
+	if req.NotificationToken != "" { // Save notification token to user_notification_tokens table
+		// Insert token into user_notification_tokens table (allows multiple tokens per user)
+		// ON CONFLICT DO NOTHING prevents duplicate tokens for the same user
+		tokenQuery := `INSERT INTO user_notification_tokens (email, token) VALUES ($1, $2) ON CONFLICT (email, token) DO NOTHING`
+		_, err := h.DB.Exec(tokenQuery, email, req.NotificationToken)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to save notification token")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			// Log but continue with other fields
+		} else {
+			utils.LogMessage(utils.LevelInfo, "Notification token saved successfully")
+		}
 	}
 	if req.Language != "" { // Allow updating language preference
 		// Language update needs a subquery to get the ID
@@ -232,11 +242,11 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 	}
 
 	if len(updateFields) == 0 {
-		// Check if only language was updated
-		if req.Language != "" {
-			utils.LogMessage(utils.LevelInfo, "Only language preference was updated")
+		// Check if only language or notification token was updated
+		if req.Language != "" || req.NotificationToken != "" {
+			utils.LogMessage(utils.LevelInfo, "Only language preference or notification token was updated")
 			utils.LogFooter()
-			return c.SendStatus(fiber.StatusOK) // Return OK if only language updated successfully
+			return c.SendStatus(fiber.StatusOK) // Return OK if only language or token updated successfully
 		}
 		utils.LogMessage(utils.LevelWarn, "No fields provided for update")
 		utils.LogFooter()
