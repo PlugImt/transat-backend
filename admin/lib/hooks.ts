@@ -33,15 +33,13 @@ import type {
   Club,
   CreateCategoryRequest,
   CreateItemRequest,
-  Event,
   ReservationItem,
   ReservationTreeItem,
   UpdateCategoryRequest,
   UpdateItemRequest,
   UpdateReservationItemMessagesRequest,
-  User,
 } from "./api";
-import type { Club as ClubType } from "./types";
+import type { Club, Event, User } from "./types";
 
 export * from "./hooks/useClickOutside";
 // Export utility hooks
