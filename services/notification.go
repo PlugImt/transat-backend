@@ -449,6 +449,133 @@ func (ns *NotificationService) SendNotification(c *fiber.Ctx) error {
 	})
 }
 
+// GetAllNotificationTokens retrieves all notification tokens from all users.
+func (ns *NotificationService) GetAllNotificationTokens() ([]string, error) {
+	query := `SELECT DISTINCT token FROM user_notification_tokens WHERE token IS NOT NULL AND token != ''`
+	rows, err := ns.db.Query(query)
+	if err != nil {
+		log.Printf("Error querying all notification tokens: %v", err)
+		return nil, fmt.Errorf("failed to query all notification tokens: %w", err)
+	}
+	defer rows.Close()
+
+	var tokens []string
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err != nil {
+			log.Printf("Error scanning token: %v", err)
+			continue
+		}
+		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
+// GetAllUsersWithLanguage retrieves all users with their notification tokens and language preferences.
+func (ns *NotificationService) GetAllUsersWithLanguage() ([]models.NotificationTargetWithLanguage, error) {
+	query := `
+		SELECT DISTINCT unt.email, unt.token, COALESCE(l.code, 'fr') as language_code
+		FROM user_notification_tokens unt
+		LEFT JOIN newf n ON unt.email = n.email
+		LEFT JOIN languages l ON n.language = l.id_languages
+		WHERE unt.token IS NOT NULL AND unt.token != ''
+	`
+	rows, err := ns.db.Query(query)
+	if err != nil {
+		log.Printf("Error querying all users with language: %v", err)
+		return nil, fmt.Errorf("failed to query all users with language: %w", err)
+	}
+	defer rows.Close()
+
+	var targets []models.NotificationTargetWithLanguage
+	for rows.Next() {
+		var target models.NotificationTargetWithLanguage
+		if err := rows.Scan(&target.Email, &target.NotificationToken, &target.LanguageCode); err != nil {
+			log.Printf("Error scanning user with language: %v", err)
+			continue
+		}
+		targets = append(targets, target)
+	}
+
+	return targets, nil
+}
+
+// GetUsersInterestedInEventOrClubWithLanguage retrieves users interested in an event or its club with their language preferences.
+func (ns *NotificationService) GetUsersInterestedInEventOrClubWithLanguage(eventID int, clubID int) ([]models.NotificationTargetWithLanguage, error) {
+	query := `
+		SELECT DISTINCT unt.email, unt.token, COALESCE(l.code, 'fr') as language_code
+		FROM user_notification_tokens unt
+		LEFT JOIN newf n ON unt.email = n.email
+		LEFT JOIN languages l ON n.language = l.id_languages
+		WHERE unt.token IS NOT NULL AND unt.token != ''
+		AND (
+			unt.email IN (
+				SELECT email FROM events_attendents WHERE id_events = $1
+			)
+			OR unt.email IN (
+				SELECT email FROM clubs_members WHERE id_clubs = $2
+			)
+		)
+	`
+	rows, err := ns.db.Query(query, eventID, clubID)
+	if err != nil {
+		log.Printf("Error querying users interested in event/club with language: %v", err)
+		return nil, fmt.Errorf("failed to query interested users with language: %w", err)
+	}
+	defer rows.Close()
+
+	var targets []models.NotificationTargetWithLanguage
+	for rows.Next() {
+		var target models.NotificationTargetWithLanguage
+		if err := rows.Scan(&target.Email, &target.NotificationToken, &target.LanguageCode); err != nil {
+			log.Printf("Error scanning user with language: %v", err)
+			continue
+		}
+		targets = append(targets, target)
+	}
+
+	return targets, nil
+}
+
+// GetUsersInterestedInEventOrClub retrieves users who are interested in an event or its club.
+// Returns notification tokens for:
+// - All users who marked interest in the event (events_attendents)
+// - All users who marked interest in the club (clubs_members)
+func (ns *NotificationService) GetUsersInterestedInEventOrClub(eventID int, clubID int) ([]string, error) {
+	query := `
+		SELECT DISTINCT unt.token
+		FROM user_notification_tokens unt
+		WHERE unt.token IS NOT NULL AND unt.token != ''
+		AND (
+			unt.email IN (
+				SELECT email FROM events_attendents WHERE id_events = $1
+			)
+			OR unt.email IN (
+				SELECT email FROM clubs_members WHERE id_clubs = $2
+			)
+		)
+	`
+	rows, err := ns.db.Query(query, eventID, clubID)
+	if err != nil {
+		log.Printf("Error querying users interested in event/club: %v", err)
+		return nil, fmt.Errorf("failed to query interested users: %w", err)
+	}
+	defer rows.Close()
+
+	var tokens []string
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err != nil {
+			log.Printf("Error scanning token: %v", err)
+			continue
+		}
+		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
 // SendDailyMenuNotification sends the daily menu notification to subscribed users.
 // It reads messages from notifications.json, picks one randomly, and sends it.
 func (ns *NotificationService) SendDailyMenuNotification() error {

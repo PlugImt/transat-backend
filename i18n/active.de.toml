@@ -2,6 +2,12 @@
 title = "🍽️ NEUES MENÜ VERFÜGBAR!"
 message = "Ein köstliches neues Menü erwartet Sie im RU! Entdecken Sie die Tagesgerichte und hinterlassen Sie Ihre Kommentare. Guten Appetit!"
 
+[event_notification]
+new_event_title = "Neue Veranstaltung"
+new_event_message = "{{.EventName}} - {{.Location}}"
+reminder_title = "Veranstaltung in 1h"
+reminder_message = "{{.EventName}} - {{.Location}}"
+
 [weather]
 thunderstorm = "Gewitter"
 drizzle = "Nieselregen"

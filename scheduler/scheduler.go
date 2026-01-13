@@ -1,21 +1,26 @@
 package scheduler
 
 import (
+	"database/sql"
+
+	"github.com/plugimt/transat-backend/services"
 	"github.com/robfig/cron/v3"
 )
 
 // Scheduler manages all scheduled tasks in the application
 type Scheduler struct {
 	restaurantScheduler *RestaurantScheduler
+	eventScheduler      *EventScheduler
 	// Add other schedulers here as needed
 	cron         *cron.Cron
 	cronEntryIDs map[string]cron.EntryID
 }
 
 // NewScheduler creates a new main scheduler
-func NewScheduler(restaurantHandler RestaurantMenuCronHandler) *Scheduler {
+func NewScheduler(restaurantHandler RestaurantMenuCronHandler, db *sql.DB, notificationService *services.NotificationService) *Scheduler {
 	return &Scheduler{
 		restaurantScheduler: NewRestaurantScheduler(restaurantHandler),
+		eventScheduler:      NewEventScheduler(db, notificationService),
 		// Initialize other schedulers here
 		cron:         cron.New(),
 		cronEntryIDs: make(map[string]cron.EntryID),
@@ -27,6 +32,9 @@ func (s *Scheduler) StartAll() {
 	// Start restaurant scheduler
 	s.restaurantScheduler.Start()
 
+	// Start event scheduler
+	s.eventScheduler.Start()
+
 	// Start other schedulers as needed
 
 	// Start cron scheduler
@@ -37,6 +45,9 @@ func (s *Scheduler) StartAll() {
 func (s *Scheduler) StopAll() {
 	// Stop restaurant scheduler
 	s.restaurantScheduler.Stop()
+
+	// Stop event scheduler
+	s.eventScheduler.Stop()
 
 	// Stop other schedulers as needed
 

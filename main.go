@@ -98,9 +98,9 @@ func main() {
 
 	clubsHandler := club.NewclubHandler(db)
 
-	eventHandler := event.NewEventHandler(db)
+	eventHandler := event.NewEventHandler(db, notificationService)
 
-	appScheduler := scheduler.NewScheduler(restHandler)
+	appScheduler := scheduler.NewScheduler(restHandler, db, notificationService)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
 
