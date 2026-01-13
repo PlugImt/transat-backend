@@ -152,7 +152,7 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 	club.Location = location.String
 	club.Link = link.String
 
-	// Get responsible info
+	// Get responsible info (can be multiple responsibles for a club)
 	roleName := fmt.Sprintf("%s_respo", strings.ToLower(strings.ReplaceAll(club.Name, " ", "")))
 	respoQuery := `
 		SELECT 
@@ -165,33 +165,52 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 		JOIN roles r ON nr.id_roles = r.id_roles
 		JOIN newf n ON nr.email = n.email
 		WHERE r.name = $1
-		LIMIT 1
 	`
 
-	var responsible map[string]interface{}
-	var respoEmail, respoFirstName, respoLastName string
-	var respoProfilePicture sql.NullString
-	var respoGraduationYear sql.NullInt64
+	var responsibles []map[string]interface{}
 
-	err = h.db.QueryRow(respoQuery, roleName).Scan(
-		&respoEmail,
-		&respoFirstName,
-		&respoLastName,
-		&respoProfilePicture,
-		&respoGraduationYear,
-	)
-
-	if err == nil {
-		responsible = map[string]interface{}{
-			"email":           respoEmail,
-			"first_name":      respoFirstName,
-			"last_name":       respoLastName,
-			"profile_picture": respoProfilePicture.String,
-			"graduation_year": respoGraduationYear.Int64,
+	respoRows, err := h.db.Query(respoQuery, roleName)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			utils.LogMessage(utils.LevelError, "Failed to fetch responsibles")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		}
-	} else if err != sql.ErrNoRows {
-		utils.LogMessage(utils.LevelError, "Failed to fetch responsible")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+	} else {
+		defer func(rows *sql.Rows) {
+			if rows == nil {
+				return
+			}
+			if err := rows.Close(); err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to close responsible rows")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			}
+		}(respoRows)
+
+		for respoRows.Next() {
+			var respoEmail, respoFirstName, respoLastName string
+			var respoProfilePicture sql.NullString
+			var respoGraduationYear sql.NullInt64
+
+			if err := respoRows.Scan(
+				&respoEmail,
+				&respoFirstName,
+				&respoLastName,
+				&respoProfilePicture,
+				&respoGraduationYear,
+			); err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to scan responsible")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				continue
+			}
+
+			responsibles = append(responsibles, map[string]interface{}{
+				"email":           respoEmail,
+				"first_name":      respoFirstName,
+				"last_name":       respoLastName,
+				"profile_picture": respoProfilePicture.String,
+				"graduation_year": respoGraduationYear.Int64,
+			})
+		}
 	}
 
 	// Get total member count
@@ -263,8 +282,11 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 		"has_joined":    hasJoined,
 	}
 
-	if responsible != nil {
-		response["responsible"] = responsible
+	if len(responsibles) > 0 {
+		// New multi-owner field
+		response["responsibles"] = responsibles
+		// Backward-compat: keep single 'responsible' as the first one
+		response["responsible"] = responsibles[0]
 	}
 
 	utils.LogMessage(utils.LevelInfo, "Successfully fetched club details")
@@ -659,7 +681,7 @@ func (h *ClubHandler) UpdateClub(c *fiber.Ctx) error {
 	})
 }
 
-// AddClubRespo assigns a new responsible to a club (removes old one)
+// AddClubRespo assigns a new responsible to a club (can have multiple responsibles)
 func (h *ClubHandler) AddClubRespo(c *fiber.Ctx) error {
 	utils.LogHeader("👑 Add Club Responsible")
 
@@ -802,7 +824,7 @@ func (h *ClubHandler) AddClubRespo(c *fiber.Ctx) error {
 	}
 	defer tx.Rollback()
 
-	// Get role ID
+	// Get role ID for this club's responsible role
 	var roleID int
 	err = tx.QueryRow("SELECT id_roles FROM roles WHERE name = $1", roleName).Scan(&roleID)
 	if err != nil {
@@ -815,18 +837,12 @@ func (h *ClubHandler) AddClubRespo(c *fiber.Ctx) error {
 		})
 	}
 
-	// Remove old responsible (if any)
-	_, err = tx.Exec("DELETE FROM newf_roles WHERE id_roles = $1", roleID)
-	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to remove old responsible")
-		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to remove old responsible",
-		})
-	}
-
-	// Add new responsible
-	_, err = tx.Exec("INSERT INTO newf_roles (email, id_roles) VALUES ($1, $2)", req.Email, roleID)
+	// Add new responsible (allow multiple responsibles per club, prevent duplicates)
+	_, err = tx.Exec(
+		"INSERT INTO newf_roles (email, id_roles) VALUES ($1, $2) ON CONFLICT (email, id_roles) DO NOTHING",
+		req.Email,
+		roleID,
+	)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to add new responsible")
 		utils.LogFooter()
