@@ -5,7 +5,8 @@ import {
   useCreateReservationItem,
   useUpdateReservationItem,
 } from "@/lib/hooks";
-import type { ReservationItem, ReservationTreeItem, Club } from "@/lib/api";
+import type { ReservationItem, ReservationTreeItem } from "@/lib/api";
+import type { Club } from "@/lib/types";
 
 interface ItemModalProps {
   isOpen: boolean;

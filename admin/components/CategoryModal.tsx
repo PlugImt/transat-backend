@@ -5,7 +5,8 @@ import {
   useCreateReservationCategory,
   useUpdateReservationCategory,
 } from "@/lib/hooks";
-import type { ReservationTreeItem, Club } from "@/lib/api";
+import type { ReservationTreeItem } from "@/lib/api";
+import type { Club } from "@/lib/types";
 
 interface CategoryModalProps {
   isOpen: boolean;
