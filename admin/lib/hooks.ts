@@ -31,8 +31,13 @@ import {
 } from "./api";
 import type {
   Club,
+  CreateCategoryRequest,
+  CreateItemRequest,
   Event,
   ReservationItem,
+  ReservationTreeItem,
+  UpdateCategoryRequest,
+  UpdateItemRequest,
   UpdateReservationItemMessagesRequest,
   User,
 } from "./api";
