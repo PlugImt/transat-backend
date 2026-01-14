@@ -506,15 +506,15 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 				err = r.DB.QueryRow(`
 					SELECT id_allergen
 					FROM allergens
-					WHERE name = $1
+					WHERE name = $1 AND is_marker = FALSE
 				`, code).Scan(&allergenID)
 
 				if err != nil {
 					if err == sql.ErrNoRows {
 						// Allergen does not exist yet, create it with minimal info
 						err = r.DB.QueryRow(`
-							INSERT INTO allergens (name)
-							VALUES ($1)
+							INSERT INTO allergens (name, is_marker)
+							VALUES ($1, FALSE)
 							RETURNING id_allergen
 						`, code).Scan(&allergenID)
 						if err != nil {
@@ -535,6 +535,47 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 
 				if err != nil {
 					utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to link allergen '%s' to article %d: %v", code, articleID, err))
+				}
+			}
+		}
+
+		// Sync markers for this article based on fetched marker codes
+		if len(item.MarkerCodes) > 0 {
+			for _, code := range item.MarkerCodes {
+				var markerID int
+
+				err = r.DB.QueryRow(`
+					SELECT id_allergen
+					FROM allergens
+					WHERE name = $1 AND is_marker = TRUE
+				`, code).Scan(&markerID)
+
+				if err != nil {
+					if err == sql.ErrNoRows {
+						// Marker does not exist yet, create it with minimal info
+						err = r.DB.QueryRow(`
+							INSERT INTO allergens (name, is_marker)
+							VALUES ($1, TRUE)
+							RETURNING id_allergen
+						`, code).Scan(&markerID)
+						if err != nil {
+							utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to insert marker '%s': %v", code, err))
+							continue
+						}
+					} else {
+						utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to lookup marker '%s': %v", code, err))
+						continue
+					}
+				}
+
+				_, err = r.DB.Exec(`
+					INSERT INTO restaurant_article_allergens (id_restaurant_articles, id_allergen)
+					VALUES ($1, $2)
+					ON CONFLICT (id_restaurant_articles, id_allergen) DO NOTHING
+				`, articleID, markerID)
+
+				if err != nil {
+					utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to link marker '%s' to article %d: %v", code, articleID, err))
 				}
 			}
 		}

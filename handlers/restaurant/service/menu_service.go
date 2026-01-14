@@ -181,11 +181,39 @@ func (s *MenuService) BuildFetchedItems(items []models.MenuItemAPI) []models.Fet
 			}
 		}
 
+		// Collect marker codes (boolean fields that are "TRUE" or "VRAI")
+		var markerCodes []string
+		markerMap := map[string]string{
+			"ardoise":    item.Ardoise,
+			"formule":    item.Formule,
+			"vitalite":   item.Vitalite,
+			"vegetarien": item.Vegetarien,
+			"bio":        item.Bio,
+			"local":      item.Local,
+			"saison":     item.Saison,
+			"equitable":  item.Equitable,
+			"weightWatcher": item.WW, // API uses "ww", DB uses "weightWatcher"
+			"peche":      item.Peche,
+			"france":     item.France,
+		}
+
+		for markerName, markerValue := range markerMap {
+			if strings.EqualFold(markerValue, "TRUE") || strings.EqualFold(markerValue, "VRAI") {
+				// Special case: API uses "ww" but DB uses "weightWatcher"
+				if markerName == "weightWatcher" {
+					markerCodes = append(markerCodes, "weightWatcher")
+				} else {
+					markerCodes = append(markerCodes, markerName)
+				}
+			}
+		}
+
 		fetchedItems = append(fetchedItems, models.FetchedItem{
 			Name:          menuItemText,
 			Category:      category,
 			MenuTypeID:    menuTypeID,
 			AllergenCodes: allergenCodes,
+			MarkerCodes:   markerCodes,
 		})
 	}
 

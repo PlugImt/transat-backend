@@ -60,6 +60,18 @@ type MenuItemAPI struct {
 	Allergene8     string `json:"allergene8"`
 	Allergene9     string `json:"allergene9"`
 	Allergene10    string `json:"allergene10"`
+	// Markers (boolean fields from API)
+	Ardoise    string `json:"ardoise"`    // "TRUE" or "FALSE"
+	Formule    string `json:"formule"`    // "TRUE" or "FALSE"
+	Vitalite   string `json:"vitalite"`   // "TRUE" or "FALSE"
+	Vegetarien string `json:"vegetarien"` // "TRUE" or "FALSE"
+	Bio        string `json:"bio"`        // "TRUE" or "FALSE"
+	Local      string `json:"local"`      // "TRUE" or "FALSE"
+	Saison     string `json:"saison"`     // "TRUE" or "FALSE"
+	Equitable  string `json:"equitable"`  // "TRUE" or "FALSE"
+	WW         string `json:"ww"`         // "TRUE" or "FALSE" (weightWatcher)
+	Peche      string `json:"peche"`      // "TRUE" or "FALSE"
+	France     string `json:"france"`     // "TRUE" or "FALSE"
 }
 
 // FetchedItem represents a processed menu item ready for database synchronization
@@ -68,6 +80,7 @@ type FetchedItem struct {
 	Category      string   `json:"category"`
 	MenuTypeID    int      `json:"menu_type_id"`
 	AllergenCodes []string `json:"allergen_codes"`
+	MarkerCodes   []string `json:"marker_codes"`
 }
 
 // MenuData holds the categorized menu items.
