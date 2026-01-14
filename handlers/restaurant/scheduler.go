@@ -29,8 +29,8 @@ func NewScheduler(menuRepo *repository.MenuRepository, menuService *service.Menu
 func (s *Scheduler) CheckAndUpdateMenuCron() (bool, error) {
 	utils.LogHeader("🤖 Cron: Check & Update Restaurant Menu")
 
-	// 1. Fetch latest base menu from API
-	baseMenuData, err := s.MenuService.FetchMenuFromAPI()
+	// 1. Fetch latest base menu from API (raw items)
+	rawItems, err := s.MenuService.FetchRawMenuItems()
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Cron: Failed to fetch base menu from API")
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Error: %v", err))
@@ -38,8 +38,8 @@ func (s *Scheduler) CheckAndUpdateMenuCron() (bool, error) {
 		return false, err
 	}
 
-	// 2. Convert to FetchedItems format
-	fetchedItems := s.MenuService.ConvertMenuDataToFetchedItems(baseMenuData)
+	// 2. Convert to FetchedItems format (with allergen codes preserved)
+	fetchedItems := s.MenuService.BuildFetchedItems(rawItems)
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Converted %d menu items for synchronization", len(fetchedItems)))
 
 	// 3. Synchronize with database
