@@ -38,6 +38,7 @@ type Allergen struct {
 	Description   string `json:"description" db:"description"`
 	DescriptionEn string `json:"description_en" db:"description_en"`
 	PictureURL    string `json:"picture_url" db:"picture_url"`
+	IsMarker      bool   `json:"is_marker" db:"is_marker"`
 }
 
 // MenuItemAPI represents the structure of an item returned by the V1 source API.
