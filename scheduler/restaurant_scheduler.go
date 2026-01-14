@@ -79,7 +79,7 @@ func (s *RestaurantScheduler) isScheduledTimeAllowed(t time.Time) bool {
 	}
 
 	hour := parisTime.Hour()
-	return hour >= 8 && hour < 15
+	return hour >= 8 && hour < 16
 }
 
 func (s *RestaurantScheduler) checkAndUpdateMenu() {

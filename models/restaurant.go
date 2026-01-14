@@ -33,11 +33,11 @@ type RestaurantMeal struct {
 
 // Allergen represents a record in the 'allergens' table
 type Allergen struct {
-	ID           int    `json:"id_allergen" db:"id_allergen"`
-	Name         string `json:"name" db:"name"`
-	Description  string `json:"description" db:"description"`
+	ID            int    `json:"id_allergen" db:"id_allergen"`
+	Name          string `json:"name" db:"name"`
+	Description   string `json:"description" db:"description"`
 	DescriptionEn string `json:"description_en" db:"description_en"`
-	PictureURL   string `json:"picture_url" db:"picture_url"`
+	PictureURL    string `json:"picture_url" db:"picture_url"`
 }
 
 // MenuItemAPI represents the structure of an item returned by the V1 source API.
@@ -145,9 +145,9 @@ type ReviewResult struct {
 // including allergens and recent reviews.
 type DishDetailsResponse struct {
 	RestaurantArticle
-	AverageRating float64       `json:"average_rating"`
-	TotalRatings  int           `json:"total_ratings"`
-	TimesServed   int           `json:"times_served"`
-	Allergens     []Allergen    `json:"allergens"`
+	AverageRating float64          `json:"average_rating"`
+	TotalRatings  int              `json:"total_ratings"`
+	TimesServed   int              `json:"times_served"`
+	Allergens     []Allergen       `json:"allergens"`
 	Reviews       []ReviewResponse `json:"recent_reviews"`
 }
