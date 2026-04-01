@@ -777,6 +777,21 @@ func (r *ReservationRepository) GetUserReservations(userEmail string, filter str
 	return response, rows.Err()
 }
 
+func (r *ReservationRepository) GetItemName(itemID int) (string, error) {
+	query := "SELECT name FROM reservation_element WHERE id_reservation_element = $1"
+	row := r.DB.QueryRow(query, itemID)
+	var name string
+	if err := row.Scan(&name); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Item with ID %d does not exist", itemID))
+			return "", fmt.Errorf("item with ID %d not found", itemID)
+		}
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get item name: %v", err))
+		return "", err
+	}
+	return name, nil
+}
+
 func (r *ReservationRepository) SearchItemsAndCategories(search string) ([]models.ReservationCategory, []models.ReservationItem, error) {
 	like := fmt.Sprintf("%%%s%%", strings.ToLower(search))
 
