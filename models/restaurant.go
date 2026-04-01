@@ -31,6 +31,16 @@ type RestaurantMeal struct {
 	DateServed   time.Time `json:"date_served" db:"date_served"`
 }
 
+// Allergen represents a record in the 'allergens' table
+type Allergen struct {
+	ID            int    `json:"id_allergen" db:"id_allergen"`
+	Name          string `json:"name" db:"name"`
+	Description   string `json:"description" db:"description"`
+	DescriptionEn string `json:"description_en" db:"description_en"`
+	PictureURL    string `json:"picture_url" db:"picture_url"`
+	IsMarker      bool   `json:"is_marker" db:"is_marker"`
+}
+
 // MenuItemAPI represents the structure of an item returned by the V1 source API.
 // Renamed from MenuItem for clarity.
 type MenuItemAPI struct {
@@ -40,13 +50,37 @@ type MenuItemAPI struct {
 	Nom            string `json:"nom"`
 	Info1          string `json:"info1"`
 	Info2          string `json:"info2"`
+	Allergene1     string `json:"allergene1"`
+	Allergene2     string `json:"allergene2"`
+	Allergene3     string `json:"allergene3"`
+	Allergene4     string `json:"allergene4"`
+	Allergene5     string `json:"allergene5"`
+	Allergene6     string `json:"allergene6"`
+	Allergene7     string `json:"allergene7"`
+	Allergene8     string `json:"allergene8"`
+	Allergene9     string `json:"allergene9"`
+	Allergene10    string `json:"allergene10"`
+	// Markers (boolean fields from API)
+	Ardoise    string `json:"ardoise"`    // "TRUE" or "FALSE"
+	Formule    string `json:"formule"`    // "TRUE" or "FALSE"
+	Vitalite   string `json:"vitalite"`   // "TRUE" or "FALSE"
+	Vegetarien string `json:"vegetarien"` // "TRUE" or "FALSE"
+	Bio        string `json:"bio"`        // "TRUE" or "FALSE"
+	Local      string `json:"local"`      // "TRUE" or "FALSE"
+	Saison     string `json:"saison"`     // "TRUE" or "FALSE"
+	Equitable  string `json:"equitable"`  // "TRUE" or "FALSE"
+	WW         string `json:"ww"`         // "TRUE" or "FALSE" (weightWatcher)
+	Peche      string `json:"peche"`      // "TRUE" or "FALSE"
+	France     string `json:"france"`     // "TRUE" or "FALSE"
 }
 
 // FetchedItem represents a processed menu item ready for database synchronization
 type FetchedItem struct {
-	Name       string `json:"name"`
-	Category   string `json:"category"`
-	MenuTypeID int    `json:"menu_type_id"`
+	Name          string   `json:"name"`
+	Category      string   `json:"category"`
+	MenuTypeID    int      `json:"menu_type_id"`
+	AllergenCodes []string `json:"allergen_codes"`
+	MarkerCodes   []string `json:"marker_codes"`
 }
 
 // MenuData holds the categorized menu items.
@@ -119,4 +153,15 @@ type ReviewResult struct {
 	TotalRatings  int     `json:"total_ratings"`
 	YourRating    int     `json:"your_rating"`
 	YourComment   string  `json:"your_comment"`
+}
+
+// DishDetailsResponse represents the payload returned by GET /restaurant/:id
+// including allergens and recent reviews.
+type DishDetailsResponse struct {
+	RestaurantArticle
+	AverageRating float64          `json:"average_rating"`
+	TotalRatings  int              `json:"total_ratings"`
+	TimesServed   int              `json:"times_served"`
+	Allergens     []Allergen       `json:"allergens"`
+	Reviews       []ReviewResponse `json:"recent_reviews"`
 }

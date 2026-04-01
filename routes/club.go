@@ -20,6 +20,7 @@ func SetupClubRoutes(router fiber.Router, clubHandler *club.ClubHandler) {
 	clubGroup.Post("/", clubHandler.CreateClub)
 	clubGroup.Patch("/:id", clubHandler.UpdateClub)
 	clubGroup.Post("/:id/respo", clubHandler.AddClubRespo)
+	clubGroup.Delete("/:id/respo", clubHandler.RemoveClubRespo)
 
 	clubGroup.Post("/:id/join", clubHandler.JoinClub)
 	clubGroup.Post("/:id/leave", clubHandler.LeaveClub)

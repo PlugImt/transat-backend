@@ -114,25 +114,28 @@ func (r *ReservationRepository) CreateCategory(category models.ReservationCreate
 		return res, fmt.Errorf("category name is required")
 	}
 
-	query := `
-		INSERT INTO reservation_category 
-			(name, id_clubs%s)
-		VALUES 
-			($1, $2%s)
-		RETURNING id_reservation_category
-	`
-
-	args := []interface{}{category.Name, category.IDClubParent}
-	extraCols, extraVals := "", ""
+	// Build query dynamically with correct parameter numbering
+	columns := []string{"name", "id_clubs"}
+	placeholders := []string{"$1", "$2"}
+	args := []interface{}{category.Name, *category.IDClubParent}
+	paramNum := 3
 
 	if category.IDCategoryParent != nil {
-		extraCols = ", id_parent_category"
-		extraVals = ", $3"
+		columns = append(columns, "id_parent_category")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", paramNum))
 		args = append(args, *category.IDCategoryParent)
+		paramNum++
 	}
 
-	finalQuery := fmt.Sprintf(query, extraCols, extraVals)
-	row := r.DB.QueryRow(finalQuery, args...)
+	query := fmt.Sprintf(`
+		INSERT INTO reservation_category 
+			(%s)
+		VALUES 
+			(%s)
+		RETURNING id_reservation_category
+	`, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+
+	row := r.DB.QueryRow(query, args...)
 
 	if err := row.Scan(&res.ID); err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create category: %v", err))
@@ -154,36 +157,40 @@ func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequ
 		return res, fmt.Errorf("item name is required")
 	}
 
-	query := `
-		INSERT INTO reservation_element 
-			(name, slot, id_clubs%s) 
-		VALUES 
-			($1, $2, $3%s)
-		RETURNING id_reservation_element
-	`
-
+	// Build query dynamically with correct parameter numbering
+	columns := []string{"name", "slot", "id_clubs"}
+	placeholders := []string{"$1", "$2", "$3"}
 	args := []interface{}{item.Name, item.Slot, *item.IDClubParent}
-	extraCols, extraVals := "", ""
+	paramNum := 4
 
 	if item.IDCategoryParent != nil {
-		extraCols = ", id_reservation_category"
-		extraVals = ", $4"
+		columns = append(columns, "id_reservation_category")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", paramNum))
 		args = append(args, *item.IDCategoryParent)
+		paramNum++
 	}
 	if item.Description != nil {
-		extraCols += ", description"
-		extraVals += ", $5"
+		columns = append(columns, "description")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", paramNum))
 		args = append(args, *item.Description)
+		paramNum++
 	}
 	if item.Location != nil {
-		extraCols += ", location"
-		extraVals += ", $6"
+		columns = append(columns, "location")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", paramNum))
 		args = append(args, *item.Location)
+		paramNum++
 	}
 
-	finalQuery := fmt.Sprintf(fmt.Sprintf(query, extraCols, extraVals) + ";")
+	query := fmt.Sprintf(`
+		INSERT INTO reservation_element 
+			(%s) 
+		VALUES 
+			(%s)
+		RETURNING id_reservation_element
+	`, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
 
-	row := r.DB.QueryRow(finalQuery, args...)
+	row := r.DB.QueryRow(query, args...)
 
 	if err := row.Scan(&res.ID); err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create item: %v", err))
@@ -258,7 +265,9 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 		    n.email,
 		    n.first_name,
 		    n.last_name,
-		    COALESCE(n.profile_picture,'')
+		    COALESCE(n.profile_picture,''),
+		    re.warning_message,
+		    re.confirmation_message
 		FROM reservation_element re
 		         LEFT JOIN reservation r
 		                   ON r.id_reservation_element = re.id_reservation_element
@@ -298,8 +307,9 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 		var item models.ReservationItem
 
 		var email, firstName, lastName, profilePicture sql.NullString
+		var warningMessage, confirmationMessage sql.NullString
 
-		if err := rows.Scan(&item.ID, &item.Name, &item.Slot, &email, &firstName, &lastName, &profilePicture); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Slot, &email, &firstName, &lastName, &profilePicture, &warningMessage, &confirmationMessage); err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan item: %v", err))
 			return nil, err
 		}
@@ -313,6 +323,13 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 			}
 		} else {
 			item.User = nil
+		}
+
+		if warningMessage.Valid && warningMessage.String != "" {
+			item.WarningMessage = &warningMessage.String
+		}
+		if confirmationMessage.Valid && confirmationMessage.String != "" {
+			item.ConfirmationMessage = &confirmationMessage.String
 		}
 
 		items = append(items, item)
@@ -338,16 +355,37 @@ func (r *ReservationRepository) GetItemDetails(itemID int, date time.Time) (mode
 	dateAfterStr := dateAfter.Format("2006-01-02")
 	dateStr := date.Format("2006-01-02")
 
+	// First get item basic info including custom messages
+	itemInfoQuery := `
+		SELECT name, slot, warning_message, confirmation_message
+		FROM reservation_element
+		WHERE id_reservation_element = $1
+	`
+	var itemName string
+	var itemSlot bool
+	var warningMessage, confirmationMessage sql.NullString
+	err := r.DB.QueryRow(itemInfoQuery, itemID).Scan(&itemName, &itemSlot, &warningMessage, &confirmationMessage)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to get item info: %v", err))
+		return res, err
+	}
+	res.Name = itemName
+	res.Slot = itemSlot
+	if warningMessage.Valid && warningMessage.String != "" {
+		res.WarningMessage = &warningMessage.String
+	}
+	if confirmationMessage.Valid && confirmationMessage.String != "" {
+		res.ConfirmationMessage = &confirmationMessage.String
+	}
+
 	query := `
-		SELECT re.name,
-		       re.slot,
+		SELECT r.id_reservation_element,
+		       r.start_date,
+		       r.end_date,
 		       n.email,
 		       n.first_name,
 		       n.last_name,
-		       COALESCE(n.profile_picture, ''),
-		       r.id_reservation_element,
-		       r.start_date,
-		       r.end_date
+		       COALESCE(n.profile_picture, '')
 		FROM reservation r
 		         JOIN newf n ON r.email = n.email
 		         JOIN reservation_element re on r.id_reservation_element = re.id_reservation_element
@@ -375,7 +413,8 @@ func (r *ReservationRepository) GetItemDetails(itemID int, date time.Time) (mode
 	for rows.Next() {
 		var item models.ReservationSlotDetail
 		var user models.ReservationUser
-		if err := rows.Scan(&res.Name, &res.Slot, &user.Email, &user.FirstName, &user.LastName, &user.ProfilePicture, &item.ID, &item.StartDate, &item.EndDate); err != nil {
+		// Note: res.Name and res.Slot are already set from the first query, so we can ignore them here
+		if err := rows.Scan(&item.ID, &item.StartDate, &item.EndDate, &user.Email, &user.FirstName, &user.LastName, &user.ProfilePicture); err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan item details: %v", err))
 			return res, err
 		}

@@ -11,7 +11,7 @@ import type {
   User,
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -109,6 +109,17 @@ export const clubsApi = {
     const response = await api.get("/admin/clubs");
     return response.data;
   },
+  getOwners: async (id: number): Promise<User[]> => {
+    const response = await api.get(`/club/${id}`);
+    const data = response.data;
+    if (Array.isArray(data.responsibles)) {
+      return data.responsibles;
+    }
+    if (data.responsible) {
+      return [data.responsible];
+    }
+    return [];
+  },
   create: async (club: Partial<Club>) => {
     const filteredClub = Object.fromEntries(
       Object.entries(club).filter(
@@ -124,6 +135,16 @@ export const clubsApi = {
   },
   delete: async (id: number) => {
     const response = await api.delete(`/admin/clubs/${id}`);
+    return response.data;
+  },
+  addOwner: async (clubId: number, email: string) => {
+    const response = await api.post(`/club/${clubId}/respo`, { email });
+    return response.data;
+  },
+  removeOwner: async (clubId: number, email: string) => {
+    const response = await api.delete(`/club/${clubId}/respo`, {
+      data: { email },
+    });
     return response.data;
   },
 };
@@ -180,6 +201,113 @@ export const bassineApi = {
   },
   getHistory: async (email: string): Promise<BassineScoreHistory[]> => {
     const response = await api.get(`/admin/bassine/history/${encodeURIComponent(email)}`);
+    return response.data;
+  },
+};
+
+export interface ReservationItem {
+  id: number;
+  name: string;
+  slot: boolean;
+  description?: string;
+  location?: string;
+  warning_message?: string;
+  confirmation_message?: string;
+}
+
+export interface UpdateReservationItemMessagesRequest {
+  warning_message?: string | null;
+  confirmation_message?: string | null;
+}
+
+export interface ReservationCategory {
+  type: "category";
+  id: number;
+  name: string;
+  club_id: number;
+  club_name: string;
+  parent_id?: number;
+  children?: ReservationCategory[];
+  items: ReservationItem[];
+}
+
+export interface ReservationTreeItem {
+  type: "category" | "club_items";
+  id?: number;
+  name?: string;
+  club_id?: number;
+  club_name?: string;
+  parent_id?: number;
+  children?: ReservationTreeItem[];
+  items?: ReservationItem[];
+}
+
+export interface CreateCategoryRequest {
+  name: string;
+  id_club_parent?: number;
+  id_category_parent?: number;
+}
+
+export interface UpdateCategoryRequest {
+  name: string;
+}
+
+export interface CreateItemRequest {
+  name: string;
+  slot: boolean;
+  description?: string;
+  location?: string;
+  id_club_parent?: number;
+  id_category_parent?: number;
+}
+
+export interface UpdateItemRequest {
+  name?: string;
+  slot?: boolean;
+  description?: string | null;
+  location?: string | null;
+  warning_message?: string | null;
+  confirmation_message?: string | null;
+}
+
+export const reservationApi = {
+  getItemsForClub: async (clubId: number): Promise<ReservationItem[]> => {
+    const response = await api.get(`/admin/clubs/${clubId}/reservation-items`);
+    return response.data;
+  },
+  updateItemMessages: async (
+    itemId: number,
+    messages: UpdateReservationItemMessagesRequest,
+  ) => {
+    const response = await api.patch(`/admin/reservation-items/${itemId}/messages`, messages);
+    return response.data;
+  },
+  getTree: async (): Promise<ReservationTreeItem[]> => {
+    const response = await api.get("/admin/reservations/tree");
+    return response.data;
+  },
+  createCategory: async (category: CreateCategoryRequest) => {
+    const response = await api.post("/reservation/category", category);
+    return response.data;
+  },
+  updateCategory: async (id: number, category: UpdateCategoryRequest) => {
+    const response = await api.patch(`/admin/reservations/categories/${id}`, category);
+    return response.data;
+  },
+  deleteCategory: async (id: number) => {
+    const response = await api.delete(`/admin/reservations/categories/${id}`);
+    return response.data;
+  },
+  createItem: async (item: CreateItemRequest) => {
+    const response = await api.post("/reservation/item", item);
+    return response.data;
+  },
+  updateItem: async (id: number, item: UpdateItemRequest) => {
+    const response = await api.patch(`/admin/reservations/items/${id}`, item);
+    return response.data;
+  },
+  deleteItem: async (id: number) => {
+    const response = await api.delete(`/admin/reservations/items/${id}`);
     return response.data;
   },
 };

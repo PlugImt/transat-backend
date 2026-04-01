@@ -7,6 +7,14 @@ type Notification struct {
 	ServiceName string `json:"service_name,omitempty" db:"service_name"`
 }
 
+// UserNotificationToken represents a notification token for a user
+type UserNotificationToken struct {
+	ID        int    `json:"id" db:"id"`
+	Email     string `json:"email" db:"email"`
+	Token     string `json:"token" db:"token"`
+	CreatedAt string `json:"created_at" db:"created_at"`
+}
+
 // NotificationTarget represents a user's email and notification token
 type NotificationTarget struct {
 	Email             string `json:"email"`

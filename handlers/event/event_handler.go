@@ -3,22 +3,28 @@ package event
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+	appI18n "github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 )
 
 type EventHandler struct {
-	db *sql.DB
+	db                 *sql.DB
+	notificationService *services.NotificationService
 }
 
-func NewEventHandler(db *sql.DB) *EventHandler {
+func NewEventHandler(db *sql.DB, notificationService *services.NotificationService) *EventHandler {
 	return &EventHandler{
-		db: db,
+		db:                 db,
+		notificationService: notificationService,
 	}
 }
 
@@ -773,6 +779,85 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 			"error": "Failed to save event",
 		})
 	}
+
+	// Send notification to all users about the new event (with translations)
+	go func() {
+		users, err := h.notificationService.GetAllUsersWithLanguage()
+		if err != nil {
+			log.Printf("Failed to get all users with language for new event notification: %v", err)
+			return
+		}
+
+		if len(users) == 0 {
+			log.Println("No users found for new event notification")
+			return
+		}
+
+		// Group users by language
+		languageGroups := make(map[string][]models.NotificationTargetWithLanguage)
+		for _, user := range users {
+			if user.NotificationToken != "" {
+				langCode := user.LanguageCode
+				if langCode == "" {
+					langCode = "fr" // Default to French
+				}
+				languageGroups[langCode] = append(languageGroups[langCode], user)
+			}
+		}
+
+		totalSent := 0
+		// Send notifications to each language group
+		for langCode, langUsers := range languageGroups {
+			localizer := appI18n.GetLocalizer(langCode)
+
+			title := localizer.MustLocalize(&i18n.LocalizeConfig{
+				MessageID: "event_notification.new_event_title",
+				DefaultMessage: &i18n.Message{
+					ID:    "event_notification.new_event_title",
+					Other: "New event",
+				},
+			})
+
+			message := localizer.MustLocalize(&i18n.LocalizeConfig{
+				MessageID: "event_notification.new_event_message",
+				TemplateData: map[string]interface{}{
+					"EventName": req.Name,
+					"Location":  req.Location,
+				},
+				DefaultMessage: &i18n.Message{
+					ID:    "event_notification.new_event_message",
+					Other: "{{.EventName}} - {{.Location}}",
+				},
+			})
+
+			var tokens []string
+			for _, user := range langUsers {
+				tokens = append(tokens, user.NotificationToken)
+			}
+
+			payload := models.NotificationPayload{
+				NotificationTokens: tokens,
+				Title:              title,
+				Message:            message,
+				Sound:              "default",
+				ChannelID:          "default",
+				Data: map[string]interface{}{
+					"screen":  "Events",
+					"eventId": eventID,
+				},
+			}
+
+			if err := h.notificationService.SendPushNotification(payload); err != nil {
+				log.Printf("Failed to send new event notification to %s users: %v", langCode, err)
+				continue
+			}
+
+			log.Printf("Successfully sent new event notification to %d users in %s", len(tokens), langCode)
+			totalSent += len(tokens)
+		}
+
+		log.Printf("Successfully sent new event notification to %d users across %d languages", totalSent, len(languageGroups))
+	}()
 
 	utils.LogMessage(utils.LevelInfo, "Event created successfully")
 	utils.LogLineKeyValue(utils.LevelInfo, "Event ID", eventID)

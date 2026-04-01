@@ -142,6 +142,45 @@ func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 
 	dishDetails.Name = internal.CapitalizeItemName(dishDetails.Name)
 
+	// Fetch allergens linked to this article
+	allergensQuery := `
+		SELECT a.id_allergen,
+		       a.name,
+		       COALESCE(a.description, ''),
+		       COALESCE(a.description_en, ''),
+		       COALESCE(a.picture_url, '')
+		FROM restaurant_article_allergens raa
+		         JOIN allergens a ON raa.id_allergen = a.id_allergen
+		WHERE raa.id_restaurant_articles = $1
+		ORDER BY a.name;
+	`
+
+	allergenRows, err := r.DB.Query(allergensQuery, dishID)
+	if err != nil {
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to fetch allergens for dish %d: %v", dishID, err))
+	}
+
+	var allergens []models.Allergen
+	if allergenRows != nil {
+		defer func(rows *sql.Rows) {
+			if rows == nil {
+				return
+			}
+			if err := rows.Close(); err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to close allergen rows: %v", err))
+			}
+		}(allergenRows)
+
+		for allergenRows.Next() {
+			var a models.Allergen
+			if err := allergenRows.Scan(&a.ID, &a.Name, &a.Description, &a.DescriptionEn, &a.PictureURL); err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to scan allergen: %v", err))
+				continue
+			}
+			allergens = append(allergens, a)
+		}
+	}
+
 	// Get all reviews ordered by date (most recent first)
 	reviewsQuery := `
 		SELECT n.first_name, n.last_name, COALESCE(n.profile_picture, ''), ran.note, ran.comment, ran.date
@@ -154,7 +193,20 @@ func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 	reviewRows, err := r.DB.Query(reviewsQuery, dishID)
 	if err != nil {
 		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to fetch reviews: %v", err))
-		return dishDetails, nil
+		// Still return basic details and allergens if reviews fail
+		return models.DishDetailsResponse{
+			RestaurantArticle: models.RestaurantArticle{
+				ID:              dishDetails.ID,
+				Name:            dishDetails.Name,
+				FirstTimeServed: dishDetails.FirstTimeServed,
+				LastTimeServed:  dishDetails.LastTimeServed,
+			},
+			AverageRating: dishDetails.AverageRating,
+			TotalRatings:  dishDetails.TotalRatings,
+			TimesServed:   dishDetails.TimesServed,
+			Allergens:     allergens,
+			Reviews:       nil,
+		}, nil
 	}
 	defer func(reviewRows *sql.Rows) {
 		err := reviewRows.Close()
@@ -176,14 +228,8 @@ func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 		reviews = append(reviews, review)
 	}
 
-	// Create response with reviews
-	response := struct {
-		models.RestaurantArticle
-		AverageRating float64                 `json:"average_rating"`
-		TotalRatings  int                     `json:"total_ratings"`
-		TimesServed   int                     `json:"times_served"`
-		Reviews       []models.ReviewResponse `json:"recent_reviews"`
-	}{
+	// Create response with reviews and allergens
+	response := models.DishDetailsResponse{
 		RestaurantArticle: models.RestaurantArticle{
 			ID:              dishDetails.ID,
 			Name:            dishDetails.Name,
@@ -193,6 +239,7 @@ func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 		AverageRating: dishDetails.AverageRating,
 		TotalRatings:  dishDetails.TotalRatings,
 		TimesServed:   dishDetails.TimesServed,
+		Allergens:     allergens,
 		Reviews:       reviews,
 	}
 
@@ -450,6 +497,88 @@ func (r *MenuRepository) SyncTodaysMenu(fetchedItems []models.FetchedItem) error
 		}
 
 		processedArticleIDs = append(processedArticleIDs, articleID)
+
+		// Sync allergens for this article based on fetched allergen codes
+		if len(item.AllergenCodes) > 0 {
+			for _, code := range item.AllergenCodes {
+				var allergenID int
+
+				err = r.DB.QueryRow(`
+					SELECT id_allergen
+					FROM allergens
+					WHERE name = $1 AND is_marker = FALSE
+				`, code).Scan(&allergenID)
+
+				if err != nil {
+					if err == sql.ErrNoRows {
+						// Allergen does not exist yet, create it with minimal info
+						err = r.DB.QueryRow(`
+							INSERT INTO allergens (name, is_marker)
+							VALUES ($1, FALSE)
+							RETURNING id_allergen
+						`, code).Scan(&allergenID)
+						if err != nil {
+							utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to insert allergen '%s': %v", code, err))
+							continue
+						}
+					} else {
+						utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to lookup allergen '%s': %v", code, err))
+						continue
+					}
+				}
+
+				_, err = r.DB.Exec(`
+					INSERT INTO restaurant_article_allergens (id_restaurant_articles, id_allergen)
+					VALUES ($1, $2)
+					ON CONFLICT (id_restaurant_articles, id_allergen) DO NOTHING
+				`, articleID, allergenID)
+
+				if err != nil {
+					utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to link allergen '%s' to article %d: %v", code, articleID, err))
+				}
+			}
+		}
+
+		// Sync markers for this article based on fetched marker codes
+		if len(item.MarkerCodes) > 0 {
+			for _, code := range item.MarkerCodes {
+				var markerID int
+
+				err = r.DB.QueryRow(`
+					SELECT id_allergen
+					FROM allergens
+					WHERE name = $1 AND is_marker = TRUE
+				`, code).Scan(&markerID)
+
+				if err != nil {
+					if err == sql.ErrNoRows {
+						// Marker does not exist yet, create it with minimal info
+						err = r.DB.QueryRow(`
+							INSERT INTO allergens (name, is_marker)
+							VALUES ($1, TRUE)
+							RETURNING id_allergen
+						`, code).Scan(&markerID)
+						if err != nil {
+							utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to insert marker '%s': %v", code, err))
+							continue
+						}
+					} else {
+						utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to lookup marker '%s': %v", code, err))
+						continue
+					}
+				}
+
+				_, err = r.DB.Exec(`
+					INSERT INTO restaurant_article_allergens (id_restaurant_articles, id_allergen)
+					VALUES ($1, $2)
+					ON CONFLICT (id_restaurant_articles, id_allergen) DO NOTHING
+				`, articleID, markerID)
+
+				if err != nil {
+					utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to link marker '%s' to article %d: %v", code, articleID, err))
+				}
+			}
+		}
 
 		_, err = r.DB.Exec(`
 			INSERT INTO restaurant_meals (id_restaurant, id_restaurant_articles, date_served)

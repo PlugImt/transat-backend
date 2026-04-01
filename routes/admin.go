@@ -49,4 +49,13 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminGroup.Post("/bassine/update-score", adminHandler.UpdateBassineScore)
 	adminGroup.Get("/bassine/history/:email", adminHandler.GetBassineHistory)
 
+	// Reservation item management
+	adminGroup.Get("/clubs/:id/reservation-items", adminHandler.GetReservationItemsForClubAdmin)
+	adminGroup.Patch("/reservation-items/:id/messages", adminHandler.UpdateReservationItemMessages)
+	adminGroup.Get("/reservations/tree", adminHandler.GetReservationTree)
+	adminGroup.Delete("/reservations/categories/:id", adminHandler.DeleteReservationCategory)
+	adminGroup.Patch("/reservations/categories/:id", adminHandler.UpdateReservationCategory)
+	adminGroup.Delete("/reservations/items/:id", adminHandler.DeleteReservationItemAdmin)
+	adminGroup.Patch("/reservations/items/:id", adminHandler.UpdateReservationItemAdmin)
+
 }

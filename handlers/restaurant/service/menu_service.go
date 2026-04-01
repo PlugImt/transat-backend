@@ -28,7 +28,8 @@ func NewMenuService() *MenuService {
 	}
 }
 
-func (s *MenuService) FetchMenuFromAPI() (*models.MenuData, error) {
+// FetchRawMenuItems fetches and parses the raw MenuItemAPI array from the remote source.
+func (s *MenuService) FetchRawMenuItems() ([]models.MenuItemAPI, error) {
 	resp, err := http.Get(s.menuSourceURL)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch URL '%s': %w", s.menuSourceURL, err)
@@ -55,12 +56,9 @@ func (s *MenuService) FetchMenuFromAPI() (*models.MenuData, error) {
 		return nil, fmt.Errorf("regex did not find 'loadingData' array in response")
 	}
 	loadingDataJSON := string(matches[1])
-	return s.parseLoadingData(loadingDataJSON)
-}
 
-func (s *MenuService) parseLoadingData(jsonData string) (*models.MenuData, error) {
 	var nestedItems [][]models.MenuItemAPI
-	if err := json.Unmarshal([]byte(jsonData), &nestedItems); err != nil {
+	if err := json.Unmarshal([]byte(loadingDataJSON), &nestedItems); err != nil {
 		log.Printf("Invalid JSON structure from API: %v", err)
 		return nil, fmt.Errorf("unable to parse menu JSON from API: %w", err)
 	}
@@ -69,7 +67,16 @@ func (s *MenuService) parseLoadingData(jsonData string) (*models.MenuData, error
 		return nil, fmt.Errorf("no menu items found in the parsed API data")
 	}
 
-	return s.processRawMenuItems(nestedItems[0]), nil
+	return nestedItems[0], nil
+}
+
+// FetchMenuFromAPI returns the legacy MenuData structure for existing callers.
+func (s *MenuService) FetchMenuFromAPI() (*models.MenuData, error) {
+	items, err := s.FetchRawMenuItems()
+	if err != nil {
+		return nil, err
+	}
+	return s.processRawMenuItems(items), nil
 }
 
 func (s *MenuService) processRawMenuItems(items []models.MenuItemAPI) *models.MenuData {
@@ -119,6 +126,98 @@ func (s *MenuService) processRawMenuItems(items []models.MenuItemAPI) *models.Me
 	}
 
 	return &menuData
+}
+
+// BuildFetchedItems converts raw MenuItemAPI entries to FetchedItem slice,
+// preserving allergen codes so they can be stored with restaurant_articles.
+func (s *MenuService) BuildFetchedItems(items []models.MenuItemAPI) []models.FetchedItem {
+	var fetchedItems []models.FetchedItem
+
+	categoryToID := map[string]int{
+		"grilladesMidi": 1,
+		"migrateurs":    2,
+		"cibo":          3,
+		"accompMidi":    4,
+		"grilladesSoir": 5,
+		"accompSoir":    6,
+	}
+
+	for _, item := range items {
+		category := GetMenuCategory(item.Pole, item.Accompagnement, item.Periode)
+		if category == "" {
+			continue
+		}
+
+		menuItemText := strings.TrimSpace(fmt.Sprintf("%s %s %s", item.Nom, item.Info1, item.Info2))
+		menuItemText = strings.Join(strings.Fields(menuItemText), " ")
+		if menuItemText == "" {
+			continue
+		}
+
+		menuTypeID, ok := categoryToID[category]
+		if !ok {
+			continue
+		}
+
+		// Collect allergen codes, skipping empty / placeholder values
+		rawCodes := []string{
+			item.Allergene1, item.Allergene2, item.Allergene3, item.Allergene4, item.Allergene5,
+			item.Allergene6, item.Allergene7, item.Allergene8, item.Allergene9, item.Allergene10,
+		}
+		var allergenCodes []string
+		seen := make(map[string]bool)
+		for _, code := range rawCodes {
+			code = strings.TrimSpace(code)
+			if code == "" {
+				continue
+			}
+			lower := strings.ToLower(code)
+			if lower == "vide" || lower == "undefined" {
+				continue
+			}
+			if !seen[code] {
+				seen[code] = true
+				allergenCodes = append(allergenCodes, code)
+			}
+		}
+
+		// Collect marker codes (boolean fields that are "TRUE" or "VRAI")
+		var markerCodes []string
+		markerMap := map[string]string{
+			"ardoise":    item.Ardoise,
+			"formule":    item.Formule,
+			"vitalite":   item.Vitalite,
+			"vegetarien": item.Vegetarien,
+			"bio":        item.Bio,
+			"local":      item.Local,
+			"saison":     item.Saison,
+			"equitable":  item.Equitable,
+			"weightWatcher": item.WW, // API uses "ww", DB uses "weightWatcher"
+			"peche":      item.Peche,
+			"france":     item.France,
+		}
+
+		for markerName, markerValue := range markerMap {
+			if strings.EqualFold(markerValue, "TRUE") || strings.EqualFold(markerValue, "VRAI") {
+				// Special case: API uses "ww" but DB uses "weightWatcher"
+				if markerName == "weightWatcher" {
+					markerCodes = append(markerCodes, "weightWatcher")
+				} else {
+					markerCodes = append(markerCodes, markerName)
+				}
+			}
+		}
+
+		fetchedItems = append(fetchedItems, models.FetchedItem{
+			Name:          menuItemText,
+			Category:      category,
+			MenuTypeID:    menuTypeID,
+			AllergenCodes: allergenCodes,
+			MarkerCodes:   markerCodes,
+		})
+	}
+
+	return fetchedItems
 }
 
 // GetMenuCategory determines the menu category based on pole, accompagnement, and periode
