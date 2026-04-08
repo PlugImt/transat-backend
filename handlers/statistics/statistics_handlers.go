@@ -117,13 +117,22 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 	}
 
 	growthQuery := `
+		WITH dates AS (
+			SELECT generate_series(
+				(SELECT MIN(DATE(creation_date)) FROM newf),
+				(SELECT MAX(DATE(creation_date)) FROM newf),
+				interval '1 day'
+			)::date AS date
+		)
 		SELECT 
-			DATE(creation_date) as date,
-			COUNT(*) as count,
-			SUM(COUNT(*)) OVER (ORDER BY DATE(creation_date) ASC) as cumulativeCount
-		FROM newf 
-		GROUP BY DATE(creation_date)
-		ORDER BY date ASC
+			d.date,
+			COUNT(n.*) as count,
+			SUM(COUNT(n.*)) OVER (ORDER BY d.date ASC) as cumulativeCount
+		FROM dates d
+		LEFT JOIN newf n 
+			ON DATE(n.creation_date) = d.date
+		GROUP BY d.date
+		ORDER BY d.date ASC;
 	`
 	rows, err := h.db.Query(growthQuery)
 	if err != nil {
