@@ -42,15 +42,16 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 			n.email,
 			n.first_name,
 			n.last_name,
-			COALESCE(n.profile_picture, '') AS profile_picture,
 			COALESCE(n.phone_number, '') AS phone_number,
+			COALESCE(n.profile_picture, '') AS profile_picture,
+			COALESCE(n.ics_link, '') AS ics_link,
 			COALESCE(n.graduation_year, 0) AS graduation_year,
 			COALESCE(n.formation_name, '') AS formation_name,
 			COALESCE(n.campus, '') AS campus,
 			-- COALESCE(n.notification_token, '') AS notification_token, -- Maybe don't expose token?
 			n.password_updated_date, -- Consider format or omitting
-			COALESCE(l.code, 'fr') AS language, -- Get language code
-			(SELECT id_newf FROM newf ORDER BY creation_date DESC LIMIT 1) AS total_newf -- Calculate total users separately if needed
+			(SELECT id_newf FROM newf ORDER BY creation_date DESC LIMIT 1) AS total_newf, -- Calculate total users separately if needed
+			COALESCE(l.code, 'fr') AS language -- Get language code
 		FROM newf n
 		LEFT JOIN languages l ON n.language = l.id_languages
 		WHERE n.email = $1;
@@ -76,15 +77,16 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 		&newf.Email,
 		&newf.FirstName,
 		&newf.LastName,
-		&newf.ProfilePicture,
 		&newf.PhoneNumber,
+		&newf.ProfilePicture,
+		&newf.IcsLink,
+		// &newf.NotificationToken, // Omitted
 		&newf.GraduationYear,
 		&newf.FormationName,
 		&newf.Campus,
-		// &newf.NotificationToken, // Omitted
 		&passwordUpdated,
-		&newf.Language,
 		&newf.TotalUsers,
+		&newf.Language,
 	)
 
 	if querySpan != nil {
@@ -119,6 +121,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 	response["first_name"] = newf.FirstName
 	response["last_name"] = newf.LastName
 	response["language"] = newf.Language
+	response["ics_link"] = newf.IcsLink
 	response["total_newf"] = newf.TotalUsers // Assuming total_newf is calculated correctly
 
 	if newf.ProfilePicture != "" {
@@ -201,6 +204,9 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 	if req.ProfilePicture != "" {
 		// Potentially validate the picture URL/path format
 		updateFields["profile_picture"] = req.ProfilePicture
+	}
+	if req.IcsLink != "" {
+		updateFields["ics_link"] = req.IcsLink
 	}
 	if req.NotificationToken != "" { // Allow updating push token
 		updateFields["notification_token"] = req.NotificationToken

@@ -13,6 +13,7 @@ type Newf struct {
 	LastName          string `json:"last_name"`
 	PhoneNumber       string `json:"phone_number"`
 	ProfilePicture    string `json:"profile_picture"`
+	IcsLink           string `json:"ics_link"`
 	NotificationToken string `json:"notification_token"`
 	GraduationYear    int    `json:"graduation_year"`
 	FormationName     string `json:"formation_name"`
