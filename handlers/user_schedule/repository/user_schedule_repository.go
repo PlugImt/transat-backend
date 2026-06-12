@@ -12,9 +12,7 @@ type UserScheduleRepository struct {
 }
 
 func NewUserScheduleRepository(db *sql.DB) *UserScheduleRepository {
-	return &UserScheduleRepository{
-		DB: db,
-	}
+	return &UserScheduleRepository{DB: db}
 }
 
 func (r *UserScheduleRepository) GetByEmail(email string) (*models.UserSchedule, error) {
@@ -59,8 +57,65 @@ func (r *UserScheduleRepository) UpsertIcsURL(email string, icsURL string) error
 		SELECT id_newf, $2 FROM newf WHERE email = $1
 		ON CONFLICT (user_id) DO UPDATE SET ics_url = EXCLUDED.ics_url
 	`
-	_, err := r.DB.Exec(query, email, icsURL)
-	return err
+	res, err := r.DB.Exec(query, email, icsURL)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func (r *UserScheduleRepository) UpdateCalendarData(userID int, data json.RawMessage) error {
+	query := `
+		UPDATE user_schedule
+		SET calendar_data = $2, last_sync_at = NOW()
+		WHERE user_id = $1
+	`
+	res, err := r.DB.Exec(query, userID, data)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func (r *UserScheduleRepository) ListAllWithIcsURL() ([]models.UserSchedule, error) {
+	query := `
+		SELECT user_id, ics_url
+		FROM user_schedule
+		WHERE ics_url IS NOT NULL AND ics_url != ''
+	`
+	rows, err := r.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var schedules []models.UserSchedule
+	for rows.Next() {
+		var schedule models.UserSchedule
+		var icsURL sql.NullString
+		if err := rows.Scan(&schedule.UserID, &icsURL); err != nil {
+			return nil, err
+		}
+		if icsURL.Valid {
+			schedule.IcsURL = icsURL.String
+		}
+		schedules = append(schedules, schedule)
+	}
+	return schedules, rows.Err()
 }
 
 func (r *UserScheduleRepository) Delete(email string) (bool, error) {

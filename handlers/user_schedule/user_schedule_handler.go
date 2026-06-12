@@ -5,17 +5,20 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/handlers/user_schedule/repository"
+	"github.com/plugimt/transat-backend/handlers/user_schedule/service"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
 )
 
 type UserScheduleHandler struct {
 	UserScheduleRepository *repository.UserScheduleRepository
+	IcsService             *service.IcsService
 }
 
-func NewUserScheduleHandler(db *sql.DB) *UserScheduleHandler {
+func NewUserScheduleHandler(db *sql.DB, icsService *service.IcsService) *UserScheduleHandler {
 	return &UserScheduleHandler{
 		UserScheduleRepository: repository.NewUserScheduleRepository(db),
+		IcsService:             icsService,
 	}
 }
 
@@ -86,6 +89,14 @@ func (h *UserScheduleHandler) UpdateMySchedule(c *fiber.Ctx) error {
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to retrieve updated schedule"})
 	}
+
+	go func(userID int, icsURL string) {
+		if err := h.IcsService.SyncUserSchedule(userID, icsURL); err != nil {
+			utils.LogMessage(utils.LevelError, "Background ICS sync failed")
+			utils.LogLineKeyValue(utils.LevelError, "UserID", userID)
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		}
+	}(schedule.UserID, req.IcsURL)
 
 	utils.LogMessage(utils.LevelInfo, "Successfully updated user schedule")
 	utils.LogFooter()

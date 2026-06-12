@@ -18,6 +18,7 @@ import (
 	"github.com/plugimt/transat-backend/handlers/association"
 	"github.com/plugimt/transat-backend/handlers/club"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
+	userScheduleService "github.com/plugimt/transat-backend/handlers/user_schedule/service"
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/internal/config"
 	"github.com/plugimt/transat-backend/internal/database"
@@ -86,6 +87,7 @@ func main() {
 	discordService := services.NewDiscordService(os.Getenv("DISCORD_WEBHOOK_URL"))
 
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
+	icsService := userScheduleService.NewIcsService(db)
 
 	weatherService, err := services.NewWeatherService()
 	if err != nil {
@@ -100,11 +102,9 @@ func main() {
 
 	clubsHandler := club.NewclubHandler(db)
 	associationsHandler := association.NewAssociationHandler(db)
-
 	eventHandler := event.NewEventHandler(db)
 	carpoolHandler := carpool.NewCarpoolHandler(db)
-
-	appScheduler := scheduler.NewScheduler(restHandler)
+	appScheduler := scheduler.NewScheduler(restHandler, icsService)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
 
@@ -175,7 +175,7 @@ func main() {
 	routes.SetupCarpoolRoutes(app, carpoolHandler)
 	routes.SetupReservationRoutes(app, db)
 	routes.SetupBassineRoutes(app, db)
-	routes.SetupUserScheduleRoutes(app, db)
+	routes.SetupUserScheduleRoutes(app, db, icsService)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
