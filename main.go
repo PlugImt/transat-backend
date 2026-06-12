@@ -175,6 +175,7 @@ func main() {
 	routes.SetupCarpoolRoutes(app, carpoolHandler)
 	routes.SetupReservationRoutes(app, db)
 	routes.SetupBassineRoutes(app, db)
+	routes.SetupUserScheduleRoutes(app, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
