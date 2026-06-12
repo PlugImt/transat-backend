@@ -734,7 +734,7 @@ func (h *ClubHandler) AddClubRespo(c *fiber.Ctx) error {
 	utils.LogLineKeyValue(utils.LevelInfo, "Raw Body", string(bodyBytes))
 	utils.LogLineKeyValue(utils.LevelInfo, "Content-Type", c.Get("Content-Type"))
 
-	var req models.AddRespoRequest
+	var req models.AddRespoClubRequest
 	if err := c.BodyParser(&req); err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to parse request body")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)

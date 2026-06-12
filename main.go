@@ -14,6 +14,7 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/plugimt/transat-backend/handlers"
+	"github.com/plugimt/transat-backend/handlers/association"
 	"github.com/plugimt/transat-backend/handlers/club"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/i18n"
@@ -97,6 +98,7 @@ func main() {
 	}
 
 	clubsHandler := club.NewclubHandler(db)
+	associationsHandler := association.NewassociationHandler(db)
 
 	eventHandler := event.NewEventHandler(db)
 
@@ -161,6 +163,7 @@ func main() {
 	routes.SetupFileRoutes(app, db, r2Service)
 	routes.SetupRestaurantRoutes(app, restHandler)
 	routes.SetupClubRoutes(app, clubsHandler)
+	routes.SetupAssociationRoutes(app, associationsHandler)
 	routes.SetupPlanningRoutes(app, db)
 	routes.SetupNotificationRoutes(app, db, notificationService)
 	routes.SetupStatisticsRoutes(app, db, statisticsService)
