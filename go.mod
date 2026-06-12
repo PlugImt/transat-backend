@@ -7,6 +7,7 @@ toolchain go1.24.1
 require (
 	cloud.google.com/go/translate v1.12.4
 	github.com/BurntSushi/toml v1.3.2
+	github.com/arran4/golang-ical v0.3.5
 	github.com/aws/aws-sdk-go-v2 v1.36.4
 	github.com/aws/aws-sdk-go-v2/config v1.29.16
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.69
@@ -22,6 +23,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.24.2
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/sethvargo/go-retry v0.3.0
 	golang.org/x/crypto v0.36.0
 	golang.org/x/text v0.23.0
 	google.golang.org/api v0.224.0
@@ -62,7 +64,6 @@ require (
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/tinylib/msgp v1.2.5 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.57.0 // indirect
