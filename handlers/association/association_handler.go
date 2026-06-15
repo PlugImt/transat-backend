@@ -15,7 +15,7 @@ type AssociationHandler struct {
 	db *sql.DB
 }
 
-func NewassociationHandler(db *sql.DB) *AssociationHandler {
+func NewAssociationHandler(db *sql.DB) *AssociationHandler {
 	return &AssociationHandler{
 		db: db,
 	}
