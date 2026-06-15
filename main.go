@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/plugimt/transat-backend/handlers/carpool"
 	"github.com/plugimt/transat-backend/handlers/event"
 
 	"github.com/gofiber/fiber/v2"
@@ -101,6 +102,7 @@ func main() {
 	associationsHandler := association.NewAssociationHandler(db)
 
 	eventHandler := event.NewEventHandler(db)
+	carpoolHandler := carpool.NewCarpoolHandler(db)
 
 	appScheduler := scheduler.NewScheduler(restHandler)
 	appScheduler.StartAll()
@@ -170,6 +172,7 @@ func main() {
 	routes.SetupWashingMachineRoutes(app)
 	routes.SetupWeatherRoutes(app, weatherHandler)
 	routes.SetupEventRoutes(app, eventHandler)
+	routes.SetupCarpoolRoutes(app, carpoolHandler)
 	routes.SetupReservationRoutes(app, db)
 	routes.SetupBassineRoutes(app, db)
 
