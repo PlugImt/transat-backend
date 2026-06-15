@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,8 +22,9 @@ import (
 )
 
 const (
-	fetchTimeout   = 30 * time.Second
-	maxFetchRetries = 2 // 3 total attempts (initial + 2 retries)
+	fetchTimeout    = 30 * time.Second
+	maxFetchRetries = 2                // 3 total attempts (initial + 2 retries)
+	maxICSSize      = 10 * 1024 * 1024 // 10MB
 )
 
 var passIDRegex = regexp.MustCompile(`PASS-\d+`)
@@ -89,14 +91,14 @@ func (s *IcsService) SyncAll() error {
 
 	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Starting ICS sync for %d users", len(schedules)))
 
-	var lastErr error
+	var syncErrs []error
 	for _, schedule := range schedules {
 		if err := s.SyncUserSchedule(schedule.UserID, schedule.IcsURL); err != nil {
-			lastErr = err
+			syncErrs = append(syncErrs, err)
 		}
 	}
 
-	return lastErr
+	return errors.Join(syncErrs...)
 }
 
 func (s *IcsService) FetchICS(icsURL string) ([]byte, error) {
@@ -128,9 +130,12 @@ func (s *IcsService) FetchICS(icsURL string) ([]byte, error) {
 			return fmt.Errorf("unexpected status code %d", resp.StatusCode)
 		}
 
-		data, err := io.ReadAll(resp.Body)
+		data, err := io.ReadAll(io.LimitReader(resp.Body, maxICSSize))
 		if err != nil {
 			return retry.RetryableError(fmt.Errorf("read response body: %w", err))
+		}
+		if int64(len(data)) == maxICSSize {
+			return fmt.Errorf("ics response exceeds maximum size of %d bytes", maxICSSize)
 		}
 		body = data
 		return nil

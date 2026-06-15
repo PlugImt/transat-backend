@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -17,6 +16,7 @@ type UserScheduleScheduler struct {
 	stopChan    chan struct{}
 	runningChan chan struct{}
 	stopOnce    sync.Once
+	syncMutex   sync.Mutex
 }
 
 func NewUserScheduleScheduler(handler UserScheduleCronHandler) *UserScheduleScheduler {
@@ -42,7 +42,6 @@ func (s *UserScheduleScheduler) Start() {
 				go s.syncAllSchedules()
 			case <-s.stopChan:
 				utils.LogMessage(utils.LevelInfo, "Stopping user schedule ICS scheduler")
-				return
 			}
 		}
 	}()
@@ -63,7 +62,8 @@ func (s *UserScheduleScheduler) syncAllSchedules() {
 	utils.LogMessage(utils.LevelInfo, "Running scheduled ICS sync for all users")
 
 	if err := s.handler.SyncAll(); err != nil {
-		log.Printf("Error in scheduled ICS sync: %v", err)
+		utils.LogMessage(utils.LevelError, "Error in scheduled ICS sync")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 	} else {
 		utils.LogMessage(utils.LevelInfo, "Scheduled ICS sync completed successfully")
 	}
