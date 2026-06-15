@@ -98,7 +98,7 @@ func main() {
 	}
 
 	clubsHandler := club.NewclubHandler(db)
-	associationsHandler := association.NewassociationHandler(db)
+	associationsHandler := association.NewAssociationHandler(db)
 
 	eventHandler := event.NewEventHandler(db)
 
