@@ -88,6 +88,7 @@ func main() {
 
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
 	icsService := userScheduleService.NewIcsService(db)
+	gtfsService := services.NewGTFSService()
 
 	weatherService, err := services.NewWeatherService()
 	if err != nil {
@@ -104,6 +105,7 @@ func main() {
 	associationsHandler := association.NewAssociationHandler(db)
 	eventHandler := event.NewEventHandler(db)
 	carpoolHandler := carpool.NewCarpoolHandler(db)
+
 	appScheduler := scheduler.NewScheduler(restHandler, icsService)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
@@ -175,6 +177,7 @@ func main() {
 	routes.SetupCarpoolRoutes(app, carpoolHandler)
 	routes.SetupReservationRoutes(app, db)
 	routes.SetupBassineRoutes(app, db)
+	routes.SetupBusDepartureRoutes(app, gtfsService)
 	routes.SetupUserScheduleRoutes(app, db, icsService)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
