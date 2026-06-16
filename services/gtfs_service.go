@@ -2,6 +2,7 @@ package services
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -147,8 +148,17 @@ func (s *GTFSService) GetChantrerieDepartures() ([]models.BusDeparture, error) {
 	return result, nil
 }
 
-func (s *GTFSService) downloadAndParse() (*gtfsData, error) {
-	resp, err := http.Get(s.gtfsURL) // #nosec G107
+func (s *GTFSService) downloadAndParse(ctx context.Context) (*gtfsData, error) {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.gtfsURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create GTFS request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+
 	if err != nil {
 		return nil, fmt.Errorf("download GTFS: %w", err)
 	}
@@ -476,7 +486,7 @@ func parseGTFSTime(value string) (int, error) {
 		return 0, err
 	}
 
-	return hours * 3600 + minutes * 60 + seconds, nil
+	return hours*3600 + minutes*60 + seconds, nil
 }
 
 func (c calendarData) isServiceActive(serviceID string, day time.Time) bool {
