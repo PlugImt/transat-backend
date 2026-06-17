@@ -25,7 +25,7 @@ func NewCarpoolHandler(db *sql.DB) *CarpoolHandler {
 func (h *CarpoolHandler) GetCarpools(c *fiber.Ctx) error {
 	utils.LogHeader("🚗 Get All Carpools")
 
-	tripTypeFilter := c.Query("type", "all") // can be SHOPPING, WEEKEND, OTHER
+	tripTypeFilter := c.Query("type", "all")
 	utils.LogLineKeyValue(utils.LevelInfo, "Trip Type Filter", tripTypeFilter)
 
 	var query string

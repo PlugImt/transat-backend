@@ -28,7 +28,7 @@ type CarpoolWithCreator struct {
 
 // CreateCarpoolRequest represents the request body for creating a carpool offer
 type CreateCarpoolRequest struct {
-	TripType       string    `json:"trip_type" validate:"required,oneof=SHOPPING WEEKEND OTHER"`
+	TripType       string    `json:"trip_type" validate:"required,oneof=SHOPPING LONG_TRIP OTHER"`
 	DeparturePlace string    `json:"departure_place" validate:"required,max=100"`
 	Destination    string    `json:"destination" validate:"required,max=100"`
 	DepartureTime  time.Time `json:"departure_time" validate:"required"`
