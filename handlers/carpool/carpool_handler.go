@@ -46,9 +46,8 @@ func (h *CarpoolHandler) GetCarpools(c *fiber.Ctx) error {
 			COALESCE(n.profile_picture, '')
 		FROM carpools c
 		JOIN newf n ON c.creator_email = n.email
-		WHERE c.status IN ('OPEN', 'FULL') AND c.departure_time >= NOW()
+		WHERE c.status IN ('OPEN', 'FULL') AND c.departure_time >= (NOW() AT TIME ZONE 'UTC')
 	`
-
 	if tripTypeFilter != "all" {
 		query = baseQuery + fmt.Sprintf(" AND c.trip_type = $%d ORDER BY c.departure_time ASC", argIndex)
 		args = append(args, tripTypeFilter)
