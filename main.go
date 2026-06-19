@@ -17,9 +17,9 @@ import (
 	"github.com/plugimt/transat-backend/handlers"
 	"github.com/plugimt/transat-backend/handlers/association"
 	"github.com/plugimt/transat-backend/handlers/club"
-	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
-	userScheduleService "github.com/plugimt/transat-backend/handlers/user_schedule/service"
 	planning_sport "github.com/plugimt/transat-backend/handlers/planning_sport"
+	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
+	scheduleService "github.com/plugimt/transat-backend/handlers/schedule/service"
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/internal/config"
 	"github.com/plugimt/transat-backend/internal/database"
@@ -89,7 +89,7 @@ func main() {
 
 	planningSportHandler := planning_sport.NewPlanningSportHandler(db)
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
-	icsService := userScheduleService.NewIcsService(db)
+	icsService := scheduleService.NewIcsService(db)
 	gtfsService := services.NewGTFSService()
 
 	weatherService, err := services.NewWeatherService()
@@ -180,7 +180,7 @@ func main() {
 	routes.SetupReservationRoutes(app, db)
 	routes.SetupBassineRoutes(app, db)
 	routes.SetupBusDepartureRoutes(app, gtfsService)
-	routes.SetupUserScheduleRoutes(app, db, icsService)
+	routes.SetupScheduleRoutes(app, db, icsService)
 	routes.SetupPlanningSportRoutes(app, planningSportHandler)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
