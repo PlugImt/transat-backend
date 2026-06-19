@@ -15,7 +15,7 @@ import (
 	"time"
 
 	ics "github.com/arran4/golang-ical"
-	"github.com/plugimt/transat-backend/handlers/user_schedule/repository"
+	"github.com/plugimt/transat-backend/handlers/schedule/repository"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
 	"github.com/sethvargo/go-retry"
