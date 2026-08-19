@@ -176,19 +176,18 @@ func (h *TraqHandler) CreateTraqArticle(c *fiber.Ctx) error {
 	})
 }
 
-// GetAllTraqArticles retrieves all Traq articles.
-func (h *TraqHandler) GetAllTraqArticles(c *fiber.Ctx) error {
-	utils.LogHeader("🍺 Get All Traq Articles")
-
-	query := `
+// getTraqArticles is the private method used to query articles with various filters.
+func (h *TraqHandler) getTraqArticles(c *fiber.Ctx, filter string) error {
+	query := fmt.Sprintf(`
 		SELECT
 			t.id_traq, t.name, t.description, t.picture, t.price, t.price_half,
 			t.alcohol, t.creation_date, t.limited, t.out_of_stock, t.disabled,
 			COALESCE(tt.name, 'Unknown') as traq_type -- Get type name, default if missing
 		FROM traq t
 		LEFT JOIN traq_types tt ON t.id_traq_types = tt.id_traq_types
+		WHERE 1=1 %s
 		ORDER BY tt.name, t.name; -- Order by type then name
-	`
+	`, filter)
 
 	rows, err := h.DB.Query(query)
 	if err != nil {
@@ -239,6 +238,18 @@ func (h *TraqHandler) GetAllTraqArticles(c *fiber.Ctx) error {
 	utils.LogFooter()
 
 	return c.JSON(articles)
+}
+
+// GetAllTraqArticles retrieves all Traq articles.
+func (h *TraqHandler) GetAllTraqArticles(c *fiber.Ctx) error {
+	utils.LogHeader("🍺 Get All Traq Articles")
+	return h.getTraqArticles(c, "")
+}
+
+// GetAllTraqArticlesAvailable retrieves all Traq articles that are not disabled.
+func (h *TraqHandler) GetAllTraqArticlesAvailable(c *fiber.Ctx) error {
+	utils.LogHeader("🍺 Get All Traq Articles Available")
+	return h.getTraqArticles(c, "AND disabled = 'false'")
 }
 
 // --- Placeholder Handlers for potential future routes ---

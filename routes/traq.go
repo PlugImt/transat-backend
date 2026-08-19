@@ -22,7 +22,8 @@ func SetupTraqRoutes(router fiber.Router, db *sql.DB) {
 	// Article routes
 	// Consider adding middleware (e.g., JWT, admin check) to POST/PUT/DELETE
 	traqGroup.Post("/", middlewares.JWTMiddleware, traqHandler.CreateTraqArticle) // Example: Require JWT
-	traqGroup.Get("/", traqHandler.GetAllTraqArticles)                            // Publicly accessible?
+	traqGroup.Get("/", middlewares.JWTMiddleware, traqHandler.GetAllTraqArticles) // Require JWT
+	traqGroup.Get("/available", traqHandler.GetAllTraqArticlesAvailable)          // Publicly accessible
 	// Uncomment and implement handlers for specific article actions if needed
 	// traqGroup.Get("/:id", traqHandler.GetTraqArticle)    // GET /api/traq/:id
 	// traqGroup.Put("/:id", middlewares.JWTMiddleware, traqHandler.UpdateTraqArticle) // Example: Require JWT
