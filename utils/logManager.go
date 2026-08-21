@@ -44,13 +44,13 @@ func _log(level LogLevel, msg string) {
 	if logger != nil {
 		switch level {
 		case LevelInfo:
-			logger.Info(ctx, msg)
+			logger.Info().WithCtx(ctx).Emit(msg)
 		case LevelError:
-			logger.Error(ctx, msg)
+			logger.Error().WithCtx(ctx).Emit(msg)
 		case LevelWarn:
-			logger.Warn(ctx, msg)
+			logger.Warn().WithCtx(ctx).Emit(msg)
 		case LevelDebug:
-			logger.Debug(ctx, msg)
+			logger.Debug().WithCtx(ctx).Emit(msg)
 		}
 	}
 }
