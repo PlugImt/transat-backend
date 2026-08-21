@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:17-alpine # Utilisation de PostgreSQL 17 Alpine
+    image: postgres:18-alpine # Utilisation de PostgreSQL 18 Alpine
     container_name: transat_db
     restart: always
     environment:
