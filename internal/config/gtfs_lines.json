@@ -1,0 +1,20 @@
+[
+  {
+    "name": "C6",
+    "routeShortName": "C6",
+    "directionId": "1",
+    "stopIds": ["FR_NAOLIB:Quay:634"]
+  },
+  {
+    "name": "75",
+    "routeShortName": "75",
+    "directionId": "1",
+    "stopIds": ["FR_NAOLIB:Quay:632"]
+  },
+  {
+    "name": "E5",
+    "routeShortName": "E5",
+    "directionId": "1",
+    "stopIds": ["FR_NAOLIB:Quay:2521"]
+  }
+]
