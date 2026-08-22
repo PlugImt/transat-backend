@@ -132,13 +132,14 @@ func parsePositiveInt(value string, fallback int) int {
 }
 
 func realtimeURL(value string) string {
-	switch strings.TrimSpace(value) {
+	trimmed := strings.TrimSpace(value)
+	switch trimmed {
 	case "off", "none", "false":
 		return ""
 	case "":
 		return defaultGTFSRealtimeURL
 	default:
-		return value
+		return trimmed
 	}
 }
 
