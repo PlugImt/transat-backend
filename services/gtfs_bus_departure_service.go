@@ -17,6 +17,7 @@ import (
 
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/utils"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -25,7 +26,9 @@ const (
 	gtfsColdStartBackoffCap   = 15 * time.Minute
 	gtfsStaticMaxBody         = 80 << 20
 	departureDatetimeLayout   = "2006-01-02 15:04:05"
-	defaultMaxDepartures = 3
+	defaultMaxDepartures      = 3
+	// Keep recently passed trips so delay-only / cancel updates can still match.
+	scheduledLookback = 2 * time.Hour
 )
 
 type lineConfig struct {
@@ -37,6 +40,7 @@ type lineConfig struct {
 
 type GTFSOptions struct {
 	URL           string
+	RealtimeURL   string
 	Lines         []models.GTFSLineConfig
 	MaxDepartures int
 }
@@ -67,16 +71,24 @@ type scheduledDeparture struct {
 type gtfsData struct {
 	lineDepartures map[string][]lineDeparture
 	calendar       calendarData
+	routeToLine    map[string]string        // routes.route_id → line name
+	tripToLine     map[string]string        // trips.trip_id → line name
+	tripTimes      map[string]lineDeparture // trip_id → configured-stop departure
 }
 
 type GTFSService struct {
 	gtfsURL       string
+	realtimeURL   string
 	lines         []lineConfig
+	lineByName    map[string]lineConfig
 	maxDepartures int
 	mu            sync.RWMutex
 	data          *gtfsData
 	lastRefresh   time.Time
 	refreshing    bool
+	rtMu          sync.Mutex
+	rtCache       *realtimeSnapshot
+	rtGroup       singleflight.Group
 }
 
 func NewGTFSService(opts GTFSOptions) *GTFSService {
@@ -90,9 +102,16 @@ func NewGTFSService(opts GTFSOptions) *GTFSService {
 		maxDepartures = defaultMaxDepartures
 	}
 
+	lineByName := make(map[string]lineConfig, len(lines))
+	for _, line := range lines {
+		lineByName[line.name] = line
+	}
+
 	svc := &GTFSService{
 		gtfsURL:       opts.URL,
+		realtimeURL:   opts.RealtimeURL,
 		lines:         lines,
+		lineByName:    lineByName,
 		maxDepartures: maxDepartures,
 	}
 	go svc.refreshLoop()
@@ -192,16 +211,22 @@ func (s *GTFSService) GetChantrerieDepartures() (*models.BusDeparturesResponse, 
 	}
 
 	now := utils.Now()
+	liveByLine, lastRealtime := s.getRealtimeDepartures(now, data)
+
 	response := &models.BusDeparturesResponse{
 		LastRefresh: lastRefresh.Format(departureDatetimeLayout),
 		Lines:       make([]models.BusLineDepartures, 0, len(s.lines)),
 	}
+	if !lastRealtime.IsZero() {
+		response.LastRealtime = lastRealtime.Format(departureDatetimeLayout)
+	}
 
 	for _, line := range s.lines {
-		scheduled := findNextDepartures(data.lineDepartures[line.name], data.calendar, now, s.maxDepartures)
+		scheduled := findNextDepartures(data.lineDepartures[line.name], data.calendar, now, s.maxDepartures*3)
+		departures := mergeDepartures(scheduled, liveByLine[line.name], s.maxDepartures, now)
 		response.Lines = append(response.Lines, models.BusLineDepartures{
 			Name:       line.name,
-			Departures: scheduledToDepartures(scheduled, s.maxDepartures),
+			Departures: departures,
 		})
 	}
 
@@ -271,9 +296,23 @@ func parseGTFSZip(zipReader *zip.Reader, lines []lineConfig) (*gtfsData, error) 
 		}
 	}
 
+	tripToLine := make(map[string]string, len(targetTrips))
+	tripTimes := make(map[string]lineDeparture, len(targetTrips))
+	for tripID, trip := range targetTrips {
+		tripToLine[tripID] = trip.lineName
+	}
+	for _, deps := range lineDepartures {
+		for _, dep := range deps {
+			tripTimes[dep.tripID] = dep
+		}
+	}
+
 	return &gtfsData{
 		lineDepartures: lineDepartures,
 		calendar:       calendar,
+		routeToLine:    routeToLine,
+		tripToLine:     tripToLine,
+		tripTimes:      tripTimes,
 	}, nil
 }
 
@@ -713,9 +752,10 @@ func findNextDepartures(departures []lineDeparture, calendar calendarData, now t
 	}
 
 	now = now.In(utils.ParisLocation)
+	recent := make([]scheduledDeparture, 0, count)
 	upcoming := make([]scheduledDeparture, 0, count*2)
 
-	for dayOffset := 0; dayOffset < 8; dayOffset++ {
+	for dayOffset := -1; dayOffset < 8; dayOffset++ {
 		day := utils.StartOfDayParis(now).AddDate(0, 0, dayOffset)
 
 		for _, dep := range departures {
@@ -724,40 +764,31 @@ func findNextDepartures(departures []lineDeparture, calendar calendarData, now t
 			}
 
 			departureTime := gtfsServiceTime(day, dep.secondsFromMidnight)
-			if !departureTime.After(now) {
-				continue
-			}
-			upcoming = append(upcoming, scheduledDeparture{
+			item := scheduledDeparture{
 				at:         departureTime,
 				tripID:     dep.tripID,
 				serviceDay: day,
-			})
+			}
+			if departureTime.After(now) {
+				upcoming = append(upcoming, item)
+				continue
+			}
+			if now.Sub(departureTime) <= scheduledLookback {
+				recent = append(recent, item)
+			}
 		}
 	}
 
+	sort.Slice(recent, func(i, j int) bool {
+		return recent[i].at.Before(recent[j].at)
+	})
 	sort.Slice(upcoming, func(i, j int) bool {
 		return upcoming[i].at.Before(upcoming[j].at)
 	})
 	if len(upcoming) > count {
 		upcoming = upcoming[:count]
 	}
-	return upcoming
-}
-
-func scheduledToDepartures(scheduled []scheduledDeparture, count int) []models.BusDeparture {
-	if count <= 0 {
-		return nil
-	}
-	if len(scheduled) > count {
-		scheduled = scheduled[:count]
-	}
-	out := make([]models.BusDeparture, 0, len(scheduled))
-	for _, dep := range scheduled {
-		out = append(out, models.BusDeparture{
-			Time: dep.at.Format(departureDatetimeLayout),
-		})
-	}
-	return out
+	return append(recent, upcoming...)
 }
 
 func defaultLineConfigs() []lineConfig {

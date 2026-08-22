@@ -8,8 +8,9 @@ type GTFSLineConfig struct {
 }
 
 type BusDeparturesResponse struct {
-	LastRefresh string              `json:"lastRefresh"`
-	Lines       []BusLineDepartures `json:"lines"`
+	LastRefresh  string              `json:"lastRefresh"`
+	LastRealtime string              `json:"lastRealtime,omitempty"`
+	Lines        []BusLineDepartures `json:"lines"`
 }
 
 type BusLineDepartures struct {
@@ -18,5 +19,7 @@ type BusLineDepartures struct {
 }
 
 type BusDeparture struct {
-	Time string `json:"time"`
+	Time         string `json:"time"`
+	Realtime     bool   `json:"realtime"`
+	DelaySeconds *int   `json:"delaySeconds,omitempty"`
 }
