@@ -1,7 +1,7 @@
 "use client";
 
 import { Command } from "cmdk";
-import { BarChart3, Building, Calendar, LogOut, Plus, Search, Users } from "lucide-react";
+import { BarChart3, Beer, Building, Calendar, LogOut, Plus, Search, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useClubs, useEvents, useKeyboardShortcuts, useUsers } from "@/lib/hooks";
@@ -26,6 +26,7 @@ function CommandPalette() {
     openUserModal,
     openClubModal,
     openEventModal,
+    openTraqArticleModal,
   } = useAppStore();
   const { logout } = useAuthStore();
   const [search, setSearch] = useState("");
@@ -137,6 +138,14 @@ function CommandPalette() {
         action: () => router.push("/clubs"),
         keywords: ["clubs", "organisations"],
       },
+      {
+        id: "nav-traq",
+        label: "Traq",
+        description: "Gérer les articles Traq",
+        icon: Beer,
+        action: () => router.push("/traq"),
+        keywords: ["traq", "boissons", "bar", "biere", "articles"],
+      },
 
       // Actions
       {
@@ -173,6 +182,17 @@ function CommandPalette() {
         keywords: ["create", "creer", "nouveau", "new", "event", "evenement"],
       },
       {
+        id: "action-new-traq",
+        label: "Créer un article Traq",
+        description: "Ajouter un nouvel article Traq",
+        icon: Plus,
+        action: () => {
+          openTraqArticleModal();
+          router.push("/traq");
+        },
+        keywords: ["create", "creer", "nouveau", "new", "traq", "boisson", "article"],
+      },
+      {
         id: "system-logout",
         label: "Déconnexion",
         description: "Se déconnecter de l'administration",
@@ -184,7 +204,7 @@ function CommandPalette() {
         keywords: ["logout", "deconnexion", "disconnect", "exit", "sortir"],
       },
     ],
-    [router, logout, openUserModal, openClubModal, openEventModal],
+    [router, logout, openUserModal, openClubModal, openEventModal, openTraqArticleModal],
   );
 
   // Combine all commands

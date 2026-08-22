@@ -8,6 +8,7 @@ import {
   reviewsApi,
   rolesApi,
   statsApi,
+  traqApi,
   usersApi,
 } from "./api";
 import type {
@@ -19,7 +20,7 @@ import type {
   UpdateItemRequest,
   UpdateReservationItemMessagesRequest,
 } from "./api";
-import type { Club, Event, User } from "./types";
+import type { Club, Event, TraqArticle, User } from "./types";
 
 export * from "./hooks/useClickOutside";
 // Export utility hooks
@@ -389,6 +390,90 @@ export const useDeleteReservationItem = () => {
     mutationFn: reservationApi.deleteItem,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reservation-tree"] });
+    },
+  });
+};
+
+// Traq hooks
+export const useTraqArticles = () => {
+  return useQuery({
+    queryKey: ["traq-articles"],
+    queryFn: traqApi.getAllArticles,
+  });
+};
+
+export const useCreateTraqArticle = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: traqApi.createArticle,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["traq-articles"] });
+    },
+  });
+};
+
+export const useUpdateTraqArticle = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<TraqArticle> }) =>
+      traqApi.updateArticle(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["traq-articles"] });
+    },
+  });
+};
+
+export const useDeleteTraqArticle = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: traqApi.deleteArticle,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["traq-articles"] });
+    },
+  });
+};
+
+export const useTraqTypes = () => {
+  return useQuery({
+    queryKey: ["traq-types"],
+    queryFn: traqApi.getAllTypes,
+  });
+};
+
+export const useCreateTraqType = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: traqApi.createType,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["traq-types"] });
+    },
+  });
+};
+
+export const useUpdateTraqType = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { name: string } }) =>
+      traqApi.updateType(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["traq-types"] });
+      queryClient.invalidateQueries({ queryKey: ["traq-articles"] });
+    },
+  });
+};
+
+export const useDeleteTraqType = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: traqApi.deleteType,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["traq-types"] });
     },
   });
 };

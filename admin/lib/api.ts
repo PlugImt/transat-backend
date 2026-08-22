@@ -7,6 +7,8 @@ import type {
   Event,
   MenuItem,
   MenuItemReview,
+  TraqArticle,
+  TraqType,
   UpdateBassineScoreRequest,
   User,
 } from "./types";
@@ -273,6 +275,41 @@ export interface UpdateItemRequest {
   warning_message?: string | null;
   confirmation_message?: string | null;
 }
+
+export const traqApi = {
+  getAllArticles: async (): Promise<TraqArticle[]> => {
+    const response = await api.get("/traq/");
+    return asArray<TraqArticle>(response.data);
+  },
+  createArticle: async (article: Partial<TraqArticle>) => {
+    const response = await api.post("/traq/", article);
+    return response.data;
+  },
+  updateArticle: async (id: number, article: Partial<TraqArticle>) => {
+    const response = await api.patch(`/traq/${id}`, article);
+    return response.data;
+  },
+  deleteArticle: async (id: number) => {
+    const response = await api.delete(`/traq/${id}`);
+    return response.data;
+  },
+  getAllTypes: async (): Promise<TraqType[]> => {
+    const response = await api.get("/traq/types/");
+    return asArray<TraqType>(response.data);
+  },
+  createType: async (type: { name: string }) => {
+    const response = await api.post("/traq/types/", type);
+    return response.data;
+  },
+  updateType: async (id: number, type: { name: string }) => {
+    const response = await api.patch(`/traq/types/${id}`, type);
+    return response.data;
+  },
+  deleteType: async (id: number) => {
+    const response = await api.delete(`/traq/types/${id}`);
+    return response.data;
+  },
+};
 
 export const reservationApi = {
   getItemsForClub: async (clubId: number): Promise<ReservationItem[]> => {
