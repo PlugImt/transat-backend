@@ -10,6 +10,8 @@ cloud.google.com/go/translate v1.18.0 h1:2dxWfGMG7y5vobxD2pPyngnfPPIk4MYdNB9QK5s
 cloud.google.com/go/translate v1.18.0/go.mod h1:aRVIE+P+7fngk8HwwFAgis5QA7wphGpKrFpdNoWtGCM=
 github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
+github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs v1.0.0 h1:f4P+fVYmSIWj4b/jvbMdmrmsx/Xb+5xCpYYtVXOdKoc=
+github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs v1.0.0/go.mod h1:nSmbVVQSM4lp9gYvVaaTotnRxSwZXEdFnJARofg5V4g=
 github.com/andybalholm/brotli v1.2.2 h1:HzTuoo2ErYQqf5qvcJInB8uvqSVxRttzkFexPWtnceM=
 github.com/andybalholm/brotli v1.2.2/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/antihax/optional v1.0.0 h1:xK2lYat7ZLaVVcIuj82J8kIro4V6kDe0AUDFboUCwcg=

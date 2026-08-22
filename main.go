@@ -95,6 +95,7 @@ func main() {
 
 	gtfsService := services.NewGTFSService(services.GTFSOptions{
 		URL:           cfg.GTFSURL,
+		RealtimeURL:   cfg.GTFSRealtimeURL,
 		Lines:         cfg.GTFSLines,
 		MaxDepartures: cfg.GTFSMaxDepartures,
 	})

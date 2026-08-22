@@ -14,6 +14,7 @@ import (
 )
 
 const defaultGTFSURL = "https://transport.data.gouv.fr/resources/84101/download"
+const defaultGTFSRealtimeURL = "https://proxy.transport.data.gouv.fr/resource/naolib-nantes-gtfs-rt-trip-update"
 const defaultGTFSMaxDepartures = 3
 
 //go:embed gtfs_lines.json
@@ -43,6 +44,7 @@ type Config struct {
 
 	// GTFS
 	GTFSURL           string
+	GTFSRealtimeURL   string
 	GTFSLines         []models.GTFSLineConfig
 	GTFSMaxDepartures int
 }
@@ -77,6 +79,7 @@ func Load() *Config {
 		EmailSenderName: os.Getenv("EMAIL_SENDER_NAME"),
 
 		GTFSURL:           firstNonEmpty(os.Getenv("GTFS_URL"), defaultGTFSURL),
+		GTFSRealtimeURL:   realtimeURL(os.Getenv("GTFS_RT_URL")),
 		GTFSLines:         loadGTFSLines(),
 		GTFSMaxDepartures: parsePositiveInt(os.Getenv("GTFS_DEPARTURE_COUNT"), defaultGTFSMaxDepartures),
 	}
@@ -126,6 +129,17 @@ func parsePositiveInt(value string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+func realtimeURL(value string) string {
+	switch strings.TrimSpace(value) {
+	case "off", "none", "false":
+		return ""
+	case "":
+		return defaultGTFSRealtimeURL
+	default:
+		return value
+	}
 }
 
 func firstNonEmpty(values ...string) string {
