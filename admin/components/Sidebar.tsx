@@ -85,6 +85,8 @@ function Sidebar() {
             width={80}
             height={80}
             className="lg:w-[100px] lg:h-[100px]"
+            priority
+            loading="eager"
           />
           <h1 className="text-lg lg:text-xl font-bold">Transat Admin</h1>
         </div>

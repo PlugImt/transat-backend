@@ -31,13 +31,13 @@ function CommandPalette() {
   const [search, setSearch] = useState("");
 
   // Fetch data for search
-  const { data: users = [] } = useUsers();
-  const { data: clubs = [] } = useClubs();
-  const { data: events = [] } = useEvents();
+  const { data: users } = useUsers();
+  const { data: clubs } = useClubs();
+  const { data: events } = useEvents();
 
   // Generate dynamic commands for users, clubs, and events
   const dynamicCommands = useMemo(() => {
-    const userCommands: CommandItem[] = users.map((user: User) => ({
+    const userCommands: CommandItem[] = (users ?? []).map((user: User) => ({
       id: `user-${user.email}`,
       label:
         `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email || "Utilisateur",
@@ -57,7 +57,7 @@ function CommandPalette() {
       ].filter(Boolean),
     }));
 
-    const clubCommands: CommandItem[] = clubs.map((club: Club, index: number) => ({
+    const clubCommands: CommandItem[] = (clubs ?? []).map((club: Club, index: number) => ({
       id: `club-${club.id_clubs || `unknown-${index}`}`,
       label: club.name || "Club sans nom",
       description: `Club • ${club.description || "Pas de description"}`,
@@ -75,7 +75,7 @@ function CommandPalette() {
       ].filter(Boolean),
     }));
 
-    const eventCommands: CommandItem[] = events.map((event: Event, index: number) => ({
+    const eventCommands: CommandItem[] = (events ?? []).map((event: Event, index: number) => ({
       id: `event-${event.id_events || `unknown-${index}`}`,
       label: event.name || "Événement sans titre",
       description: `Événement • ${

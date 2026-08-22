@@ -3,22 +3,43 @@
 import {
   type ColumnDef,
   type ColumnFiltersState,
+  columnFilteringFeature,
+  createFilteredRowModel,
+  createPaginatedRowModel,
+  createSortedRowModel,
+  filterFn_includesString,
   flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
+  globalFilteringFeature,
+  type RowData,
+  rowPaginationFeature,
+  rowSortingFeature,
   type SortingState,
-  useReactTable,
+  sortFn_alphanumeric,
+  tableFeatures,
+  useTable,
 } from "@tanstack/react-table";
 import clsx from "clsx";
 import { ChevronDown, ChevronUp, Filter, Search } from "lucide-react";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useDebounce } from "@/lib/hooks";
 
-interface DataTableProps<T> {
+export const dataTableFeatures = tableFeatures({
+  columnFilteringFeature,
+  globalFilteringFeature,
+  rowSortingFeature,
+  rowPaginationFeature,
+  filteredRowModel: createFilteredRowModel(),
+  sortedRowModel: createSortedRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+  filterFns: { includesString: filterFn_includesString },
+  sortFns: { alphanumeric: sortFn_alphanumeric },
+});
+
+export type DataTableColumnDef<T extends RowData> = ColumnDef<typeof dataTableFeatures, T>;
+
+interface DataTableProps<T extends RowData> {
   data: T[];
-  columns: ColumnDef<T>[];
+  columns: DataTableColumnDef<T>[];
   searchPlaceholder?: string;
   globalFilterColumn?: string;
   className?: string;
@@ -31,7 +52,7 @@ interface DataTableProps<T> {
   filterActiveLabel?: string;
 }
 
-function DataTable<T>({
+function DataTable<T extends RowData>({
   data,
   columns,
   searchPlaceholder = "Rechercher...",
@@ -58,34 +79,25 @@ function DataTable<T>({
     setGlobalFilter(debouncedSearchTerm);
   }, [debouncedSearchTerm]);
 
-  // Memoize table configuration to avoid recreating on every render
-  const tableConfig = useMemo(
-    () => ({
-      data,
-      columns,
-      getCoreRowModel: getCoreRowModel(),
-      getSortedRowModel: getSortedRowModel(),
-      getFilteredRowModel: getFilteredRowModel(),
-      getPaginationRowModel: getPaginationRowModel(),
-      onSortingChange: setSorting,
-      onColumnFiltersChange: setColumnFilters,
-      onGlobalFilterChange: setGlobalFilter,
-      // Utilise la fonction de filtrage par défaut pour rechercher dans toutes les colonnes
-      state: {
-        sorting,
-        columnFilters,
-        globalFilter,
+  const table = useTable({
+    features: dataTableFeatures,
+    data,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
+    },
+    initialState: {
+      pagination: {
+        pageIndex: 0,
+        pageSize: 10,
       },
-      initialState: {
-        pagination: {
-          pageSize: 10,
-        },
-      },
-    }),
-    [data, columns, sorting, columnFilters, globalFilter],
-  );
-
-  const table = useReactTable(tableConfig);
+    },
+  });
 
   return (
     <div className={clsx("space-y-4", className)}>
@@ -189,7 +201,7 @@ function DataTable<T>({
                   className={clsx("hover:bg-gray-50", onRowClick && "cursor-pointer")}
                   onClick={() => onRowClick?.(row.original)}
                 >
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getAllCells().map((cell) => (
                     <td key={cell.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
@@ -205,8 +217,8 @@ function DataTable<T>({
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-700">
           {(() => {
-            const pageIndex = table.getState().pagination.pageIndex;
-            const pageSize = table.getState().pagination.pageSize;
+            const pageIndex = table.state.pagination.pageIndex;
+            const pageSize = table.state.pagination.pageSize;
             const totalRows = table.getFilteredRowModel().rows.length;
             const start = totalRows === 0 ? 0 : pageIndex * pageSize + 1;
             const end = Math.min((pageIndex + 1) * pageSize, totalRows);
@@ -224,7 +236,7 @@ function DataTable<T>({
             Précédent
           </button>
           <span className="text-sm text-gray-700">
-            Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
+            Page {table.state.pagination.pageIndex + 1} sur {table.getPageCount()}
           </span>
           <button
             type="button"
@@ -241,4 +253,6 @@ function DataTable<T>({
 }
 
 // Export memoized component with proper typing
-export default memo(DataTable) as <T = unknown>(props: DataTableProps<T>) => React.ReactElement;
+export default memo(DataTable) as <T extends RowData>(
+  props: DataTableProps<T>,
+) => React.ReactElement;

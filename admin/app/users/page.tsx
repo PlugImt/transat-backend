@@ -1,10 +1,9 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
-import { Check, CheckCircle, Edit, Mail, Phone, Plus, Trash2, Users, X } from "lucide-react";
+import { Check, CircleCheck, Edit, Mail, Phone, Plus, Trash2, Users, X } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import DataTable from "@/components/DataTable";
+import DataTable, { type DataTableColumnDef } from "@/components/DataTable";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import LanguageFlag from "@/components/LanguageFlag";
 import { UserModal } from "@/components/LazyComponents";
@@ -74,7 +73,7 @@ function UsersPageContent() {
   }, [users, showUnverifiedOnly]);
 
   // Define columns for the DataTable
-  const columns = useMemo<ColumnDef<User>[]>(
+  const columns = useMemo<DataTableColumnDef<User>[]>(
     () => [
       {
         id: "user_info",
@@ -128,7 +127,7 @@ function UsersPageContent() {
             </div>
           );
         },
-        sortingFn: (a, b) => {
+        sortFn: (a, b) => {
           const nameA = `${a.original.first_name || ""} ${
             a.original.last_name || ""
           }`.toLowerCase();
@@ -184,7 +183,7 @@ function UsersPageContent() {
             <span className="text-sm text-gray-500">-</span>
           );
         },
-        sortingFn: (a, b) => {
+        sortFn: (a, b) => {
           const rolesA = (a.original.roles || []).join(", ").toLowerCase();
           const rolesB = (b.original.roles || []).join(", ").toLowerCase();
           return rolesA.localeCompare(rolesB);
@@ -212,7 +211,7 @@ function UsersPageContent() {
                   className="p-2 text-gray-400 hover:text-green-600 rounded-full hover:bg-gray-100"
                   title="Valider l'utilisateur (VERIFYING → NEWF)"
                 >
-                  <CheckCircle className="h-4 w-4" />
+                  <CircleCheck className="h-4 w-4" />
                 </button>
               )}
               <button
