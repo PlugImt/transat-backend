@@ -290,10 +290,17 @@ func parseGTFSZip(zipReader *zip.Reader, lines []lineConfig) (*gtfsData, error) 
 		return nil, err
 	}
 
+	matched := 0
 	for _, line := range lines {
 		if len(lineDepartures[line.name]) == 0 {
-			return nil, fmt.Errorf("configured line %q matched no stop times", line.name)
+			utils.LogMessage(utils.LevelWarn, "Configured GTFS line matched no stop times")
+			utils.LogLineKeyValue(utils.LevelWarn, "Line", line.name)
+			continue
 		}
+		matched++
+	}
+	if matched == 0 {
+		return nil, fmt.Errorf("no configured GTFS line matched any stop time")
 	}
 
 	tripToLine := make(map[string]string, len(targetTrips))
