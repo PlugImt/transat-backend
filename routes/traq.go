@@ -3,36 +3,34 @@ package routes
 import (
 	"database/sql"
 
-	"github.com/plugimt/transat-backend/handlers/traq" // Import the traq handlers
-	"github.com/plugimt/transat-backend/middlewares"   // Import if specific middlewares are needed
-
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/handlers/traq"
+	"github.com/plugimt/transat-backend/middlewares"
+	"github.com/plugimt/transat-backend/utils"
 )
 
-// SetupTraqRoutes configures routes related to Traq articles and types.
 func SetupTraqRoutes(router fiber.Router, db *sql.DB) {
-	// Initialize Traq Handler
 	traqHandler := traq.NewTraqHandler(db)
-
-	// Group Traq routes under /traq
-	// Add authentication middleware if needed for specific actions
-	// Example: traqGroup := router.Group("/traq", middlewares.JWTMiddleware)
 	traqGroup := router.Group("/traq")
 
-	// Article routes
-	// Consider adding middleware (e.g., JWT, admin check) to POST/PUT/DELETE
-	traqGroup.Post("/", middlewares.JWTMiddleware, traqHandler.CreateTraqArticle) // Example: Require JWT
-	traqGroup.Get("/", traqHandler.GetAllTraqArticles)                            // Publicly accessible?
-	// Uncomment and implement handlers for specific article actions if needed
-	// traqGroup.Get("/:id", traqHandler.GetTraqArticle)    // GET /api/traq/:id
-	// traqGroup.Put("/:id", middlewares.JWTMiddleware, traqHandler.UpdateTraqArticle) // Example: Require JWT
-	// traqGroup.Delete("/:id", middlewares.JWTMiddleware, traqHandler.DeleteTraqArticle) // Example: Require JWT
+	adminOnly := []fiber.Handler{
+		middlewares.JWTMiddleware,
+		utils.EnhanceSentryEventWithEmail,
+		middlewares.AdminAuthMiddleware(db),
+	}
 
-	// Type routes
-	traqTypesGroup := traqGroup.Group("/types") // /api/traq/types
+	// Types must be registered before /:id so "types" is not captured as an article ID.
+	traqTypesGroup := traqGroup.Group("/types")
+	traqTypesGroup.Get("/", traqHandler.GetAllTraqTypes)
+	traqTypesGroup.Get("/:id", traqHandler.GetTraqType)
+	traqTypesGroup.Post("/", append(adminOnly, traqHandler.CreateTraqType)...)
+	traqTypesGroup.Patch("/:id", append(adminOnly, traqHandler.UpdateTraqType)...)
+	traqTypesGroup.Delete("/:id", append(adminOnly, traqHandler.DeleteTraqType)...)
 
-	// Assuming creating types might need auth, getting them might be public
-	// Add middlewares as appropriate
-	traqTypesGroup.Post("/", middlewares.JWTMiddleware, traqHandler.CreateTraqType) // Example: Require JWT
-	traqTypesGroup.Get("/", traqHandler.GetAllTraqTypes)                            // Publicly accessible?
+	traqGroup.Get("/", traqHandler.GetAllTraqArticles)
+	traqGroup.Get("/available", traqHandler.GetAvailableTraqArticles)
+	traqGroup.Get("/:id", traqHandler.GetTraqArticle)
+	traqGroup.Post("/", append(adminOnly, traqHandler.CreateTraqArticle)...)
+	traqGroup.Patch("/:id", append(adminOnly, traqHandler.UpdateTraqArticle)...)
+	traqGroup.Delete("/:id", append(adminOnly, traqHandler.DeleteTraqArticle)...)
 }

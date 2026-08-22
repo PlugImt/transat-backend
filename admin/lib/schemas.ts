@@ -64,3 +64,24 @@ export const clubSchema = z.object({
 });
 
 export type ClubFormData = z.infer<typeof clubSchema>;
+
+export const traqArticleSchema = z.object({
+  name: z.string().min(1, "Le nom est requis"),
+  description: z.string().min(1, "La description est requise"),
+  picture: z.string().min(1, "L'URL de l'image est requise"),
+  traq_type: z.string().min(1, "Le type est requis"),
+  price: z.coerce.number().min(0, "Le prix doit être positif"),
+  price_half: z.coerce.number().min(0, "Le demi-prix doit être positif"),
+  alcohol: z.coerce.number().min(0, "Le taux d'alcool doit être positif"),
+  limited: z.boolean().default(false),
+  out_of_stock: z.boolean().default(false),
+  disabled: z.boolean().default(false),
+});
+
+export type TraqArticleFormData = z.infer<typeof traqArticleSchema>;
+
+export const traqTypeSchema = z.object({
+  name: z.string().min(1, "Le nom du type est requis"),
+});
+
+export type TraqTypeFormData = z.infer<typeof traqTypeSchema>;

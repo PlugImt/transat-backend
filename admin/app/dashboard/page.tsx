@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Building, Calendar, Users } from "lucide-react";
+import { Building, Calendar, CircleAlert, Users } from "lucide-react";
 import UserGrowthChart from "@/components/UserGrowthChart";
 import { useDashboardStats } from "@/lib/hooks";
 import type { ApiError } from "@/lib/types";
@@ -46,7 +46,7 @@ export default function DashboardPage() {
     {
       title: "Non vérifiés",
       value: stats?.unverifiedUsers || 0,
-      icon: AlertCircle,
+      icon: CircleAlert,
       color: "text-red-600",
       bgColor: "bg-red-50",
     },
