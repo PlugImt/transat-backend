@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { authApi } from "@/lib/api";
@@ -60,7 +60,7 @@ export default function LoginPage() {
             {showVerifiedMessage && (
               <div className="rounded-md bg-green-50 p-4 border border-green-200">
                 <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <CircleCheck className="h-5 w-5 text-green-500" />
                   <div className="text-sm text-green-700">
                     Compte vérifié avec succès ! Vous pouvez maintenant vous connecter.
                   </div>

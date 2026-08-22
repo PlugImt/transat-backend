@@ -7,6 +7,8 @@ import type {
   Event,
   MenuItem,
   MenuItemReview,
+  TraqArticle,
+  TraqType,
   UpdateBassineScoreRequest,
   User,
 } from "./types";
@@ -16,6 +18,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
+
+function asArray<T>(data: T[] | null | undefined): T[] {
+  return data ?? [];
+}
 
 // Add auth token to requests
 api.interceptors.request.use((config) => {
@@ -44,7 +50,7 @@ export const authApi = {
 export const usersApi = {
   getAll: async (): Promise<User[]> => {
     const response = await api.get("/admin/users");
-    return response.data;
+    return asArray<User>(response.data);
   },
   create: async (user: Partial<User>) => {
     const filteredUser = Object.fromEntries(
@@ -81,8 +87,8 @@ export const usersApi = {
 export const eventsApi = {
   getAll: async (): Promise<Event[]> => {
     const response = await api.get("/admin/events");
-    return response.data.sort(
-      (a: Event, b: Event) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+    return asArray<Event>(response.data).sort(
+      (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
     );
   },
   create: async (event: Partial<Event>) => {
@@ -107,7 +113,7 @@ export const eventsApi = {
 export const clubsApi = {
   getAll: async (): Promise<Club[]> => {
     const response = await api.get("/admin/clubs");
-    return response.data;
+    return asArray<Club>(response.data);
   },
   getOwners: async (id: number): Promise<User[]> => {
     const response = await api.get(`/club/${id}`);
@@ -159,14 +165,14 @@ export const statsApi = {
 export const rolesApi = {
   getAll: async (): Promise<{ id_roles: number; name: string }[]> => {
     const response = await api.get("/admin/roles");
-    return response.data;
+    return asArray<{ id_roles: number; name: string }>(response.data);
   },
 };
 
 export const menuApi = {
   getAll: async (): Promise<MenuItem[]> => {
     const response = await api.get("/admin/menu");
-    return response.data;
+    return asArray<MenuItem>(response.data);
   },
   delete: async (id: number) => {
     const response = await api.delete(`/admin/menu/${id}`);
@@ -174,7 +180,7 @@ export const menuApi = {
   },
   getReviews: async (id: number): Promise<MenuItemReview[]> => {
     const response = await api.get(`/admin/menu/${id}/reviews`);
-    return response.data;
+    return asArray<MenuItemReview>(response.data);
   },
   deleteReview: async (id: number, email: string) => {
     const response = await api.delete(`/admin/menu/${id}/reviews/${encodeURIComponent(email)}`);
@@ -186,14 +192,14 @@ export const reviewsApi = {
   getAll: async (userEmail?: string): Promise<MenuItemReview[]> => {
     const params = userEmail ? `?user_email=${encodeURIComponent(userEmail)}` : "";
     const response = await api.get(`/admin/reviews${params}`);
-    return response.data;
+    return asArray<MenuItemReview>(response.data);
   },
 };
 
 export const bassineApi = {
   getScores: async (): Promise<BassineScore[]> => {
     const response = await api.get("/admin/bassine/scores");
-    return response.data;
+    return asArray<BassineScore>(response.data);
   },
   updateScore: async (request: UpdateBassineScoreRequest) => {
     const response = await api.post("/admin/bassine/update-score", request);
@@ -201,7 +207,7 @@ export const bassineApi = {
   },
   getHistory: async (email: string): Promise<BassineScoreHistory[]> => {
     const response = await api.get(`/admin/bassine/history/${encodeURIComponent(email)}`);
-    return response.data;
+    return asArray<BassineScoreHistory>(response.data);
   },
 };
 
@@ -270,10 +276,45 @@ export interface UpdateItemRequest {
   confirmation_message?: string | null;
 }
 
+export const traqApi = {
+  getAllArticles: async (): Promise<TraqArticle[]> => {
+    const response = await api.get("/traq/");
+    return asArray<TraqArticle>(response.data);
+  },
+  createArticle: async (article: Partial<TraqArticle>) => {
+    const response = await api.post("/traq/", article);
+    return response.data;
+  },
+  updateArticle: async (id: number, article: Partial<TraqArticle>) => {
+    const response = await api.patch(`/traq/${id}`, article);
+    return response.data;
+  },
+  deleteArticle: async (id: number) => {
+    const response = await api.delete(`/traq/${id}`);
+    return response.data;
+  },
+  getAllTypes: async (): Promise<TraqType[]> => {
+    const response = await api.get("/traq/types/");
+    return asArray<TraqType>(response.data);
+  },
+  createType: async (type: { name: string }) => {
+    const response = await api.post("/traq/types/", type);
+    return response.data;
+  },
+  updateType: async (id: number, type: { name: string }) => {
+    const response = await api.patch(`/traq/types/${id}`, type);
+    return response.data;
+  },
+  deleteType: async (id: number) => {
+    const response = await api.delete(`/traq/types/${id}`);
+    return response.data;
+  },
+};
+
 export const reservationApi = {
   getItemsForClub: async (clubId: number): Promise<ReservationItem[]> => {
     const response = await api.get(`/admin/clubs/${clubId}/reservation-items`);
-    return response.data;
+    return asArray<ReservationItem>(response.data);
   },
   updateItemMessages: async (
     itemId: number,
@@ -284,7 +325,7 @@ export const reservationApi = {
   },
   getTree: async (): Promise<ReservationTreeItem[]> => {
     const response = await api.get("/admin/reservations/tree");
-    return response.data;
+    return asArray<ReservationTreeItem>(response.data);
   },
   createCategory: async (category: CreateCategoryRequest) => {
     const response = await api.post("/reservation/category", category);

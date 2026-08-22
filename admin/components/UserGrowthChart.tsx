@@ -44,8 +44,8 @@ export default function UserGrowthChart({ data }: UserGrowthChartProps) {
         <XAxis dataKey="date" tickFormatter={formatDate} stroke="#6b7280" fontSize={12} />
         <YAxis stroke="#6b7280" fontSize={12} />
         <Tooltip
-          labelFormatter={formatTooltipDate}
-          formatter={(value: number, name: string) => [
+          labelFormatter={(label) => formatTooltipDate(String(label ?? ""))}
+          formatter={(value, name) => [
             value,
             name === "cumulativeCount" ? "Nombre de comptes" : "Compte créés quotidiennement",
           ]}

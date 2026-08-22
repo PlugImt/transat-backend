@@ -1,6 +1,5 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
 import {
   Calendar,
   ChefHat,
@@ -12,7 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import DataTable from "@/components/DataTable";
+import DataTable, { type DataTableColumnDef } from "@/components/DataTable";
 import { PageLoading } from "@/components/LoadingSpinner";
 import ReviewsModal from "@/components/ReviewsModal";
 import { useDeleteMenuItem, useMenuItems } from "@/lib/hooks";
@@ -52,7 +51,7 @@ export default function MenuManager() {
     setSelectedMenuItem(null);
   }, []);
 
-  const columns = useMemo<ColumnDef<MenuItem>[]>(
+  const columns = useMemo<DataTableColumnDef<MenuItem>[]>(
     () => [
       {
         accessorKey: "name",

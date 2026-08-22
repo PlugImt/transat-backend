@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Club, Event, User } from "../types";
+import type { Club, Event, TraqArticle, User } from "../types";
 
 interface AppState {
   // UI State
@@ -14,6 +14,8 @@ interface AppState {
   editingClub: Club | null;
   eventModalOpen: boolean;
   editingEvent: Event | null;
+  traqArticleModalOpen: boolean;
+  editingTraqArticle: TraqArticle | null;
 
   // Search & Filters
   globalSearch: string;
@@ -36,6 +38,8 @@ interface AppState {
   closeClubModal: () => void;
   openEventModal: (event?: Event) => void;
   closeEventModal: () => void;
+  openTraqArticleModal: (article?: TraqArticle) => void;
+  closeTraqArticleModal: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -51,6 +55,8 @@ export const useAppStore = create<AppState>((set) => ({
   editingClub: null,
   eventModalOpen: false,
   editingEvent: null,
+  traqArticleModalOpen: false,
+  editingTraqArticle: null,
 
   globalSearch: "",
   activeFilters: {},
@@ -123,6 +129,19 @@ export const useAppStore = create<AppState>((set) => ({
     set({ eventModalOpen: false });
     setTimeout(() => {
       set({ editingEvent: null });
+    }, 150);
+  },
+
+  openTraqArticleModal: (article) =>
+    set({
+      traqArticleModalOpen: true,
+      editingTraqArticle: article || null,
+    }),
+
+  closeTraqArticleModal: () => {
+    set({ traqArticleModalOpen: false });
+    setTimeout(() => {
+      set({ editingTraqArticle: null });
     }, 150);
   },
 }));
