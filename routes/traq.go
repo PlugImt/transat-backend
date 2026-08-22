@@ -28,6 +28,7 @@ func SetupTraqRoutes(router fiber.Router, db *sql.DB) {
 	traqTypesGroup.Delete("/:id", append(adminOnly, traqHandler.DeleteTraqType)...)
 
 	traqGroup.Get("/", traqHandler.GetAllTraqArticles)
+	traqGroup.Get("/available", traqHandler.GetAvailableTraqArticles)
 	traqGroup.Get("/:id", traqHandler.GetTraqArticle)
 	traqGroup.Post("/", append(adminOnly, traqHandler.CreateTraqArticle)...)
 	traqGroup.Patch("/:id", append(adminOnly, traqHandler.UpdateTraqArticle)...)

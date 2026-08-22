@@ -70,6 +70,29 @@ func scanTraqArticle(scanner interface{ Scan(dest ...any) error }) (models.TraqA
 	return article, nil
 }
 
+func (h *TraqHandler) listTraqArticles(query string, args ...any) ([]models.TraqArticle, error) {
+	rows, err := h.DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	articles := make([]models.TraqArticle, 0)
+	for rows.Next() {
+		article, err := scanTraqArticle(rows)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, "Failed to scan Traq article row")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			continue
+		}
+		articles = append(articles, article)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return articles, nil
+}
+
 func (h *TraqHandler) CreateTraqType(c *fiber.Ctx) error {
 	utils.LogHeader("🍺 Create Traq Type")
 	var traqType models.TraqType
@@ -352,9 +375,7 @@ func (h *TraqHandler) CreateTraqArticle(c *fiber.Ctx) error {
 func (h *TraqHandler) GetAllTraqArticles(c *fiber.Ctx) error {
 	utils.LogHeader("🍺 Get All Traq Articles")
 
-	query := traqArticleSelect + ` ORDER BY tt.name, t.name;`
-
-	rows, err := h.DB.Query(query)
+	articles, err := h.listTraqArticles(traqArticleSelect + ` ORDER BY tt.name, t.name;`)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to query Traq articles")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
@@ -363,25 +384,28 @@ func (h *TraqHandler) GetAllTraqArticles(c *fiber.Ctx) error {
 			"error": "Failed to retrieve Traq articles",
 		})
 	}
-	defer rows.Close()
-
-	articles := make([]models.TraqArticle, 0)
-	for rows.Next() {
-		article, err := scanTraqArticle(rows)
-		if err != nil {
-			utils.LogMessage(utils.LevelError, "Failed to scan Traq article row")
-			utils.LogLineKeyValue(utils.LevelError, "Error", err)
-			continue
-		}
-		articles = append(articles, article)
-	}
-
-	if err := rows.Err(); err != nil {
-		utils.LogMessage(utils.LevelError, "Error iterating Traq article rows")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-	}
 
 	utils.LogMessage(utils.LevelInfo, "Traq articles retrieved successfully")
+	utils.LogLineKeyValue(utils.LevelInfo, "Count", len(articles))
+	utils.LogFooter()
+
+	return c.JSON(articles)
+}
+
+func (h *TraqHandler) GetAvailableTraqArticles(c *fiber.Ctx) error {
+	utils.LogHeader("🍺 Get Available Traq Articles")
+
+	articles, err := h.listTraqArticles(traqArticleSelect + ` WHERE t.disabled = FALSE ORDER BY tt.name, t.name;`)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to query available Traq articles")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve Traq articles",
+		})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Available Traq articles retrieved successfully")
 	utils.LogLineKeyValue(utils.LevelInfo, "Count", len(articles))
 	utils.LogFooter()
 
@@ -448,7 +472,7 @@ func (h *TraqHandler) UpdateTraqArticle(c *fiber.Ctx) error {
 	}
 
 	var updateFields []string
-	var updateValues []interface{}
+	var updateValues []any
 	paramCount := 1
 
 	if req.Name != nil {
