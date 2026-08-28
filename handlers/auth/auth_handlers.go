@@ -149,7 +149,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			commitOrRollback(tx, err) // Rollback
 			tx, err = h.DB.Begin()
 			if err != nil {
-				fmt.Println("Failed to begin database transaction")
+				utils.LogMessage(utils.LevelError, "Failed to begin database transaction")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				utils.LogFooter()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database transaction error"})
 			}
 
 			alreadyExists = true
@@ -179,7 +182,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 				commitOrRollback(tx, err)
 				tx, err = h.DB.Begin()
 				if err != nil {
-					fmt.Println("Failed to begin database transaction")
+					utils.LogMessage(utils.LevelError, "Failed to begin database transaction")
+					utils.LogLineKeyValue(utils.LevelError, "Error", err)
+					utils.LogFooter()
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database transaction error"})
 				}
 			} else {
 				utils.LogMessage(utils.LevelError, "Failed to add initial role")
@@ -193,7 +199,15 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	// Generate and store verification code (within the same transaction)
-	code := utils.Generate2FACode(6) // Use helper
+	code, err := utils.Generate2FACode(6)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to generate verification code")
+		utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		commitOrRollback(tx, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong setting up verification"})
+	}
 	setVerificationCodeQuery := `
 		UPDATE newf
 		SET verification_code = $1, verification_code_expiration = NOW() + INTERVAL '10 minutes'
@@ -855,7 +869,14 @@ func (h *AuthHandler) RequestVerificationCode(c *fiber.Ctx) error {
 	// }
 
 	// Generate and update code
-	code := utils.Generate2FACode(6)
+	code, err := utils.Generate2FACode(6)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to generate verification code")
+		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate verification code"})
+	}
 	updateQuery := `
 		UPDATE newf
 		SET verification_code = $1,

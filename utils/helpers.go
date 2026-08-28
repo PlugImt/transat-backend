@@ -26,7 +26,7 @@ func CheckEmail(email string) (bool, error) {
 }
 
 // Generate2FACode generates a random numeric string of the specified length.
-func Generate2FACode(digits int) string {
+func Generate2FACode(digits int) (string, error) {
 	if digits <= 0 {
 		digits = 6
 	}
@@ -36,12 +36,12 @@ func Generate2FACode(digits int) string {
 
 	n, err := rand.Int(rand.Reader, max)
 	if err != nil {
-		return "000000"
+		return "", fmt.Errorf("failed to generate secure random code: %w", err)
 	}
 
 	// Formatage avec zéros en tête
 	format := "%0" + strconv.Itoa(digits) + "s"
-	return fmt.Sprintf(format, n.Text(10))
+	return fmt.Sprintf(format, n.Text(10)), nil
 }
 
 //// GenerateJWT creates a new JWT token for a user with their email and role.
