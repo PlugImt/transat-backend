@@ -7,16 +7,21 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/models"
 )
 
-type WashingMachineHandler struct{}
+type WashingMachineHandler struct {
+	client *http.Client
+}
 
 // NewWashingMachineHandler creates a new instance of WashingMachineHandler
 func NewWashingMachineHandler() *WashingMachineHandler {
-	return &WashingMachineHandler{}
+	return &WashingMachineHandler{
+		client: &http.Client{Timeout: 10 * time.Second},
+	}
 }
 
 // GetWashingMachines returns the status of all washing machines
@@ -36,8 +41,7 @@ func (h *WashingMachineHandler) GetWashingMachines() fiber.Handler {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 
 		// Send the request
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		resp, err := h.client.Do(req)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(models.WashingMachineResponse{
 				Success: false,
@@ -72,8 +76,6 @@ func (h *WashingMachineHandler) GetWashingMachines() fiber.Handler {
 
 		// Transform the data into the desired format
 		formattedData := transformMachineData(externalResponse.MachineInfoStatus.MachineList)
-
-		fmt.Println(formattedData)
 
 		// Return the formatted data
 		return c.JSON(models.WashingMachineResponse{

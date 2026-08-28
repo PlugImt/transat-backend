@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/plugimt/transat-backend/models" // Assuming models are correctly placed
 	"github.com/plugimt/transat-backend/utils"
@@ -22,6 +23,7 @@ import (
 type NotificationService struct {
 	db          *sql.DB
 	expoPushURL string
+	httpClient  *http.Client
 }
 
 // NewNotificationService creates a new NotificationService.
@@ -29,6 +31,7 @@ func NewNotificationService(db *sql.DB) *NotificationService {
 	return &NotificationService{
 		db:          db,
 		expoPushURL: "https://api.expo.dev/v2/push/send",
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -281,8 +284,7 @@ func (ns *NotificationService) SendPushNotification(payload models.NotificationP
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Accept-Encoding", "gzip, deflate")
 
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		resp, err := ns.httpClient.Do(req)
 		if err != nil {
 			log.Printf("Error sending push notification to Expo for token %s: %v", token, err)
 			failedTokens = append(failedTokens, token)
