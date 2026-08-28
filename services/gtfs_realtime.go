@@ -249,6 +249,9 @@ func predictConfiguredStop(
 
 		if rel == gtfsrt.TripUpdate_StopTimeUpdate_NO_DATA {
 			inheritedDelay = nil
+			if isConfigured {
+				sawConfigured = true
+			}
 			continue
 		}
 
