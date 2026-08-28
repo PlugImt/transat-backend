@@ -42,6 +42,8 @@ interface AppState {
   closeTraqArticleModal: () => void;
 }
 
+let closeTraqArticleTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const useAppStore = create<AppState>((set) => ({
   // Initial state
   sidebarOpen: false,
@@ -132,15 +134,24 @@ export const useAppStore = create<AppState>((set) => ({
     }, 150);
   },
 
-  openTraqArticleModal: (article) =>
+  openTraqArticleModal: (article) => {
+    if (closeTraqArticleTimer) {
+      clearTimeout(closeTraqArticleTimer);
+      closeTraqArticleTimer = null;
+    }
     set({
       traqArticleModalOpen: true,
       editingTraqArticle: article || null,
-    }),
+    });
+  },
 
   closeTraqArticleModal: () => {
     set({ traqArticleModalOpen: false });
-    setTimeout(() => {
+    if (closeTraqArticleTimer) {
+      clearTimeout(closeTraqArticleTimer);
+    }
+    closeTraqArticleTimer = setTimeout(() => {
+      closeTraqArticleTimer = null;
       set({ editingTraqArticle: null });
     }, 150);
   },
