@@ -537,7 +537,7 @@ func (h *TraqHandler) UpdateTraqArticle(c *fiber.Ctx) error {
 
 	result, err := h.DB.Exec(query, updateValues...)
 	if err != nil {
-		if isMissingTraqType(err) {
+		if req.TraqType != nil && isMissingTraqType(err) {
 			utils.LogMessage(utils.LevelWarn, "Failed to update article: TraqType not found")
 			utils.LogLineKeyValue(utils.LevelWarn, "Type Name", *req.TraqType)
 			utils.LogFooter()
