@@ -2,13 +2,7 @@
 
 import { MessageSquare, UtensilsCrossed } from "lucide-react";
 import { useState } from "react";
-import { MessageSquare, UtensilsCrossed } from "lucide-react";
-import { useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import MenuManager from "@/components/MenuManager";
-import ReviewsManager from "@/components/ReviewsManager";
-
-type MenuTab = "menu" | "reviews";
 import MenuManager from "@/components/MenuManager";
 import ReviewsManager from "@/components/ReviewsManager";
 
@@ -16,22 +10,7 @@ type MenuTab = "menu" | "reviews";
 
 function MenuPageContent() {
   const [activeTab, setActiveTab] = useState<MenuTab>("menu");
-  const [activeTab, setActiveTab] = useState<MenuTab>("menu");
 
-  const tabs = [
-    {
-      id: "menu" as MenuTab,
-      label: "Menu",
-      icon: UtensilsCrossed,
-      description: "Gestion des plats du restaurant universitaire",
-    },
-    {
-      id: "reviews" as MenuTab,
-      label: "Avis",
-      icon: MessageSquare,
-      description: "Gestion des avis laissés par les utilisateurs",
-    },
-  ];
   const tabs = [
     {
       id: "menu" as MenuTab,
@@ -53,11 +32,6 @@ function MenuPageContent() {
         <div className="flex items-center space-x-3">
           <UtensilsCrossed className="h-6 w-6 text-orange-600" />
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Restaurant</h1>
-  if (isLoading) {
-    return (
-      <div className="p-4 sm:p-6 pt-16 lg:pt-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Menu du RU</h1>
         </div>
       </div>
 
@@ -86,13 +60,6 @@ function MenuPageContent() {
               );
             })}
           </nav>
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="text-sm text-red-700">
-            {(error as ApiError)?.message || "Échec de la récupération du menu"}
-          </div>
         </div>
 
         {/* Tab Description */}
@@ -107,20 +74,6 @@ function MenuPageContent() {
       <div className="min-h-[400px]">
         {activeTab === "menu" && <MenuManager />}
         {activeTab === "reviews" && <ReviewsManager />}
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 sm:p-6 pt-16 lg:pt-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Menu du RU</h1>
-        <div className="flex items-center space-x-2 text-gray-600">
-          <UtensilsCrossed className="h-5 w-5" />
-          <span className="text-sm sm:text-base">
-            {menuItems.length} plat{menuItems.length > 1 ? "s" : ""}
-          </span>
-        </div>
       </div>
     </div>
   );

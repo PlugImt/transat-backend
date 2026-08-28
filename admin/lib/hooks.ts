@@ -20,26 +20,6 @@ import type {
   UpdateItemRequest,
   UpdateReservationItemMessagesRequest,
 } from "./api";
-import {
-  bassineApi,
-  clubsApi,
-  eventsApi,
-  menuApi,
-  reviewsApi,
-  rolesApi,
-  statsApi,
-  usersApi,
-} from "./api";
-import type {
-  Club,
-  CreateCategoryRequest,
-  CreateItemRequest,
-  ReservationItem,
-  ReservationTreeItem,
-  UpdateCategoryRequest,
-  UpdateItemRequest,
-  UpdateReservationItemMessagesRequest,
-} from "./api";
 import type { Club, Event, TraqArticle, User } from "./types";
 
 export * from "./hooks/useClickOutside";
