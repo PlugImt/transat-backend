@@ -9,7 +9,7 @@ import (
 
 // GeneralRateLimiter is a middleware that limits repeated requests to all API endpoints
 var GeneralRateLimiter = limiter.New(limiter.Config{
-	Max:        1000,            // 100 requests
+	Max:        1000,            // 1000 requests
 	Expiration: 1 * time.Minute, // per minute
 	KeyGenerator: func(c *fiber.Ctx) string {
 		// Use both IP and path to create more targeted rate limiting
@@ -26,7 +26,7 @@ var GeneralRateLimiter = limiter.New(limiter.Config{
 
 // AccountRateLimiter protects account-related endpoints
 var AccountRateLimiter = limiter.New(limiter.Config{
-	Max:        50,              // 5 requests
+	Max:        50,              // 50 requests
 	Expiration: 1 * time.Minute, // per minute
 	KeyGenerator: func(c *fiber.Ctx) string {
 		return c.IP() + "-account"
@@ -40,7 +40,7 @@ var AccountRateLimiter = limiter.New(limiter.Config{
 
 // AccessRateLimiter for public access points (even more strict)
 var AccessRateLimiter = limiter.New(limiter.Config{
-	Max:        100,             // 10 requests
+	Max:        100,             // 100 requests
 	Expiration: 5 * time.Minute, // per 5 minutes
 	KeyGenerator: func(c *fiber.Ctx) string {
 		return c.IP() + "-access"
