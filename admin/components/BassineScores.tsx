@@ -1,11 +1,10 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
 import { Award, Calendar, Edit, History, TrendingUp, User } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import BassineHistoryModal from "@/components/BassineHistoryModal";
 import BassineScoreModal from "@/components/BassineScoreModal";
-import DataTable from "@/components/DataTable";
+import DataTable, { type DataTableColumnDef } from "@/components/DataTable";
 import { PageLoading } from "@/components/LoadingSpinner";
 import { useBassineScores } from "@/lib/hooks";
 import type { ApiError, BassineScore } from "@/lib/types";
@@ -49,7 +48,7 @@ export default function BassineScores() {
     return { totalPlayers, totalGames, averageScore, topScore };
   }, [scores]);
 
-  const columns = useMemo<ColumnDef<BassineScore>[]>(
+  const columns = useMemo<DataTableColumnDef<BassineScore>[]>(
     () => [
       {
         accessorKey: "user_info",

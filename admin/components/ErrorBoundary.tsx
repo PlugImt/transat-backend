@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ChevronDown, ChevronRight, Copy, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, RefreshCw, TriangleAlert } from "lucide-react";
 import React from "react";
 
 interface Props {
@@ -97,7 +97,7 @@ URL: ${window.location.href}
     return (
       <div className={containerClass}>
         <div className="text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <TriangleAlert className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
             {isPageLevel ? "Erreur de chargement de la page" : "Une erreur est survenue"}
           </h3>

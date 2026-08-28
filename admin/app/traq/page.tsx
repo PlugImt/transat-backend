@@ -1,28 +1,38 @@
 "use client";
 
-import { MessageSquare, UtensilsCrossed } from "lucide-react";
-import { useState } from "react";
+import { Beer, Tags } from "lucide-react";
+import { useEffect, useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import MenuManager from "@/components/MenuManager";
-import ReviewsManager from "@/components/ReviewsManager";
+import TraqArticleModal from "@/components/TraqArticleModal";
+import TraqArticlesManager from "@/components/TraqArticlesManager";
+import TraqTypesManager from "@/components/TraqTypesManager";
+import { useAppStore } from "@/lib/stores/appStore";
 
-type MenuTab = "menu" | "reviews";
+type TraqTab = "articles" | "types";
 
-function MenuPageContent() {
-  const [activeTab, setActiveTab] = useState<MenuTab>("menu");
+function TraqPageContent() {
+  const [activeTab, setActiveTab] = useState<TraqTab>("articles");
+  const { traqArticleModalOpen, editingTraqArticle, closeTraqArticleModal } = useAppStore();
+
+  // Command palette can open the modal while Types is active — switch to Articles.
+  useEffect(() => {
+    if (traqArticleModalOpen) {
+      setActiveTab("articles");
+    }
+  }, [traqArticleModalOpen]);
 
   const tabs = [
     {
-      id: "menu" as MenuTab,
-      label: "Menu",
-      icon: UtensilsCrossed,
-      description: "Gestion des plats du restaurant universitaire",
+      id: "articles" as TraqTab,
+      label: "Articles",
+      icon: Beer,
+      description: "Gestion des boissons et articles Traq",
     },
     {
-      id: "reviews" as MenuTab,
-      label: "Avis",
-      icon: MessageSquare,
-      description: "Gestion des avis laissés par les utilisateurs",
+      id: "types" as TraqTab,
+      label: "Types",
+      icon: Tags,
+      description: "Catégories d'articles (bière, soft, etc.)",
     },
   ];
 
@@ -30,12 +40,11 @@ function MenuPageContent() {
     <div className="p-4 sm:p-6 pt-16 lg:pt-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
         <div className="flex items-center space-x-3">
-          <UtensilsCrossed className="h-6 w-6 text-orange-600" />
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Restaurant</h1>
+          <Beer className="h-6 w-6 text-amber-600" />
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Traq</h1>
         </div>
       </div>
 
-      {/* Tabs Navigation */}
       <div className="mb-6">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
@@ -50,7 +59,7 @@ function MenuPageContent() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                     isActive
-                      ? "border-orange-500 text-orange-600"
+                      ? "border-amber-500 text-amber-600"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
                 >
@@ -62,7 +71,6 @@ function MenuPageContent() {
           </nav>
         </div>
 
-        {/* Tab Description */}
         <div className="mt-4">
           <p className="text-sm text-gray-600">
             {tabs.find((tab) => tab.id === activeTab)?.description}
@@ -70,19 +78,24 @@ function MenuPageContent() {
         </div>
       </div>
 
-      {/* Tab Content */}
       <div className="min-h-[400px]">
-        {activeTab === "menu" && <MenuManager />}
-        {activeTab === "reviews" && <ReviewsManager />}
+        {activeTab === "articles" && <TraqArticlesManager />}
+        {activeTab === "types" && <TraqTypesManager />}
       </div>
+
+      <TraqArticleModal
+        isOpen={traqArticleModalOpen}
+        onClose={closeTraqArticleModal}
+        article={editingTraqArticle}
+      />
     </div>
   );
 }
 
-export default function MenuPage() {
+export default function TraqPage() {
   return (
     <ErrorBoundary>
-      <MenuPageContent />
+      <TraqPageContent />
     </ErrorBoundary>
   );
 }

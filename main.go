@@ -93,6 +93,13 @@ func main() {
 	}
 	weatherHandler := handlers.NewWeatherHandler(weatherService)
 
+	gtfsService := services.NewGTFSService(services.GTFSOptions{
+		URL:           cfg.GTFSURL,
+		RealtimeURL:   cfg.GTFSRealtimeURL,
+		Lines:         cfg.GTFSLines,
+		MaxDepartures: cfg.GTFSMaxDepartures,
+	})
+
 	r2Service, err := services.NewR2Service()
 	if err != nil {
 		log.Fatalf("💥 Failed to create R2 Service: %v", err)
@@ -169,6 +176,7 @@ func main() {
 	routes.SetupStatisticsRoutes(app, db, statisticsService)
 	routes.SetupWashingMachineRoutes(app)
 	routes.SetupWeatherRoutes(app, weatherHandler)
+	routes.SetupBusDepartureRoutes(app, gtfsService)
 	routes.SetupEventRoutes(app, eventHandler)
 	routes.SetupReservationRoutes(app, db, reservationDiscordService)
 	routes.SetupBassineRoutes(app, db)

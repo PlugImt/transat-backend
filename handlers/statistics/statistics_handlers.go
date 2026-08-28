@@ -92,9 +92,9 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 	}
 
 	unverifiedQuery := `
-		SELECT COUNT(DISTINCT nr.email) 
-		FROM newf_roles nr 
-		JOIN roles r ON nr.id_roles = r.id_roles 
+		SELECT COUNT(DISTINCT nr.email)
+		FROM newf_roles nr
+		JOIN roles r ON nr.id_roles = r.id_roles
 		WHERE r.name = 'VERIFYING'`
 	err = h.db.QueryRow(unverifiedQuery).Scan(&stats.UnverifiedUsers)
 	if err != nil {
@@ -124,12 +124,12 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 				interval '1 day'
 			)::date AS date
 		)
-		SELECT 
+		SELECT
 			d.date,
 			COUNT(n.*) as count,
 			SUM(COUNT(n.*)) OVER (ORDER BY d.date ASC) as cumulativeCount
 		FROM dates d
-		LEFT JOIN newf n 
+		LEFT JOIN newf n
 			ON DATE(n.creation_date) = d.date
 		GROUP BY d.date
 		ORDER BY d.date ASC;

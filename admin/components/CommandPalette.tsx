@@ -1,7 +1,7 @@
 "use client";
 
 import { Command } from "cmdk";
-import { BarChart3, Building, Calendar, LogOut, Plus, Search, Users } from "lucide-react";
+import { BarChart3, Beer, Building, Calendar, LogOut, Plus, Search, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useClubs, useEvents, useKeyboardShortcuts, useUsers } from "@/lib/hooks";
@@ -26,18 +26,19 @@ function CommandPalette() {
     openUserModal,
     openClubModal,
     openEventModal,
+    openTraqArticleModal,
   } = useAppStore();
   const { logout } = useAuthStore();
   const [search, setSearch] = useState("");
 
   // Fetch data for search
-  const { data: users = [] } = useUsers();
-  const { data: clubs = [] } = useClubs();
-  const { data: events = [] } = useEvents();
+  const { data: users } = useUsers();
+  const { data: clubs } = useClubs();
+  const { data: events } = useEvents();
 
   // Generate dynamic commands for users, clubs, and events
   const dynamicCommands = useMemo(() => {
-    const userCommands: CommandItem[] = users.map((user: User) => ({
+    const userCommands: CommandItem[] = (users ?? []).map((user: User) => ({
       id: `user-${user.email}`,
       label:
         `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email || "Utilisateur",
@@ -57,7 +58,7 @@ function CommandPalette() {
       ].filter(Boolean),
     }));
 
-    const clubCommands: CommandItem[] = clubs.map((club: Club, index: number) => ({
+    const clubCommands: CommandItem[] = (clubs ?? []).map((club: Club, index: number) => ({
       id: `club-${club.id_clubs || `unknown-${index}`}`,
       label: club.name || "Club sans nom",
       description: `Club • ${club.description || "Pas de description"}`,
@@ -75,7 +76,7 @@ function CommandPalette() {
       ].filter(Boolean),
     }));
 
-    const eventCommands: CommandItem[] = events.map((event: Event, index: number) => ({
+    const eventCommands: CommandItem[] = (events ?? []).map((event: Event, index: number) => ({
       id: `event-${event.id_events || `unknown-${index}`}`,
       label: event.name || "Événement sans titre",
       description: `Événement • ${
@@ -137,6 +138,14 @@ function CommandPalette() {
         action: () => router.push("/clubs"),
         keywords: ["clubs", "organisations"],
       },
+      {
+        id: "nav-traq",
+        label: "Traq",
+        description: "Gérer les articles Traq",
+        icon: Beer,
+        action: () => router.push("/traq"),
+        keywords: ["traq", "boissons", "bar", "biere", "articles"],
+      },
 
       // Actions
       {
@@ -173,6 +182,17 @@ function CommandPalette() {
         keywords: ["create", "creer", "nouveau", "new", "event", "evenement"],
       },
       {
+        id: "action-new-traq",
+        label: "Créer un article Traq",
+        description: "Ajouter un nouvel article Traq",
+        icon: Plus,
+        action: () => {
+          openTraqArticleModal();
+          router.push("/traq");
+        },
+        keywords: ["create", "creer", "nouveau", "new", "traq", "boisson", "article"],
+      },
+      {
         id: "system-logout",
         label: "Déconnexion",
         description: "Se déconnecter de l'administration",
@@ -184,7 +204,7 @@ function CommandPalette() {
         keywords: ["logout", "deconnexion", "disconnect", "exit", "sortir"],
       },
     ],
-    [router, logout, openUserModal, openClubModal, openEventModal],
+    [router, logout, openUserModal, openClubModal, openEventModal, openTraqArticleModal],
   );
 
   // Combine all commands

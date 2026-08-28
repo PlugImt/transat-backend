@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  Beer,
   Building,
   Calendar,
   CalendarCheck,
@@ -34,6 +35,7 @@ function Sidebar() {
       { href: "/clubs", label: "Clubs", icon: Building },
       { href: "/reservations", label: "Réservations", icon: CalendarCheck },
       { href: "/menu", label: "RU", icon: UtensilsCrossed },
+      { href: "/traq", label: "Traq", icon: Beer },
       { href: "/games", label: "Jeux", icon: Gamepad2 },
     ],
     [],
@@ -85,6 +87,8 @@ function Sidebar() {
             width={80}
             height={80}
             className="lg:w-[100px] lg:h-[100px]"
+            priority
+            loading="eager"
           />
           <h1 className="text-lg lg:text-xl font-bold">Transat Admin</h1>
         </div>
