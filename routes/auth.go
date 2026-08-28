@@ -20,9 +20,8 @@ func SetupAuthRoutes(router fiber.Router, db *sql.DB, jwtSecret []byte, notifSer
 	// Group routes for auth operations and apply multiple security layers
 	authGroup := router.Group("/auth")
 
-	// Apply account rate limiter to sensitive account endpoints
-	authGroup.Post("/register", middlewares.AccessRateLimiter, authHandler.Register)
-	authGroup.Post("/login", middlewares.AccessRateLimiter, authHandler.Login)
+	authGroup.Post("/register", middlewares.LoginRegisterLimiter, authHandler.Register)
+	authGroup.Post("/login", middlewares.LoginRegisterLimiter, authHandler.Login)
 	authGroup.Post("/verify-account", middlewares.AccessRateLimiter, authHandler.VerifyAccount)
 	
 	// Apply slightly less restrictive rate limiter to these endpoints
