@@ -104,7 +104,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 		contentType = "application/octet-stream"
 	}
 
-	publicURL, err := h.R2Service.UploadFile(finalFilename, file, contentType)
+	publicURL, err := h.R2Service.UploadFile(c.UserContext(), finalFilename, file, contentType)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to upload file to R2")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
@@ -130,7 +130,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 		utils.LogFooter()
 
 		// Try to delete the uploaded file from R2
-		if delErr := h.R2Service.DeleteFile(finalFilename); delErr != nil {
+		if delErr := h.R2Service.DeleteFile(c.UserContext(), finalFilename); delErr != nil {
 			utils.LogMessage(utils.LevelError, "Failed to delete file from R2 after DB error")
 			utils.LogLineKeyValue(utils.LevelError, "Error", delErr)
 		}
@@ -171,7 +171,7 @@ func (h *FileHandler) ServeFile(c *fiber.Ctx) error {
 	}()
 
 	// Get the file from R2
-	reader, err := h.R2Service.GetObject(filename)
+	reader, err := h.R2Service.GetObject(c.UserContext(), filename)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to get file from R2")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
@@ -295,7 +295,7 @@ func (h *FileHandler) DeleteFile(c *fiber.Ctx) error {
 	}
 
 	// Delete from R2 first
-	if err := h.R2Service.DeleteFile(storedPath); err != nil {
+	if err := h.R2Service.DeleteFile(c.UserContext(), storedPath); err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to delete file from R2")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()

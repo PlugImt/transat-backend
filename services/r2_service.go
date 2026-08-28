@@ -49,7 +49,7 @@ func NewR2Service() (*R2Service, error) {
 		return nil, fmt.Errorf("missing required R2 configuration: %v", missingVars)
 	}
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
+	cfg, err := config.LoadDefaultConfig(context.Background(),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyID, accessKeySecret, "")),
 		config.WithRegion("auto"),
 	)
@@ -72,7 +72,7 @@ func NewR2Service() (*R2Service, error) {
 	}, nil
 }
 
-func (s *R2Service) UploadFile(key string, reader io.Reader, contentType string) (string, error) {
+func (s *R2Service) UploadFile(ctx context.Context, key string, reader io.Reader, contentType string) (string, error) {
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucketName),
 		Key:         aws.String(key),
@@ -80,7 +80,7 @@ func (s *R2Service) UploadFile(key string, reader io.Reader, contentType string)
 		ContentType: aws.String(contentType),
 	}
 
-	_, err := s.client.PutObject(context.TODO(), input)
+	_, err := s.client.PutObject(ctx, input)
 	if err != nil {
 		return "", fmt.Errorf("failed to upload file: %w", err)
 	}
@@ -88,13 +88,13 @@ func (s *R2Service) UploadFile(key string, reader io.Reader, contentType string)
 	return s.GetPublicURL(key), nil
 }
 
-func (s *R2Service) DeleteFile(key string) error {
+func (s *R2Service) DeleteFile(ctx context.Context, key string) error {
 	input := &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(key),
 	}
 
-	_, err := s.client.DeleteObject(context.TODO(), input)
+	_, err := s.client.DeleteObject(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
@@ -107,7 +107,7 @@ func (s *R2Service) GetPublicURL(key string) string {
 	return fmt.Sprintf("%s/%s", publicURL, key)
 }
 
-func (s *R2Service) GetPresignedURL(key string, duration time.Duration) (string, error) {
+func (s *R2Service) GetPresignedURL(ctx context.Context, key string, duration time.Duration) (string, error) {
 	presignClient := s3.NewPresignClient(s.client)
 
 	input := &s3.GetObjectInput{
@@ -115,7 +115,7 @@ func (s *R2Service) GetPresignedURL(key string, duration time.Duration) (string,
 		Key:    aws.String(key),
 	}
 
-	request, err := presignClient.PresignGetObject(context.TODO(), input, s3.WithPresignExpires(duration))
+	request, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(duration))
 	if err != nil {
 		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
@@ -123,13 +123,13 @@ func (s *R2Service) GetPresignedURL(key string, duration time.Duration) (string,
 	return request.URL, nil
 }
 
-func (s *R2Service) GetObject(key string) (io.ReadCloser, error) {
+func (s *R2Service) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(key),
 	}
 
-	result, err := s.client.GetObject(context.TODO(), input)
+	result, err := s.client.GetObject(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object: %w", err)
 	}
