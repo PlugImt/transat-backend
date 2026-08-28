@@ -1,7 +1,7 @@
 "use client";
 
 import { Edit, Plus, Save, Tags, Trash2, X } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { PageLoading } from "@/components/LoadingSpinner";
 import {
@@ -21,6 +21,8 @@ export default function TraqTypesManager() {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+  const editingIdRef = useRef(editingId);
+  editingIdRef.current = editingId;
   const newNameId = useId();
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -53,7 +55,9 @@ export default function TraqTypesManager() {
 
     try {
       await updateMutation.mutateAsync({ id, data: { name } });
-      cancelEdit();
+      if (editingIdRef.current === id) {
+        cancelEdit();
+      }
       toast.success("Type mis à jour");
     } catch (err: unknown) {
       toast.error((err as ApiError)?.response?.data?.error || "Échec de la mise à jour");
