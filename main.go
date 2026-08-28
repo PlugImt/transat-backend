@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/plugimt/transat-backend/handlers/event"
@@ -24,7 +27,6 @@ import (
 	"github.com/plugimt/transat-backend/scheduler"
 	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
-	"github.com/robfig/cron/v3"
 )
 
 var db *sql.DB
@@ -111,13 +113,6 @@ func main() {
 
 	appScheduler := scheduler.NewScheduler(restHandler, db, notificationService)
 	appScheduler.StartAll()
-	defer appScheduler.StopAll()
-
-	// Cron Jobs - Requires access to handlers/services
-	c := cron.New()
-
-	c.Start()
-	defer c.Stop()
 
 	// ---- SECURITY MIDDLEWARES ----
 	// 1. Add security headers to all responses
@@ -187,6 +182,30 @@ func main() {
 	})
 
 	// Start Server
-	log.Printf("Server starting on port %s", cfg.Port)
-	log.Fatal(app.Listen(":" + cfg.Port))
+	go func() {
+		log.Printf("Server starting on port %s", cfg.Port)
+		if err := app.Listen(":" + cfg.Port); err != nil {
+			log.Printf("Server stopped: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutting down server...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
+		log.Printf("Error during Fiber shutdown: %v", err)
+	}
+
+	appScheduler.StopAll()
+
+	if err := db.Close(); err != nil {
+		log.Printf("Error closing database: %v", err)
+	}
+
+	log.Println("Server shutdown complete")
 }
