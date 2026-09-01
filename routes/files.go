@@ -26,11 +26,11 @@ func SetupFileRoutes(router fiber.Router, db *sql.DB, r2Service *services.R2Serv
 
 	// Authenticated routes for managing files
 	// Placed directly under /api, protected by JWT middleware
-	router.Post("/upload", middlewares.JWTMiddleware, fileHandler.UploadFile)
-	router.Get("/files", middlewares.JWTMiddleware, fileHandler.ListUserFiles)           // List user's own files
-	router.Delete("/files/:filename", middlewares.JWTMiddleware, fileHandler.DeleteFile) // Delete user's own file (by original name)
+	router.Post("/upload", middlewares.JWTMiddleware(db), fileHandler.UploadFile)
+	router.Get("/files", middlewares.JWTMiddleware(db), fileHandler.ListUserFiles)           // List user's own files
+	router.Delete("/files/:filename", middlewares.JWTMiddleware(db), fileHandler.DeleteFile) // Delete user's own file (by original name)
 
 	// Admin route (example - secure appropriately!)
 	// Requires admin check within handler or a specific admin middleware
-	router.Get("/all-files", middlewares.JWTMiddleware, fileHandler.ListAllFiles) // List all files on server
+	router.Get("/all-files", middlewares.JWTMiddleware(db), fileHandler.ListAllFiles) // List all files on server
 }

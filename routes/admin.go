@@ -13,7 +13,7 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminHandler := admin.NewAdminHandler(db)
 
 	adminGroup := router.Group("/admin",
-		middlewares.JWTMiddleware,
+		middlewares.JWTMiddleware(db),
 		utils.EnhanceSentryEventWithEmail,
 		middlewares.AdminAuthMiddleware(db),
 	)

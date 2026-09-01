@@ -14,7 +14,7 @@ func SetupTraqRoutes(router fiber.Router, db *sql.DB) {
 	traqGroup := router.Group("/traq")
 
 	adminOnly := []fiber.Handler{
-		middlewares.JWTMiddleware,
+		middlewares.JWTMiddleware(db),
 		utils.EnhanceSentryEventWithEmail,
 		middlewares.AdminAuthMiddleware(db),
 	}
