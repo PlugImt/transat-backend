@@ -467,7 +467,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Something went wrong during login"})
 	}
 
-	// Record last login timestamp
+	// Record last activity timestamp (best-effort, does not block login)
 	if _, err := h.DB.Exec(`UPDATE newf SET last_activity = NOW() WHERE email = $1`, storedNewf.Email); err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to update last_activity")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)

@@ -1,8 +1,10 @@
 package middlewares
 
 import (
+	"context"
 	"database/sql"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
@@ -10,6 +12,7 @@ import (
 )
 
 func JWTMiddleware(db *sql.DB) fiber.Handler {
+	sem := make(chan struct{}, 50)
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 
@@ -50,10 +53,20 @@ func JWTMiddleware(db *sql.DB) fiber.Handler {
 		utils.LogLineKeyValue(utils.LevelInfo, "Email", email)
 		utils.LogFooter()
 
-		// Update last_activity at most once per day to avoid a write on every request
-		go func() {
-			db.Exec(`UPDATE newf SET last_activity = NOW() WHERE email = $1 AND (last_activity IS NULL OR last_activity < NOW() - INTERVAL '1 day')`, email)
-		}()
+		// Update last_activity at most once per day; bounded to 50 concurrent writes.
+		select {
+		case sem <- struct{}{}:
+			go func() {
+				defer func() { <-sem }()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if _, err := db.ExecContext(ctx, `UPDATE newf SET last_activity = NOW() WHERE email = $1 AND (last_activity IS NULL OR last_activity < NOW() - INTERVAL '1 day')`, email); err != nil {
+					utils.LogMessage(utils.LevelError, "Failed to update last_activity")
+					utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				}
+			}()
+		default:
+		}
 
 		return c.Next()
 	}
