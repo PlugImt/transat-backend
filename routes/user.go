@@ -18,7 +18,7 @@ func SetupUserRoutes(router fiber.Router, db *sql.DB, notifService *services.Not
 
 	// Group routes that require JWT authentication
 	// Changed group name from "/newf" to "/user" for clarity
-	userGroup := router.Group("/newf", middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail)
+	userGroup := router.Group("/newf", middlewares.JWTMiddleware(db), utils.EnhanceSentryEventWithEmail)
 
 	// Profile routes
 	userGroup.Get("/me", userHandler.GetNewf)       // GET /api/user/me

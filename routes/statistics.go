@@ -23,6 +23,6 @@ func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *s
 	statsGroup.Get("/top-users", statsHandler.GetTopUserStatistics)
 	
 	// Admin endpoints
-	adminStatsGroup := router.Group("/statistics", middlewares.JWTMiddleware, middlewares.AdminAuthMiddleware(db))
+	adminStatsGroup := router.Group("/statistics", middlewares.JWTMiddleware(db), middlewares.AdminAuthMiddleware(db))
 	adminStatsGroup.Get("/dashboard", statsHandler.GetDashboardStatistics)
 }

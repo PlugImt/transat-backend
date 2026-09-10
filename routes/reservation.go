@@ -13,7 +13,7 @@ func SetupReservationRoutes(router fiber.Router, db *sql.DB, discordService *ser
 	// Initialize Reservation Handler
 	reservationHandler := reservation.NewReservationHandler(db, discordService)
 
-	reservationGroup := router.Group("/reservation", middlewares.JWTMiddleware)
+	reservationGroup := router.Group("/reservation", middlewares.JWTMiddleware(db))
 
 	// Root reservation routes
 	reservationGroup.Get("", reservationHandler.GetReservationItems)      // Returns root categories and items TODO: Add filders && add reservations overview

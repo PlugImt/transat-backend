@@ -13,7 +13,7 @@ func SetupBassineRoutes(router fiber.Router, db *sql.DB) {
 	// Initialize Reservation Handler
 	bassineHandler := bassine.NewBassineHandler(db)
 
-	bassineGroup := router.Group("/bassine", middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail)
+	bassineGroup := router.Group("/bassine", middlewares.JWTMiddleware(db), utils.EnhanceSentryEventWithEmail)
 
 	// Root reservation routes
 	bassineGroup.Patch("", bassineHandler.IncrementBassine)                // Increments or decrements the bassine count

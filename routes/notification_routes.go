@@ -15,7 +15,7 @@ func SetupNotificationRoutes(router fiber.Router, db *sql.DB, notificationServic
 	notificationGroup := router.Group("/notifications")
 
 	// Apply authentication middleware
-	notificationGroup.Use(middlewares.JWTMiddleware)
+	notificationGroup.Use(middlewares.JWTMiddleware(db))
 
 	// route 1: Send notification to a specific user by email
 	notificationGroup.Post("/send-to-user", func(c *fiber.Ctx) error {
