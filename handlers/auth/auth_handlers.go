@@ -558,9 +558,14 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 	}()
 
 	// Check code and expiration, and update role if valid
+	targetRole := "NEWF"
+	if utils.IsStaffEmail(strings.ToLower(req.Email)) {
+		targetRole = "STAFF"
+	}
+
 	query := `
 		UPDATE newf_roles
-		SET id_roles = (SELECT id_roles FROM roles WHERE name = 'NEWF')
+		SET id_roles = (SELECT id_roles FROM roles WHERE name = $3)
 		WHERE email = $1
 		  AND id_roles = (SELECT id_roles FROM roles WHERE name = 'VERIFYING')
 		  AND EXISTS (
@@ -571,7 +576,7 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 		  );
 	`
 	var result sql.Result
-	result, err = tx.Exec(query, strings.ToLower(req.Email), req.VerificationCode)
+	result, err = tx.Exec(query, strings.ToLower(req.Email), req.VerificationCode, targetRole)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to execute verification update")
 		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
