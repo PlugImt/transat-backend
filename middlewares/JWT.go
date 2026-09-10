@@ -11,8 +11,10 @@ import (
 	"github.com/plugimt/transat-backend/utils"
 )
 
+// sémaphore partagé
+var activitySem = make(chan struct{}, 50)
+
 func JWTMiddleware(db *sql.DB) fiber.Handler {
-	sem := make(chan struct{}, 50)
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 
@@ -55,9 +57,9 @@ func JWTMiddleware(db *sql.DB) fiber.Handler {
 
 		// Update last_activity at most once per day; bounded to 50 concurrent writes.
 		select {
-		case sem <- struct{}{}:
+		case activitySem <- struct{}{}:
 			go func() {
-				defer func() { <-sem }()
+				defer func() { <-activitySem }()
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				if _, err := db.ExecContext(ctx, `UPDATE newf SET last_activity = NOW() WHERE email = $1 AND (last_activity IS NULL OR last_activity < NOW() - INTERVAL '1 day')`, email); err != nil {
