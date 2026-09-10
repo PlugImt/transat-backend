@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"database/sql"
+
 	"github.com/plugimt/transat-backend/handlers/event" // Import the event handlers
 	"github.com/plugimt/transat-backend/middlewares"
 	"github.com/plugimt/transat-backend/utils"
@@ -8,9 +10,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func SetupEventRoutes(router fiber.Router, eventHandler *event.EventHandler) {
+func SetupEventRoutes(router fiber.Router, db *sql.DB, eventHandler *event.EventHandler) {
 
-	eventGroup := router.Group("/event", middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail)
+	eventGroup := router.Group("/event", middlewares.JWTMiddleware, middlewares.NewfAuthMiddleware(db), utils.EnhanceSentryEventWithEmail)
 
 	eventGroup.Get("", eventHandler.GetEvent)
 	eventGroup.Get("/", eventHandler.GetEvent)

@@ -8,21 +8,25 @@ import (
 	"math/big"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/plugimt/transat-backend/models" // Need this for GetVerificationCodeData
 )
 
-// CheckEmail validates if the email format is correct for imt-atlantique.net.
+// CheckEmail validates if the email format is correct for imt-atlantique.net or imt-atlantique.fr.
 func CheckEmail(email string) (bool, error) {
-	// Consider making the domain configurable
-	regex := `^[a-z0-9.\-]+@imt-atlantique\.net$`
+	regex := `^[a-z0-9.\-]+@imt-atlantique\.(net|fr)$`
 	matched, err := regexp.MatchString(regex, email)
 	if err != nil {
 		log.Printf("Error matching email regex: %v", err)
 		return false, fmt.Errorf("regex error: %w", err)
 	}
 	return matched, nil
+}
+
+func IsStaffEmail(email string) bool {
+	return strings.HasSuffix(email, "@imt-atlantique.fr")
 }
 
 // Generate2FACode generates a random numeric string of the specified length.
