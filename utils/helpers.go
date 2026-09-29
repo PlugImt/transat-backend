@@ -25,7 +25,7 @@ func CheckEmail(email string) (bool, error) {
 	return matched, nil
 }
 
-func IsStaffEmail(email string) bool {
+func IsAcademicEmail(email string) bool {
 	return strings.HasSuffix(email, "@imt-atlantique.fr")
 }
 

@@ -559,8 +559,8 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 
 	// Check code and expiration, and update role if valid
 	targetRole := "NEWF"
-	if utils.IsStaffEmail(strings.ToLower(req.Email)) {
-		targetRole = "STAFF"
+	if utils.IsAcademicEmail(strings.ToLower(req.Email)) {
+		targetRole = "ACADEMICS"
 	}
 
 	query := `

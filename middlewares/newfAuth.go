@@ -7,7 +7,7 @@ import (
 	"github.com/plugimt/transat-backend/utils"
 )
 
-// NewfAuthMiddleware rejects requests from users who don't have the NEWF or ADMIN role (aka les staff)
+// NewfAuthMiddleware rejects requests from users who don't have the NEWF or ADMIN role (aka les academics)
 // Must be used after JWTMiddleware.
 func NewfAuthMiddleware(db *sql.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -40,7 +40,7 @@ func NewfAuthMiddleware(db *sql.DB) fiber.Handler {
 		}
 
 		if !hasAccess {
-			utils.LogMessage(utils.LevelWarn, "Staff user attempted student-only access")
+			utils.LogMessage(utils.LevelWarn, "Academic user attempted student-only access")
 			utils.LogFooter()
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "This feature is only available to students"})
 		}
