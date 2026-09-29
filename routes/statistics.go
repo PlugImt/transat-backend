@@ -21,4 +21,6 @@ func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *s
 	statsGroup.Get("/global", statsHandler.GetGlobalStatistics)
 	statsGroup.Get("/top-users", statsHandler.GetTopUserStatistics)
 	statsGroup.Get("/dashboard", statsHandler.GetDashboardStatistics)
+	statsGroup.Get("/active-users", statsHandler.GetActiveUsersOverTime)
+	statsGroup.Get("/activity-heatmap", statsHandler.GetActivityHeatmap)
 }

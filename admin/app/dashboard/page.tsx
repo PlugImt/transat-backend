@@ -14,9 +14,16 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import ActiveUsersChart from "@/components/ActiveUsersChart";
+import ActivityHeatmapChart from "@/components/ActivityHeatmapChart";
 import UserGrowthChart from "@/components/UserGrowthChart";
-import { useDashboardStats, useEndpointApiStats, useGlobalApiStats } from "@/lib/hooks";
-import type { ApiError } from "@/lib/types";
+import {
+  useActiveUsersOverTime,
+  useActivityHeatmap,
+  useDashboardStats,
+  useEndpointApiStats,
+  useGlobalApiStats,
+} from "@/lib/hooks";
+import type { ActiveUsersPeriod, ActivityHeatmapRange, ApiError } from "@/lib/types";
 
 const RANGES = [
   { label: "7 j", days: 7 },
@@ -24,6 +31,21 @@ const RANGES = [
   { label: "90 j", days: 90 },
   { label: "Tout", days: 0 },
 ] as const;
+
+const ACTIVE_USERS_PERIODS: { label: string; value: ActiveUsersPeriod }[] = [
+  { label: "Jour", value: "day" },
+  { label: "Semaine", value: "week" },
+  { label: "Mois", value: "month" },
+  { label: "3 mois", value: "quarter" },
+  { label: "Année", value: "year" },
+];
+
+const HEATMAP_RANGES: { label: string; value: ActivityHeatmapRange }[] = [
+  { label: "Cette semaine", value: "week" },
+  { label: "Ce mois", value: "month" },
+  { label: "Cette année", value: "year" },
+  { label: "Tout", value: "all" },
+];
 
 const nf = new Intl.NumberFormat("fr-FR");
 const pf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
@@ -68,6 +90,10 @@ export default function DashboardPage() {
   const { data: apiGlobal } = useGlobalApiStats();
   const { data: endpoints } = useEndpointApiStats();
   const [rangeDays, setRangeDays] = useState<number>(30);
+  const [activeUsersPeriod, setActiveUsersPeriod] = useState<ActiveUsersPeriod>("day");
+  const [heatmapRange, setHeatmapRange] = useState<ActivityHeatmapRange>("month");
+  const { data: activeUsersOverTime } = useActiveUsersOverTime(activeUsersPeriod);
+  const { data: activityHeatmap } = useActivityHeatmap(heatmapRange);
 
   const growth = stats?.userGrowth;
 
@@ -314,14 +340,56 @@ export default function DashboardPage() {
               bgColor="bg-fuchsia-50"
             />
           </div>
-          {stats.dailyActiveUsers && stats.dailyActiveUsers.length > 0 && (
-            <div className="bg-white shadow rounded-lg p-6">
-              <h3 className="text-base font-medium text-gray-900 mb-4">
-                Utilisateurs actifs par jour (90 derniers jours)
-              </h3>
-              <div className="h-64">
-                <ActiveUsersChart data={stats.dailyActiveUsers} />
+          {activeUsersOverTime && activeUsersOverTime.length > 0 && (
+            <div className="bg-white shadow rounded-lg p-6 mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h3 className="text-base font-medium text-gray-900">Utilisateurs actifs</h3>
+                <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
+                  {ACTIVE_USERS_PERIODS.map((p) => (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setActiveUsersPeriod(p.value)}
+                      className={`px-3 py-1 text-sm ${
+                        activeUsersPeriod === p.value
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+              <div className="h-64">
+                <ActiveUsersChart data={activeUsersOverTime} period={activeUsersPeriod} />
+              </div>
+            </div>
+          )}
+          {activityHeatmap && activityHeatmap.length > 0 && (
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h3 className="text-base font-medium text-gray-900">
+                  Heures d&apos;activité par jour de la semaine
+                </h3>
+                <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
+                  {HEATMAP_RANGES.map((r) => (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => setHeatmapRange(r.value)}
+                      className={`px-3 py-1 text-sm ${
+                        heatmapRange === r.value
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ActivityHeatmapChart data={activityHeatmap} />
             </div>
           )}
         </section>

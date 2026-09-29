@@ -1,5 +1,9 @@
 import axios from "axios";
 import type {
+  ActiveUsersPeriod,
+  ActiveUsersPoint,
+  ActivityHeatmapRange,
+  ActivityHourPoint,
   BassineScore,
   BassineScoreHistory,
   Club,
@@ -169,6 +173,14 @@ export const statsApi = {
   getEndpoints: async (): Promise<EndpointApiStat[]> => {
     const response = await api.get("/statistics/endpoints");
     return asArray<EndpointApiStat>(response.data?.statistics);
+  },
+  getActiveUsers: async (period: ActiveUsersPeriod): Promise<ActiveUsersPoint[]> => {
+    const response = await api.get("/statistics/active-users", { params: { period } });
+    return asArray<ActiveUsersPoint>(response.data?.data);
+  },
+  getActivityHeatmap: async (range: ActivityHeatmapRange): Promise<ActivityHourPoint[]> => {
+    const response = await api.get("/statistics/activity-heatmap", { params: { range } });
+    return asArray<ActivityHourPoint>(response.data?.data);
   },
 };
 

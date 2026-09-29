@@ -58,6 +58,21 @@ export interface DashboardStats {
   dailyActiveUsers?: { date: string; count: number }[];
 }
 
+export type ActiveUsersPeriod = "day" | "week" | "month" | "quarter" | "year";
+
+export interface ActiveUsersPoint {
+  date: string;
+  count: number;
+}
+
+export type ActivityHeatmapRange = "week" | "month" | "year" | "all";
+
+export interface ActivityHourPoint {
+  dayOfWeek: number; // ISO day of week: 1 = lundi ... 7 = dimanche
+  hour: number; // 0-23
+  count: number;
+}
+
 export interface GlobalApiStats {
   total_request_count: number;
   global_avg_duration_ms: number;

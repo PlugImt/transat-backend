@@ -72,6 +72,64 @@ func (h *StatisticsHandler) GetGlobalStatistics(c *fiber.Ctx) error {
 	})
 }
 
+// GetActiveUsersOverTime returns the number of distinct active users bucketed by the
+// requested granularity (day, week, month, quarter, year) so the dashboard chart can
+// switch between views.
+func (h *StatisticsHandler) GetActiveUsersOverTime(c *fiber.Ctx) error {
+	utils.LogHeader("📊 Get Active Users Over Time")
+
+	period := c.Query("period", "day")
+
+	data, err := h.statisticsService.GetActiveUsersOverTime(period)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get active users over time")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid period, expected one of: day, week, month, quarter, year",
+		})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully retrieved active users over time")
+	utils.LogLineKeyValue(utils.LevelInfo, "Period", period)
+	utils.LogFooter()
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"period":  period,
+		"data":    data,
+	})
+}
+
+// GetActivityHeatmap returns the number of distinct active users for each day-of-week/hour
+// slot within the requested range (week, month, year, all), to visualize when users are
+// typically active during the week.
+func (h *StatisticsHandler) GetActivityHeatmap(c *fiber.Ctx) error {
+	utils.LogHeader("📊 Get Activity Heatmap")
+
+	rangeParam := c.Query("range", "all")
+
+	data, err := h.statisticsService.GetActivityHeatmap(rangeParam)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get activity heatmap")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid range, expected one of: week, month, year, all",
+		})
+	}
+
+	utils.LogMessage(utils.LevelInfo, "Successfully retrieved activity heatmap")
+	utils.LogLineKeyValue(utils.LevelInfo, "Range", rangeParam)
+	utils.LogFooter()
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"range":   rangeParam,
+		"data":    data,
+	})
+}
+
 func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 	utils.LogHeader("📊 Get Dashboard Statistics")
 

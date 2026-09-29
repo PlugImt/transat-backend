@@ -20,7 +20,14 @@ import {
   traqApi,
   usersApi,
 } from "./api";
-import type { Club, Event, TraqArticle, User } from "./types";
+import type {
+  ActiveUsersPeriod,
+  ActivityHeatmapRange,
+  Club,
+  Event,
+  TraqArticle,
+  User,
+} from "./types";
 
 export * from "./hooks/useClickOutside";
 // Export utility hooks
@@ -219,6 +226,22 @@ export const useEndpointApiStats = () => {
   return useQuery({
     queryKey: ["api-stats-endpoints"],
     queryFn: statsApi.getEndpoints,
+    refetchInterval: 60_000,
+  });
+};
+
+export const useActiveUsersOverTime = (period: ActiveUsersPeriod) => {
+  return useQuery({
+    queryKey: ["active-users-over-time", period],
+    queryFn: () => statsApi.getActiveUsers(period),
+    refetchInterval: 60_000,
+  });
+};
+
+export const useActivityHeatmap = (range: ActivityHeatmapRange) => {
+  return useQuery({
+    queryKey: ["activity-heatmap", range],
+    queryFn: () => statsApi.getActivityHeatmap(range),
     refetchInterval: 60_000,
   });
 };
