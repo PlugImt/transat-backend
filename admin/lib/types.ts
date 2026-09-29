@@ -54,6 +54,34 @@ export interface DashboardStats {
   totalEvents: number;
   totalClubs: number;
   userGrowth: { date: string; count: number; cumulativeCount: number }[];
+  activeUsers?: { dau: number; wau: number; mau: number; yau: number };
+  dailyActiveUsers?: { date: string; count: number }[];
+}
+
+export interface GlobalApiStats {
+  total_request_count: number;
+  global_avg_duration_ms: number;
+  global_min_duration_ms: number;
+  global_max_duration_ms: number;
+  global_success_rate_percent: number;
+  first_request: string;
+  last_request: string;
+  success_count: number;
+  error_count: number;
+}
+
+export interface EndpointApiStat {
+  endpoint: string;
+  method: string;
+  request_count: number;
+  avg_duration_ms: number;
+  min_duration_ms: number;
+  max_duration_ms: number;
+  success_rate_percent: number;
+  success_count: number;
+  error_count: number;
+  first_request: string;
+  last_request: string;
 }
 
 // Types pour la gestion des erreurs

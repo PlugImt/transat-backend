@@ -1,4 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  CreateCategoryRequest,
+  CreateItemRequest,
+  ReservationItem,
+  ReservationTreeItem,
+  UpdateCategoryRequest,
+  UpdateItemRequest,
+  UpdateReservationItemMessagesRequest,
+} from "./api";
 import {
   bassineApi,
   clubsApi,
@@ -10,15 +19,6 @@ import {
   statsApi,
   traqApi,
   usersApi,
-} from "./api";
-import type {
-  CreateCategoryRequest,
-  CreateItemRequest,
-  ReservationItem,
-  ReservationTreeItem,
-  UpdateCategoryRequest,
-  UpdateItemRequest,
-  UpdateReservationItemMessagesRequest,
 } from "./api";
 import type { Club, Event, TraqArticle, User } from "./types";
 
@@ -203,6 +203,23 @@ export const useDashboardStats = () => {
   return useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: statsApi.getDashboard,
+    refetchInterval: 60_000,
+  });
+};
+
+export const useGlobalApiStats = () => {
+  return useQuery({
+    queryKey: ["api-stats-global"],
+    queryFn: statsApi.getGlobal,
+    refetchInterval: 60_000,
+  });
+};
+
+export const useEndpointApiStats = () => {
+  return useQuery({
+    queryKey: ["api-stats-endpoints"],
+    queryFn: statsApi.getEndpoints,
+    refetchInterval: 60_000,
   });
 };
 

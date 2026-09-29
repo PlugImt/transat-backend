@@ -4,12 +4,7 @@ import { Edit, Plus, Save, Tags, Trash2, X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { PageLoading } from "@/components/LoadingSpinner";
-import {
-  useCreateTraqType,
-  useDeleteTraqType,
-  useTraqTypes,
-  useUpdateTraqType,
-} from "@/lib/hooks";
+import { useCreateTraqType, useDeleteTraqType, useTraqTypes, useUpdateTraqType } from "@/lib/hooks";
 import type { ApiError, TraqType } from "@/lib/types";
 
 export default function TraqTypesManager() {
@@ -72,9 +67,7 @@ export default function TraqTypesManager() {
       toast.success("Type supprimé");
     } catch (err: unknown) {
       const apiError = err as ApiError;
-      toast.error(
-        apiError?.response?.data?.error || "Échec de la suppression du type",
-      );
+      toast.error(apiError?.response?.data?.error || "Échec de la suppression du type");
     }
   };
 

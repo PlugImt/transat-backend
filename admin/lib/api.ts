@@ -4,7 +4,9 @@ import type {
   BassineScoreHistory,
   Club,
   DashboardStats,
+  EndpointApiStat,
   Event,
+  GlobalApiStats,
   MenuItem,
   MenuItemReview,
   TraqArticle,
@@ -159,6 +161,14 @@ export const statsApi = {
   getDashboard: async (): Promise<DashboardStats> => {
     const response = await api.get("/statistics/dashboard");
     return response.data;
+  },
+  getGlobal: async (): Promise<GlobalApiStats | null> => {
+    const response = await api.get("/statistics/global");
+    return response.data?.statistics ?? null;
+  },
+  getEndpoints: async (): Promise<EndpointApiStat[]> => {
+    const response = await api.get("/statistics/endpoints");
+    return asArray<EndpointApiStat>(response.data?.statistics);
   },
 };
 
@@ -316,10 +326,7 @@ export const reservationApi = {
     const response = await api.get(`/admin/clubs/${clubId}/reservation-items`);
     return asArray<ReservationItem>(response.data);
   },
-  updateItemMessages: async (
-    itemId: number,
-    messages: UpdateReservationItemMessagesRequest,
-  ) => {
+  updateItemMessages: async (itemId: number, messages: UpdateReservationItemMessagesRequest) => {
     const response = await api.patch(`/admin/reservation-items/${itemId}/messages`, messages);
     return response.data;
   },

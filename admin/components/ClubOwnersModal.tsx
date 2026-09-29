@@ -21,11 +21,7 @@ export default function ClubOwnersModal({
   const emailId = useId();
 
   const enabled = isOpen && !!clubId;
-  const {
-    data: owners = [],
-    isLoading,
-    refetch,
-  } = useClubOwners(clubId ?? 0, { enabled });
+  const { data: owners = [], isLoading, refetch } = useClubOwners(clubId ?? 0, { enabled });
 
   const addOwnerMutation = useAddClubOwner();
   const removeOwnerMutation = useRemoveClubOwner();
@@ -60,11 +56,7 @@ export default function ClubOwnersModal({
             <h2 className="text-xl font-bold text-gray-900">Responsables du club</h2>
             <p className="text-sm text-gray-500 mt-1">{clubName}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -93,8 +85,8 @@ export default function ClubOwnersModal({
               </button>
             </div>
             <p className="text-xs text-gray-500">
-              L&apos;utilisateur doit exister dans Transat. Il sera automatiquement ajouté
-              comme membre du club si nécessaire.
+              L&apos;utilisateur doit exister dans Transat. Il sera automatiquement ajouté comme
+              membre du club si nécessaire.
             </p>
           </form>
 
@@ -138,4 +130,3 @@ export default function ClubOwnersModal({
     </div>
   );
 }
-

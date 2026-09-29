@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  useCreateReservationItem,
-  useUpdateReservationItem,
-} from "@/lib/hooks";
+import { useEffect, useState } from "react";
 import type { ReservationItem, ReservationTreeItem } from "@/lib/api";
+import { useCreateReservationItem, useUpdateReservationItem } from "@/lib/hooks";
 import type { Club } from "@/lib/types";
 
 interface ItemModalProps {
@@ -112,9 +109,7 @@ export const ItemModal = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b">
-          <h2 className="text-2xl font-bold">
-            {item ? "Modifier l'élément" : "Nouvel élément"}
-          </h2>
+          <h2 className="text-2xl font-bold">{item ? "Modifier l'élément" : "Nouvel élément"}</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -139,9 +134,7 @@ export const ItemModal = ({
                 onChange={(e) => setSlot(e.target.checked)}
                 className="rounded"
               />
-              <span className="text-sm font-medium text-gray-700">
-                Réservation par créneau
-              </span>
+              <span className="text-sm font-medium text-gray-700">Réservation par créneau</span>
             </label>
           </div>
 
@@ -154,9 +147,7 @@ export const ItemModal = ({
                 <select
                   value={selectedCategoryId || ""}
                   onChange={(e) =>
-                    setSelectedCategoryId(
-                      e.target.value ? parseInt(e.target.value) : null,
-                    )
+                    setSelectedCategoryId(e.target.value ? parseInt(e.target.value) : null)
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
@@ -199,9 +190,7 @@ export const ItemModal = ({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -211,9 +200,7 @@ export const ItemModal = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Localisation
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Localisation</label>
             <input
               type="text"
               value={location}
