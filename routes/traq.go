@@ -11,7 +11,7 @@ import (
 
 func SetupTraqRoutes(router fiber.Router, db *sql.DB) {
 	traqHandler := traq.NewTraqHandler(db)
-	traqGroup := router.Group("/traq")
+	traqGroup := router.Group("/traq", middlewares.JWTMiddleware, middlewares.NewfAuthMiddleware(db))
 
 	adminOnly := []fiber.Handler{
 		middlewares.JWTMiddleware,

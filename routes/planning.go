@@ -12,7 +12,7 @@ import (
 func SetupPlanningRoutes(router fiber.Router, db *sql.DB) {
 	planningHandler := planning.NewPlanningHandler(db)
 
-	planningGroup := router.Group("/planning", middlewares.JWTMiddleware)
+	planningGroup := router.Group("/planning", middlewares.JWTMiddleware, middlewares.NewfAuthMiddleware(db))
 
 	// GET /planning/users - List users with only NewfID, FirstName, LastName, PassID
 	planningGroup.Get("/users", planningHandler.GetUsersWithPassID)
