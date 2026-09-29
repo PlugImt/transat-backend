@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CreateCategoryRequest,
   CreateItemRequest,
@@ -235,6 +235,7 @@ export const useActiveUsersOverTime = (period: ActiveUsersPeriod) => {
     queryKey: ["active-users-over-time", period],
     queryFn: () => statsApi.getActiveUsers(period),
     refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
   });
 };
 
@@ -243,6 +244,7 @@ export const useActivityHeatmap = (range: ActivityHeatmapRange) => {
     queryKey: ["activity-heatmap", range],
     queryFn: () => statsApi.getActivityHeatmap(range),
     refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
   });
 };
 

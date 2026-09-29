@@ -340,58 +340,64 @@ export default function DashboardPage() {
               bgColor="bg-fuchsia-50"
             />
           </div>
-          {activeUsersOverTime && activeUsersOverTime.length > 0 && (
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h3 className="text-base font-medium text-gray-900">Utilisateurs actifs</h3>
-                <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
-                  {ACTIVE_USERS_PERIODS.map((p) => (
-                    <button
-                      key={p.value}
-                      type="button"
-                      onClick={() => setActiveUsersPeriod(p.value)}
-                      className={`px-3 py-1 text-sm ${
-                        activeUsersPeriod === p.value
-                          ? "bg-blue-600 text-white"
-                          : "bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
+          <div className="bg-white shadow rounded-lg p-6 mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="text-base font-medium text-gray-900">Utilisateurs actifs</h3>
+              <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
+                {ACTIVE_USERS_PERIODS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setActiveUsersPeriod(p.value)}
+                    className={`px-3 py-1 text-sm ${
+                      activeUsersPeriod === p.value
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
               </div>
-              <div className="h-64">
+            </div>
+            <div className="h-64">
+              {activeUsersOverTime && activeUsersOverTime.length > 0 ? (
                 <ActiveUsersChart data={activeUsersOverTime} period={activeUsersPeriod} />
-              </div>
-            </div>
-          )}
-          {activityHeatmap && activityHeatmap.length > 0 && (
-            <div className="bg-white shadow rounded-lg p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h3 className="text-base font-medium text-gray-900">
-                  Heures d&apos;activité par jour de la semaine
-                </h3>
-                <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
-                  {HEATMAP_RANGES.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => setHeatmapRange(r.value)}
-                      className={`px-3 py-1 text-sm ${
-                        heatmapRange === r.value
-                          ? "bg-blue-600 text-white"
-                          : "bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                  Chargement…
                 </div>
-              </div>
-              <ActivityHeatmapChart data={activityHeatmap} />
+              )}
             </div>
-          )}
+          </div>
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="text-base font-medium text-gray-900">
+                Heures d&apos;activité par jour de la semaine
+              </h3>
+              <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
+                {HEATMAP_RANGES.map((r) => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() => setHeatmapRange(r.value)}
+                    className={`px-3 py-1 text-sm ${
+                      heatmapRange === r.value
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {activityHeatmap && activityHeatmap.length > 0 ? (
+              <ActivityHeatmapChart data={activityHeatmap} />
+            ) : (
+              <div className="text-sm text-gray-400">Chargement…</div>
+            )}
+          </div>
         </section>
       )}
 
