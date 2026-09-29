@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/services"
@@ -80,6 +81,13 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 		TotalEvents     int                      `json:"totalEvents"`
 		TotalClubs      int                      `json:"totalClubs"`
 		UserGrowth      []map[string]interface{} `json:"userGrowth"`
+		ActiveUsers     struct {
+			DAU int `json:"dau"`
+			WAU int `json:"wau"`
+			MAU int `json:"mau"`
+			YAU int `json:"yau"`
+		} `json:"activeUsers"`
+		DailyActiveUsers []map[string]interface{} `json:"dailyActiveUsers"`
 	}
 
 	var stats DashboardStats
@@ -149,6 +157,50 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 					"date":            date,
 					"count":           count,
 					"cumulativeCount": cumulativeCount,
+				})
+			}
+		}
+	}
+
+	// Utilisateurs actifs (fenêtres glissantes), basés sur les requêtes authentifiées
+	activeQuery := `
+		SELECT
+			COUNT(DISTINCT user_email) FILTER (WHERE request_received >= NOW() - INTERVAL '1 day'),
+			COUNT(DISTINCT user_email) FILTER (WHERE request_received >= NOW() - INTERVAL '7 days'),
+			COUNT(DISTINCT user_email) FILTER (WHERE request_received >= NOW() - INTERVAL '30 days'),
+			COUNT(DISTINCT user_email)
+		FROM request_statistics
+		WHERE user_email IS NOT NULL
+			AND request_received >= NOW() - INTERVAL '365 days'`
+	err = h.db.QueryRow(activeQuery).Scan(
+		&stats.ActiveUsers.DAU, &stats.ActiveUsers.WAU, &stats.ActiveUsers.MAU, &stats.ActiveUsers.YAU,
+	)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get active users counts")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+	}
+
+	// DAU par jour sur les 90 derniers jours (jours sans activité inclus)
+	dauQuery := `
+		SELECT d.date, COUNT(DISTINCT r.user_email)
+		FROM generate_series(CURRENT_DATE - INTERVAL '89 days', CURRENT_DATE, INTERVAL '1 day') AS d(date)
+		LEFT JOIN request_statistics r
+			ON DATE(r.request_received) = d.date::date AND r.user_email IS NOT NULL
+		GROUP BY d.date
+		ORDER BY d.date ASC`
+	dauRows, err := h.db.Query(dauQuery)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to get daily active users")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+	} else {
+		defer dauRows.Close()
+		for dauRows.Next() {
+			var date time.Time
+			var count int
+			if err := dauRows.Scan(&date, &count); err == nil {
+				stats.DailyActiveUsers = append(stats.DailyActiveUsers, map[string]interface{}{
+					"date":  date.Format("2006-01-02"),
+					"count": count,
 				})
 			}
 		}

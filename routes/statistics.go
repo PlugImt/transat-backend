@@ -14,15 +14,11 @@ func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *s
 	// Initialize Statistics Handler
 	statsHandler := statistics.NewStatisticsHandler(db, statisticsService)
 
-	// Create a statistics group (public for easier testing)
-	statsGroup := router.Group("/statistics")
+	// Toutes les routes de statistiques nécessitent un JWT admin
+	statsGroup := router.Group("/statistics", middlewares.JWTMiddleware, middlewares.AdminAuthMiddleware(db))
 
-	// Endpoints
 	statsGroup.Get("/endpoints", statsHandler.GetEndpointStatistics)
 	statsGroup.Get("/global", statsHandler.GetGlobalStatistics)
 	statsGroup.Get("/top-users", statsHandler.GetTopUserStatistics)
-	
-	// Admin endpoints
-	adminStatsGroup := router.Group("/statistics", middlewares.JWTMiddleware, middlewares.AdminAuthMiddleware(db))
-	adminStatsGroup.Get("/dashboard", statsHandler.GetDashboardStatistics)
+	statsGroup.Get("/dashboard", statsHandler.GetDashboardStatistics)
 }
