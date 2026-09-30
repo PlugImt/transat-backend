@@ -28,18 +28,7 @@ func GenerateJWT(email string, roles []string, fingerprint string) (string, erro
 		}
 	}
 
-	// Set expiration time - 24 hours by default
-	expirationHours := 2400000000000
-	expirationEnv := os.Getenv("JWT_EXPIRATION_HOURS")
-	if expirationEnv != "" {
-		if _, err := fmt.Sscanf(expirationEnv, "%d", &expirationHours); err != nil {
-			return "", fmt.Errorf("invalid JWT_EXPIRATION_HOURS: %v", err)
-		}
-	}
-
-	// Create expiration time using Paris timezone
 	now := Now()
-	expirationTime := AddInParis(now, time.Duration(expirationHours)*time.Hour)
 
 	// For backward compatibility, set Role to the first role if any exist
 	var primaryRole string
@@ -53,13 +42,12 @@ func GenerateJWT(email string, roles []string, fingerprint string) (string, erro
 		Role:        primaryRole, // Deprecated field for backward compatibility
 		Roles:       roles,       // New field with all roles
 		Fingerprint: fingerprint,
+		// No exp/nbf: a session ends only on account deletion or password change (checked by the middleware).
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    "transat-backend",
-			Subject:   email,
-			ID:        GenerateRandomString(16), // Unique JWT ID
+			IssuedAt: jwt.NewNumericDate(now),
+			Issuer:   "transat-backend",
+			Subject:  email,
+			ID:       GenerateRandomString(16), // Unique JWT ID
 		},
 	}
 
@@ -91,7 +79,7 @@ func ValidateJWT(tokenString string) (*jwt.Token, error) {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return jwtSecret, nil
-	})
+	}, jwt.WithLeeway(time.Minute)) // tolerate clock skew on legacy tokens that carry nbf
 
 	if err != nil {
 		return nil, err

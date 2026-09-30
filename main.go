@@ -45,6 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("💥 Error initializing database: %v", err)
 	}
+	middlewares.InitJWTMiddleware(db)
 
 	if err := i18n.Init(); err != nil {
 		log.Fatalf("Failed to initialize i18n: %v", err)

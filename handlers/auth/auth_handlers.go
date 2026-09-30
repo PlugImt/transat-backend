@@ -366,14 +366,15 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		if err == sql.ErrNoRows {
 			utils.LogMessage(utils.LevelWarn, "Login attempt failed: User not found")
 			utils.LogLineKeyValue(utils.LevelWarn, "Email", candidate.Email)
-		} else {
-			utils.LogMessage(utils.LevelError, "Failed to fetch user during login")
-			utils.LogLineKeyValue(utils.LevelError, "Email", candidate.Email)
-			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			utils.LogFooter()
+			// Return generic error for security
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 		}
+		utils.LogMessage(utils.LevelError, "Failed to fetch user during login")
+		utils.LogLineKeyValue(utils.LevelError, "Email", candidate.Email)
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
-		// Return generic error for security
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
 	}
 
 	// Now fetch all roles for this user
@@ -744,7 +745,7 @@ func (h *AuthHandler) VerifyAccount(c *fiber.Ctx) error {
 	}
 
 	var token string
-	token, err = utils.GenerateJWT(req.Email, userRoles, "") // Empty fingerprint for now
+	token, err = utils.GenerateJWT(strings.ToLower(req.Email), userRoles, "") // Empty fingerprint for now
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to generate JWT after verification")
 		utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
@@ -990,6 +991,7 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 	// Determine update logic based on provided fields (Verification Code vs Old Password)
 	var rowsAffected int64
 	var updateErr error
+	var freshToken string
 
 	if req.VerificationCode != "" {
 		// --- Change password using verification code (e.g., forgot password flow) ---
@@ -1037,14 +1039,16 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 		if err != nil {
 			if err == sql.ErrNoRows {
 				utils.LogMessage(utils.LevelWarn, "Password change failed: User not found")
-			} else {
-				utils.LogMessage(utils.LevelError, "Failed to fetch user for password change")
-				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				utils.LogLineKeyValue(utils.LevelWarn, "Email", req.Email)
+				utils.LogFooter()
+				// Return generic error for security if user not found
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 			}
-			utils.LogLineKeyValue(utils.LevelWarn, "Email", req.Email)
+			utils.LogMessage(utils.LevelError, "Failed to fetch user for password change")
+			utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			utils.LogLineKeyValue(utils.LevelError, "Email", req.Email)
 			utils.LogFooter()
-			// Return generic error for security if user not found
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
 		}
 
 		// 2. Compare old password
@@ -1081,6 +1085,9 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 			utils.LogFooter()
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update password"})
 		}
+
+		// The password change invalidates the caller's current token, so hand back a new one.
+		freshToken = h.issueTokenForUser(strings.ToLower(req.Email))
 
 	} else {
 		// --- Invalid request: Neither verification code nor old password provided ---
@@ -1143,5 +1150,48 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 		utils.LogMessage(utils.LevelWarn, "EmailService not initialized, skipping password change confirmation email.")
 	}
 
+	if freshToken != "" {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"token": freshToken})
+	}
 	return c.SendStatus(fiber.StatusOK)
+}
+
+// issueTokenForUser signs a new JWT with the user's current roles; returns "" on failure.
+func (h *AuthHandler) issueTokenForUser(email string) string {
+	rows, err := h.DB.Query(`
+		SELECT r.name
+		FROM newf_roles nr
+		JOIN roles r ON nr.id_roles = r.id_roles
+		WHERE nr.email = $1;
+	`, email)
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to fetch roles for fresh token")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		return ""
+	}
+	defer rows.Close()
+
+	var roles []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			continue
+		}
+		// Unverified accounts must go through /auth/verify-account, never get a token here.
+		if name == "VERIFYING" || name == "UNKNOWN" {
+			return ""
+		}
+		roles = append(roles, name)
+	}
+	if rows.Err() != nil || len(roles) == 0 {
+		return ""
+	}
+
+	token, err := utils.GenerateJWT(email, roles, "")
+	if err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to generate fresh token after password change")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+		return ""
+	}
+	return token
 }
