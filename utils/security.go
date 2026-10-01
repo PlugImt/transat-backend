@@ -28,7 +28,20 @@ func GenerateJWT(email string, roles []string, fingerprint string) (string, erro
 		}
 	}
 
+	// Default lifetime is 4 years; JWT_EXPIRATION_HOURS overrides it.
+	expirationHours := 4 * 365 * 24
+	if expirationEnv := os.Getenv("JWT_EXPIRATION_HOURS"); expirationEnv != "" {
+		if _, err := fmt.Sscanf(expirationEnv, "%d", &expirationHours); err != nil {
+			return "", fmt.Errorf("invalid JWT_EXPIRATION_HOURS: %v", err)
+		}
+		// Upper bound (100 years) keeps the time.Duration multiplication from overflowing.
+		if expirationHours <= 0 || expirationHours > 100*365*24 {
+			return "", fmt.Errorf("invalid JWT_EXPIRATION_HOURS: %d", expirationHours)
+		}
+	}
+
 	now := Now()
+	expirationTime := AddInParis(now, time.Duration(expirationHours)*time.Hour)
 
 	// For backward compatibility, set Role to the first role if any exist
 	var primaryRole string
@@ -42,12 +55,12 @@ func GenerateJWT(email string, roles []string, fingerprint string) (string, erro
 		Role:        primaryRole, // Deprecated field for backward compatibility
 		Roles:       roles,       // New field with all roles
 		Fingerprint: fingerprint,
-		// No exp/nbf: a session ends only on account deletion or password change (checked by the middleware).
 		RegisteredClaims: jwt.RegisteredClaims{
-			IssuedAt: jwt.NewNumericDate(now),
-			Issuer:   "transat-backend",
-			Subject:  email,
-			ID:       GenerateRandomString(16), // Unique JWT ID
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(now),
+			Issuer:    "transat-backend",
+			Subject:   email,
+			ID:        GenerateRandomString(16), // Unique JWT ID
 		},
 	}
 
