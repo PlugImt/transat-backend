@@ -265,7 +265,7 @@ func (r *MenuRepository) shouldSendMenuNotification(today string) (bool, error) 
 // sendMenuUpdateNotification sends a notification for menu updates and records it
 func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
 	// Get subscribers to RESTAURANT service with their language preferences
-	subscribers, err := r.NotifService.GetSubscribedUsersWithLanguage("RESTAURANT")
+	subscribers, err := r.NotifService.GetSubscribedUsersWithLanguage(models.NotificationRestaurant)
 	if err != nil {
 		return fmt.Errorf("failed to get restaurant subscribers: %w", err)
 	}
@@ -275,64 +275,10 @@ func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
 		return nil
 	}
 
-	// Group users by language
-	languageGroups := make(map[string][]models.NotificationTargetWithLanguage)
-	for _, sub := range subscribers {
-		if sub.NotificationToken != "" {
-			languageGroups[sub.LanguageCode] = append(languageGroups[sub.LanguageCode], sub)
-		}
-	}
-
-	if len(languageGroups) == 0 {
-		utils.LogMessage(utils.LevelInfo, "No valid notification tokens found")
-		return nil
-	}
-
-	totalSent := 0
-
-	// Send notifications to each language group
-	for langCode, users := range languageGroups {
-		localizer := appI18n.GetLocalizer(langCode)
-
-		title := localizer.MustLocalize(&i18n.LocalizeConfig{
-			MessageID: "restaurant_notification.title",
-			DefaultMessage: &i18n.Message{
-				ID:    "restaurant_notification.title",
-				Other: "🍽️ NEW MENU AVAILABLE!",
-			},
-		})
-
-		message := localizer.MustLocalize(&i18n.LocalizeConfig{
-			MessageID: "restaurant_notification.message",
-			DefaultMessage: &i18n.Message{
-				ID:    "restaurant_notification.message",
-				Other: "A delicious new menu awaits you at the cafeteria! Discover today's dishes and leave your reviews. Enjoy your meal!",
-			},
-		})
-
-		var tokens []string
-		for _, user := range users {
-			tokens = append(tokens, user.NotificationToken)
-		}
-
-		payload := models.NotificationPayload{
-			NotificationTokens: tokens,
-			Title:              title,
-			Message:            message,
-			Sound:              "default",
-			ChannelID:          "default",
-			Navigation:         models.RestaurantNavigation(),
-		}
-
-		err = r.NotifService.SendPushNotification(payload)
-		if err != nil {
-			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to send notification to %s users: %v", langCode, err))
-			continue
-		}
-
-		utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Sent menu notification to %d users in %s", len(tokens), langCode))
-		totalSent += len(tokens)
-	}
+	sent := r.NotifService.SendLocalized(subscribers, func(l *i18n.Localizer) (string, string) {
+		return appI18n.Localize(l, "restaurant_notification.title", "🍽️ NEW MENU AVAILABLE!", nil),
+			appI18n.Localize(l, "restaurant_notification.message", "A delicious new menu awaits you at the cafeteria! Discover today's dishes and leave your reviews. Enjoy your meal!", nil)
+	}, models.RestaurantNavigation())
 
 	_, err = r.DB.Exec(`
 		INSERT INTO restaurant_notifications (date, notification_sent) 
@@ -342,7 +288,7 @@ func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
 		return fmt.Errorf("failed to record notification: %w", err)
 	}
 
-	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Successfully sent menu notifications to %d users across %d languages", totalSent, len(languageGroups)))
+	utils.LogMessage(utils.LevelInfo, fmt.Sprintf("Sent menu notification to %d devices", sent))
 	return nil
 }
 

@@ -3,6 +3,7 @@
 import {
   BarChart3,
   Beer,
+  Bell,
   Building,
   Calendar,
   CalendarCheck,
@@ -37,6 +38,7 @@ function Sidebar() {
       { href: "/menu", label: "RU", icon: UtensilsCrossed },
       { href: "/traq", label: "Traq", icon: Beer },
       { href: "/games", label: "Jeux", icon: Gamepad2 },
+      { href: "/notifications", label: "Notifications", icon: Bell },
     ],
     [],
   );

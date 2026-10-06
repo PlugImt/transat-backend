@@ -88,18 +88,14 @@ func (n *NavigationTarget) normalized() *NavigationTarget {
 	return newNavigationTarget(n.Type, n.ID, n.Params)
 }
 
-// ExpoData builds the `data` object delivered with the push: custom Data plus the navigation context.
+// ExpoData builds the `data` object delivered with the push, or nil without navigation.
 // "screen" is kept only so apps predating the navigation context still open the right tab.
 func (p NotificationPayload) ExpoData() map[string]interface{} {
 	if p.Navigation == nil {
-		return p.Data
+		return nil
 	}
 
-	data := make(map[string]interface{}, len(p.Data)+2)
-	for k, v := range p.Data {
-		data[k] = v
-	}
-	data["navigation"] = p.Navigation.normalized()
+	data := map[string]interface{}{"navigation": p.Navigation.normalized()}
 	if rule, ok := navigationRules[p.Navigation.Type]; ok && rule.legacyScreen != "" {
 		data["screen"] = rule.legacyScreen
 	}

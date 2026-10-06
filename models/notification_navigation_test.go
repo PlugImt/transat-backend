@@ -29,32 +29,16 @@ func TestNavigationTargetValidate(t *testing.T) {
 	}
 }
 
-func TestExpoDataWithoutNavigationKeepsData(t *testing.T) {
-	p := NotificationPayload{Data: map[string]interface{}{"foo": "bar"}}
-	data := p.ExpoData()
-	if data["foo"] != "bar" || len(data) != 1 {
-		t.Fatalf("unexpected data: %v", data)
-	}
+func TestExpoDataWithoutNavigationIsNil(t *testing.T) {
 	if (NotificationPayload{}).ExpoData() != nil {
-		t.Fatal("expected nil data for empty payload")
+		t.Fatal("expected nil data for payload without navigation")
 	}
 }
 
 func TestExpoDataEmbedsNavigation(t *testing.T) {
-	p := NotificationPayload{
-		Data:       map[string]interface{}{"foo": "bar"},
-		Navigation: EventNavigation(42),
-	}
-
-	data := p.ExpoData()
-	if data["foo"] != "bar" {
-		t.Fatalf("custom data lost: %v", data)
-	}
+	data := NotificationPayload{Navigation: EventNavigation(42)}.ExpoData()
 	if data["screen"] != "Events" {
 		t.Fatalf("legacy screen = %v, want Events", data["screen"])
-	}
-	if _, mutated := p.Data["navigation"]; mutated {
-		t.Fatal("ExpoData must not mutate the payload Data map")
 	}
 
 	raw, err := json.Marshal(data["navigation"])

@@ -185,3 +185,38 @@ export interface TraqType {
   id_traq_types: number;
   name: string;
 }
+
+// Notifications
+export type NotificationAudience =
+  | { type: "all" }
+  | { type: "club"; clubId: number }
+  | { type: "campus"; campus: string }
+  | { type: "users"; emails: string[] };
+
+export type NotificationCategory =
+  | "RESTAURANT"
+  | "TRAQ"
+  | "EVENTS"
+  | "EVENT_REMINDERS"
+  | "RESERVATIONS";
+
+// Screen opened when the notification is tapped; types and ids match the backend NavigationTarget.
+export interface NotificationNavigation {
+  type: "event" | "club" | "restaurant" | "service";
+  id?: string;
+}
+
+export interface SendNotificationRequest {
+  title: string;
+  message: string;
+  audience: NotificationAudience;
+  service?: NotificationCategory;
+  navigation?: NotificationNavigation;
+  dryRun?: boolean;
+}
+
+export interface NotificationRecipients {
+  users: number;
+  devices: number;
+  sent: boolean;
+}

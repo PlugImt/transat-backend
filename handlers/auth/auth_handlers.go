@@ -17,20 +17,18 @@ import (
 type AuthHandler struct {
 	DB             *sql.DB
 	JwtSecret      []byte
-	NotifService   *services.NotificationService
 	EmailService   *services.EmailService
 	DiscordService *services.DiscordService
 }
 
 // NewAuthHandler creates a new AuthHandler.
-func NewAuthHandler(db *sql.DB, jwtSecret []byte, notifService *services.NotificationService, emailService *services.EmailService, discordService *services.DiscordService) *AuthHandler {
+func NewAuthHandler(db *sql.DB, jwtSecret []byte, emailService *services.EmailService, discordService *services.DiscordService) *AuthHandler {
 	if emailService == nil {
 		log.Println("Warning: EmailService is nil in NewAuthHandler")
 	}
 	return &AuthHandler{
 		DB:             db,
 		JwtSecret:      jwtSecret,
-		NotifService:   notifService, // Store the notification service if needed later
 		EmailService:   emailService,
 		DiscordService: discordService,
 	}

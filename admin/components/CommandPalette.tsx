@@ -1,7 +1,17 @@
 "use client";
 
 import { Command } from "cmdk";
-import { BarChart3, Beer, Building, Calendar, LogOut, Plus, Search, Users } from "lucide-react";
+import {
+  BarChart3,
+  Beer,
+  Bell,
+  Building,
+  Calendar,
+  LogOut,
+  Plus,
+  Search,
+  Users,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useClubs, useEvents, useKeyboardShortcuts, useUsers } from "@/lib/hooks";
@@ -145,6 +155,14 @@ function CommandPalette() {
         icon: Beer,
         action: () => router.push("/traq"),
         keywords: ["traq", "boissons", "bar", "biere", "articles"],
+      },
+      {
+        id: "nav-notifications",
+        label: "Notifications",
+        description: "Envoyer une notification personnalisée",
+        icon: Bell,
+        action: () => router.push("/notifications"),
+        keywords: ["notifications", "push", "envoyer", "message", "annonce"],
       },
 
       // Actions

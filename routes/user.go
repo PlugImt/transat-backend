@@ -25,16 +25,7 @@ func SetupUserRoutes(router fiber.Router, db *sql.DB, notifService *services.Not
 	userGroup.Patch("/me", userHandler.UpdateNewf)  // PATCH /api/user/me
 	userGroup.Delete("/me", userHandler.DeleteNewf) // DELETE /api/user/me (Use with caution!)
 
-	// Notification Preferences routes (within the authenticated user group)
-	// Combine add/remove into one endpoint toggling state
-	userGroup.Post("/notifications/subscriptions", userHandler.AddOrRemoveNotificationSubscription) // POST /api/user/notifications/subscriptions expects {"service": "..."}
-	// Endpoint to get subscription status (all or specific)
-	// Use GET with optional body
-	userGroup.Get("/notifications/subscriptions", userHandler.GetNotificationSubscriptions) // GET /api/user/notifications/subscriptions (body optional for specific check)
-
-	// Route to *trigger* sending a notification (might require admin)
-	// This was previously POST /newf/send-notification
-	// Kept under /user for now, but permissions must be checked in the handler.
-	// Consider moving to /admin or /notifications group later.
-	userGroup.Post("/send-notification", userHandler.SendNotification) // POST /api/user/send-notification (Requires Permissions!)
+	// Notification preferences: one idempotent read and write per category.
+	userGroup.Get("/notifications/preferences", userHandler.GetNotificationPreferences) // GET /api/newf/notifications/preferences
+	userGroup.Put("/notifications/preferences", userHandler.SetNotificationPreference)  // PUT /api/newf/notifications/preferences {"service","enabled"}
 }

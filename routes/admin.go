@@ -6,11 +6,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/handlers/admin"
 	"github.com/plugimt/transat-backend/middlewares"
+	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 )
 
-func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
-	adminHandler := admin.NewAdminHandler(db)
+func SetupAdminRoutes(router fiber.Router, db *sql.DB, notifications *services.NotificationService) {
+	adminHandler := admin.NewAdminHandler(db, notifications)
 
 	adminGroup := router.Group("/admin",
 		middlewares.JWTMiddleware,
@@ -24,6 +25,9 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB) {
 	adminGroup.Delete("/users/:email", adminHandler.DeleteUser)
 	adminGroup.Post("/users/:email/validate", adminHandler.ValidateUser)
 	adminGroup.Get("/roles", adminHandler.GetAllRoles)
+
+	// Custom push notifications
+	adminGroup.Post("/notifications/send", adminHandler.SendNotification)
 
 	adminGroup.Get("/events", adminHandler.GetAllEvents)
 	adminGroup.Post("/events", adminHandler.CreateEvent)

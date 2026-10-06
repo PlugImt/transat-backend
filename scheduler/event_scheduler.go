@@ -124,7 +124,7 @@ func (es *EventScheduler) checkAndSendEventNotifications() {
 // sendEventReminderNotification sends a reminder notification 1h before an event
 func (es *EventScheduler) sendEventReminderNotification(eventID int, eventName string, location string, clubID int) {
 	// Get users interested in the event or club with their language preferences
-	users, err := es.notificationService.GetUsersInterestedInEventOrClubWithLanguage(eventID, clubID)
+	users, err := es.notificationService.GetUsersInterestedInEventOrClubWithLanguage(eventID, clubID, models.NotificationEventReminders)
 	if err != nil {
 		log.Printf("Failed to get users interested in event %d: %v", eventID, err)
 		return
@@ -137,67 +137,13 @@ func (es *EventScheduler) sendEventReminderNotification(eventID int, eventName s
 		return
 	}
 
-	// Group users by language
-	languageGroups := make(map[string][]models.NotificationTargetWithLanguage)
-	for _, user := range users {
-		if user.NotificationToken != "" {
-			langCode := user.LanguageCode
-			if langCode == "" {
-				langCode = "fr" // Default to French
-			}
-			languageGroups[langCode] = append(languageGroups[langCode], user)
-		}
-	}
+	sent := es.notificationService.SendLocalized(users, func(l *i18n.Localizer) (string, string) {
+		data := map[string]interface{}{"EventName": eventName, "Location": location}
+		return appI18n.Localize(l, "event_notification.reminder_title", "Event in 1h", nil),
+			appI18n.Localize(l, "event_notification.reminder_message", "{{.EventName}} - {{.Location}}", data)
+	}, models.EventNavigation(eventID))
 
-	totalSent := 0
-	// Send notifications to each language group
-	for langCode, langUsers := range languageGroups {
-		localizer := appI18n.GetLocalizer(langCode)
-
-		title := localizer.MustLocalize(&i18n.LocalizeConfig{
-			MessageID: "event_notification.reminder_title",
-			DefaultMessage: &i18n.Message{
-				ID:    "event_notification.reminder_title",
-				Other: "Event in 1h",
-			},
-		})
-
-		message := localizer.MustLocalize(&i18n.LocalizeConfig{
-			MessageID: "event_notification.reminder_message",
-			TemplateData: map[string]interface{}{
-				"EventName": eventName,
-				"Location":  location,
-			},
-			DefaultMessage: &i18n.Message{
-				ID:    "event_notification.reminder_message",
-				Other: "{{.EventName}} - {{.Location}}",
-			},
-		})
-
-		var tokens []string
-		for _, user := range langUsers {
-			tokens = append(tokens, user.NotificationToken)
-		}
-
-		payload := models.NotificationPayload{
-			NotificationTokens: tokens,
-			Title:              title,
-			Message:            message,
-			Sound:              "default",
-			ChannelID:          "default",
-			Navigation:         models.EventNavigation(eventID),
-		}
-
-		if err := es.notificationService.SendPushNotification(payload); err != nil {
-			log.Printf("Failed to send 1h reminder notification to %s users for event %d: %v", langCode, eventID, err)
-			continue
-		}
-
-		log.Printf("Successfully sent 1h reminder notification for event %d to %d users in %s", eventID, len(tokens), langCode)
-		totalSent += len(tokens)
-	}
-
-	log.Printf("Successfully sent 1h reminder notification for event %d to %d users across %d languages", eventID, totalSent, len(languageGroups))
+	log.Printf("Sent 1h reminder for event %d to %d devices", eventID, sent)
 
 	// Mark notification as sent
 	es.markNotificationSent(eventID, "1h_before")

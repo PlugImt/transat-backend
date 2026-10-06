@@ -13,6 +13,8 @@ import type {
   GlobalApiStats,
   MenuItem,
   MenuItemReview,
+  NotificationRecipients,
+  SendNotificationRequest,
   TraqArticle,
   TraqType,
   UpdateBassineScoreRequest,
@@ -188,6 +190,13 @@ export const rolesApi = {
   getAll: async (): Promise<{ id_roles: number; name: string }[]> => {
     const response = await api.get("/admin/roles");
     return asArray<{ id_roles: number; name: string }>(response.data);
+  },
+};
+
+export const notificationsApi = {
+  send: async (request: SendNotificationRequest): Promise<NotificationRecipients> => {
+    const response = await api.post("/admin/notifications/send", request);
+    return response.data;
   },
 };
 

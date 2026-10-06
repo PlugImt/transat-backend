@@ -166,14 +166,13 @@ func main() {
 	})
 
 	// API Group --- NEW ROUTES
-	routes.SetupAuthRoutes(app, db, jwtSecret, notificationService, emailService, discordService)
+	routes.SetupAuthRoutes(app, db, jwtSecret, emailService, discordService)
 	routes.SetupUserRoutes(app, db, notificationService)
 	routes.SetupTraqRoutes(app, db)
 	routes.SetupFileRoutes(app, db, r2Service)
 	routes.SetupRestaurantRoutes(app, restHandler)
 	routes.SetupClubRoutes(app, db, clubsHandler)
 	routes.SetupPlanningRoutes(app, db)
-	routes.SetupNotificationRoutes(app, db, notificationService)
 	routes.SetupStatisticsRoutes(app, db, statisticsService)
 	routes.SetupWashingMachineRoutes(app)
 	routes.SetupWeatherRoutes(app, weatherHandler)
@@ -181,7 +180,7 @@ func main() {
 	routes.SetupEventRoutes(app, db, eventHandler)
 	routes.SetupReservationRoutes(app, db, reservationDiscordService)
 	routes.SetupBassineRoutes(app, db)
-	routes.SetupAdminRoutes(app, db)
+	routes.SetupAdminRoutes(app, db, notificationService)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")

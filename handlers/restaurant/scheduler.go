@@ -5,23 +5,19 @@ import (
 
 	"github.com/plugimt/transat-backend/handlers/restaurant/repository"
 	"github.com/plugimt/transat-backend/handlers/restaurant/service"
-	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 )
 
 type Scheduler struct {
 	MenuRepository          *repository.MenuRepository
 	MenuService             *service.MenuService
-	NotifService            *services.NotificationService
-	lastNotificationDate    string
 	menuSimilarityThreshold float64
 }
 
-func NewScheduler(menuRepo *repository.MenuRepository, menuService *service.MenuService, notifService *services.NotificationService) *Scheduler {
+func NewScheduler(menuRepo *repository.MenuRepository, menuService *service.MenuService) *Scheduler {
 	return &Scheduler{
 		MenuRepository:          menuRepo,
 		MenuService:             menuService,
-		NotifService:            notifService,
 		menuSimilarityThreshold: 0.7,
 	}
 }

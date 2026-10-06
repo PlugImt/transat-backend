@@ -13,6 +13,7 @@ import {
   clubsApi,
   eventsApi,
   menuApi,
+  notificationsApi,
   reservationApi,
   reviewsApi,
   rolesApi,
@@ -25,6 +26,9 @@ import type {
   ActivityHeatmapRange,
   Club,
   Event,
+  NotificationAudience,
+  NotificationCategory,
+  SendNotificationRequest,
   TraqArticle,
   User,
 } from "./types";
@@ -517,5 +521,30 @@ export const useDeleteTraqType = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["traq-types"] });
     },
+  });
+};
+
+// Notifications hooks
+export const useNotificationRecipients = (
+  audience: NotificationAudience | null,
+  service?: NotificationCategory,
+) => {
+  return useQuery({
+    queryKey: ["notification-recipients", audience, service],
+    queryFn: () =>
+      notificationsApi.send({
+        title: "preview",
+        message: "",
+        audience: audience as NotificationAudience,
+        service,
+        dryRun: true,
+      }),
+    enabled: audience !== null,
+  });
+};
+
+export const useSendNotification = () => {
+  return useMutation({
+    mutationFn: (request: SendNotificationRequest) => notificationsApi.send(request),
   });
 };

@@ -10,16 +10,18 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AdminHandler struct {
-	DB *sql.DB
+	DB            *sql.DB
+	Notifications *services.NotificationService
 }
 
-func NewAdminHandler(db *sql.DB) *AdminHandler {
-	return &AdminHandler{DB: db}
+func NewAdminHandler(db *sql.DB, notifications *services.NotificationService) *AdminHandler {
+	return &AdminHandler{DB: db, Notifications: notifications}
 }
 
 func (h *AdminHandler) GetAllUsers(c *fiber.Ctx) error {
