@@ -39,6 +39,7 @@ type NotificationPayload struct {
 	ChannelID          string                 `json:"channel_id,omitempty"`
 	Badge              int                    `json:"badge,omitempty"`
 	Data               map[string]interface{} `json:"data,omitempty"`
+	Navigation         *NavigationTarget      `json:"navigation,omitempty"`
 	Subtitle           string                 `json:"subtitle,omitempty"`
 	TTL                int                    `json:"ttl,omitempty"`
 	ImageURL           string                 `json:"imageUrl,omitempty"`

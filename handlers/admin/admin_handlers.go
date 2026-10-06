@@ -565,6 +565,19 @@ func (h *AdminHandler) GetAllEvents(c *fiber.Ctx) error {
 	return c.JSON(events)
 }
 
+// parseAdminEventDates reads the admin panel's dates as Paris time and returns them in UTC.
+func parseAdminEventDates(start, end string) (time.Time, time.Time, error) {
+	startDate, err := utils.ParseEventTime(start)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	endDate, err := utils.ParseEventTime(end)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	return startDate, endDate, nil
+}
+
 func (h *AdminHandler) CreateEvent(c *fiber.Ctx) error {
 	utils.LogHeader("🎉 Create Event (Admin)")
 
@@ -586,6 +599,13 @@ func (h *AdminHandler) CreateEvent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
 	}
 
+	startDate, endDate, err := parseAdminEventDates(req.StartDate, req.EndDate)
+	if err != nil {
+		utils.LogMessage(utils.LevelWarn, "Invalid event date")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid date format"})
+	}
+
 	insertQuery := `
 		INSERT INTO events (name, description, link, start_date, end_date, location, picture, creator, id_club)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -593,8 +613,8 @@ func (h *AdminHandler) CreateEvent(c *fiber.Ctx) error {
 	`
 
 	var eventID int
-	err := h.DB.QueryRow(insertQuery, req.Name, req.Description, req.Link,
-		req.StartDate, req.EndDate, req.Location, req.Picture, req.Creator, req.ClubID).Scan(&eventID)
+	err = h.DB.QueryRow(insertQuery, req.Name, req.Description, req.Link,
+		startDate, endDate, req.Location, req.Picture, req.Creator, req.ClubID).Scan(&eventID)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to create event")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
@@ -632,6 +652,13 @@ func (h *AdminHandler) UpdateEvent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
 	}
 
+	startDate, endDate, err := parseAdminEventDates(req.StartDate, req.EndDate)
+	if err != nil {
+		utils.LogMessage(utils.LevelWarn, "Invalid event date")
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid date format"})
+	}
+
 	updateQuery := `
 		UPDATE events 
 		SET name = $1, description = $2, link = $3, start_date = $4, end_date = $5, 
@@ -640,7 +667,7 @@ func (h *AdminHandler) UpdateEvent(c *fiber.Ctx) error {
 	`
 
 	result, err := h.DB.Exec(updateQuery, req.Name, req.Description, req.Link,
-		req.StartDate, req.EndDate, req.Location, req.Picture, req.Creator, req.ClubID, eventID)
+		startDate, endDate, req.Location, req.Picture, req.Creator, req.ClubID, eventID)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to update event")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)

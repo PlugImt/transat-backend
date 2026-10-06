@@ -68,6 +68,7 @@ export default function EventsPage() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString("fr-FR", {
+      timeZone: "Europe/Paris",
       year: "numeric",
       month: "short",
       day: "numeric",

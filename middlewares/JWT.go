@@ -32,18 +32,20 @@ func InitJWTMiddleware(db *sql.DB) {
 	sessionDB = db
 }
 
-// passwordChangedAt returns the Unix time (seconds) of the user's last password change.
-func passwordChangedAt(ctx context.Context, email string) (int64, error) {
+// passwordChangedAt returns the stored email and the Unix time (seconds) of the user's last password change.
+// Both the token's email and its lowercase form are tried so legacy mixed-case accounts still match.
+func passwordChangedAt(ctx context.Context, email, lowerEmail string) (string, int64, error) {
 	// The column is a timestamp without time zone written with NOW(), so cast using the session time zone.
-	const q = `SELECT FLOOR(EXTRACT(EPOCH FROM password_updated_date::timestamptz))::bigint FROM newf WHERE email = $1`
+	const q = `SELECT email, FLOOR(EXTRACT(EPOCH FROM password_updated_date::timestamptz))::bigint FROM newf WHERE email IN ($1, $2) ORDER BY (email = $1) DESC LIMIT 1`
+	var storedEmail string
 	var ts int64
-	if err := sessionDB.QueryRowContext(ctx, q, email).Scan(&ts); err != nil {
+	if err := sessionDB.QueryRowContext(ctx, q, email, lowerEmail).Scan(&storedEmail, &ts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, errUserNotFound
+			return "", 0, errUserNotFound
 		}
-		return 0, err
+		return "", 0, err
 	}
-	return ts, nil
+	return storedEmail, ts, nil
 }
 
 // JWTMiddleware rejects a token if it is invalid or expired, the account no longer exists,
@@ -79,18 +81,18 @@ func JWTMiddleware(c *fiber.Ctx) error {
 	}
 
 	rawEmail, _ := claims["email"].(string)
-	email := strings.ToLower(strings.TrimSpace(rawEmail))
+	tokenEmail := strings.TrimSpace(rawEmail)
 	iat, hasIat := claims["iat"].(float64)
-	if email == "" || !hasIat {
+	if tokenEmail == "" || !hasIat {
 		utils.LogMessage(utils.LevelError, "Token is missing email or iat")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid claims"})
 	}
 
-	changedAt, err := passwordChangedAt(c.UserContext(), email)
+	email, changedAt, err := passwordChangedAt(c.UserContext(), tokenEmail, strings.ToLower(tokenEmail))
 	if err != nil {
 		if errors.Is(err, errUserNotFound) {
 			utils.LogMessage(utils.LevelWarn, "Token for deleted account")
-			utils.LogLineKeyValue(utils.LevelWarn, "Email", email)
+			utils.LogLineKeyValue(utils.LevelWarn, "Email", tokenEmail)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": MsgAccountDeleted})
 		}
 		// Not a 401: a database hiccup must not log the user out.

@@ -321,9 +321,7 @@ func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
 			Message:            message,
 			Sound:              "default",
 			ChannelID:          "default",
-			Data: map[string]interface{}{
-				"screen": "Restaurant",
-			},
+			Navigation:         models.RestaurantNavigation(),
 		}
 
 		err = r.NotifService.SendPushNotification(payload)

@@ -252,8 +252,8 @@ func (ns *NotificationService) SendPushNotification(payload models.NotificationP
 		if payload.Badge != 0 {
 			expoPayload["badge"] = payload.Badge
 		}
-		if payload.Data != nil {
-			expoPayload["data"] = payload.Data
+		if data := payload.ExpoData(); len(data) > 0 {
+			expoPayload["data"] = data
 		}
 		if payload.Subtitle != "" {
 			expoPayload["subtitle"] = payload.Subtitle
@@ -355,6 +355,16 @@ func (ns *NotificationService) SendNotification(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Title is required",
 		})
+	}
+
+	if payload.Navigation != nil {
+		if err := payload.Navigation.Validate(); err != nil {
+			log.Println("║ 💥 Invalid navigation target: ", err)
+			log.Println("╚=========================================╝")
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
 	}
 
 	// Check if either tokens, emails, or groups are provided
@@ -644,9 +654,7 @@ func (ns *NotificationService) SendDailyMenuNotification() error {
 		Message:            randomMessage,
 		Sound:              "default",
 		ChannelID:          "default", // Ensure this channel exists on the client app
-		Data: map[string]interface{}{
-			"screen": "Restaurant",
-		},
+		Navigation:         models.RestaurantNavigation(),
 	}
 
 	utils.LogLineKeyValue(utils.LevelInfo, "Sending daily menu notification to", len(tokens))

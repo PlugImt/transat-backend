@@ -57,7 +57,8 @@ func (es *EventScheduler) run() {
 // checkAndSendEventNotifications checks for events starting in 1 hour and sends notifications
 func (es *EventScheduler) checkAndSendEventNotifications() {
 	// Get current time + 1 hour
-	oneHourFromNow := time.Now().Add(1 * time.Hour)
+	// start_date is stored as UTC, and Postgres ignores a parameter's offset, so pass UTC.
+	oneHourFromNow := time.Now().UTC().Add(1 * time.Hour)
 	// Use a 2-minute window to account for timing variations
 	windowStart := oneHourFromNow.Add(-1 * time.Minute)
 	windowEnd := oneHourFromNow.Add(1 * time.Minute)
@@ -184,10 +185,7 @@ func (es *EventScheduler) sendEventReminderNotification(eventID int, eventName s
 			Message:            message,
 			Sound:              "default",
 			ChannelID:          "default",
-			Data: map[string]interface{}{
-				"screen":  "Events",
-				"eventId": eventID,
-			},
+			Navigation:         models.EventNavigation(eventID),
 		}
 
 		if err := es.notificationService.SendPushNotification(payload); err != nil {

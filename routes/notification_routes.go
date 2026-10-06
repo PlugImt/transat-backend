@@ -20,10 +20,11 @@ func SetupNotificationRoutes(router fiber.Router, db *sql.DB, notificationServic
 	// route 1: Send notification to a specific user by email
 	notificationGroup.Post("/send-to-user", func(c *fiber.Ctx) error {
 		type SendToUserRequest struct {
-			Email   string                 `json:"email"`
-			Title   string                 `json:"title"`
-			Message string                 `json:"message"`
-			Data    map[string]interface{} `json:"data,omitempty"`
+			Email      string                   `json:"email"`
+			Title      string                   `json:"title"`
+			Message    string                   `json:"message"`
+			Data       map[string]interface{}   `json:"data,omitempty"`
+			Navigation *models.NavigationTarget `json:"navigation,omitempty"`
 		}
 
 		var req SendToUserRequest
@@ -39,12 +40,19 @@ func SetupNotificationRoutes(router fiber.Router, db *sql.DB, notificationServic
 			})
 		}
 
+		if req.Navigation != nil {
+			if err := req.Navigation.Validate(); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			}
+		}
+
 		// Create notification payload
 		payload := models.NotificationPayload{
 			UserEmails: []string{req.Email},
 			Title:      req.Title,
 			Message:    req.Message,
 			Data:       req.Data,
+			Navigation: req.Navigation,
 		}
 
 		// Send notification using existing service method
@@ -65,10 +73,11 @@ func SetupNotificationRoutes(router fiber.Router, db *sql.DB, notificationServic
 	// route 2: Send notification to a group of users by service name
 	notificationGroup.Post("/send-to-group", func(c *fiber.Ctx) error {
 		type SendToGroupRequest struct {
-			ServiceName string                 `json:"serviceName"`
-			Title       string                 `json:"title"`
-			Message     string                 `json:"message"`
-			Data        map[string]interface{} `json:"data,omitempty"`
+			ServiceName string                   `json:"serviceName"`
+			Title       string                   `json:"title"`
+			Message     string                   `json:"message"`
+			Data        map[string]interface{}   `json:"data,omitempty"`
+			Navigation  *models.NavigationTarget `json:"navigation,omitempty"`
 		}
 
 		var req SendToGroupRequest
@@ -82,6 +91,12 @@ func SetupNotificationRoutes(router fiber.Router, db *sql.DB, notificationServic
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Service name and title are required",
 			})
+		}
+
+		if req.Navigation != nil {
+			if err := req.Navigation.Validate(); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			}
 		}
 
 		// Get subscribers for the service
@@ -119,6 +134,7 @@ func SetupNotificationRoutes(router fiber.Router, db *sql.DB, notificationServic
 			Title:              req.Title,
 			Message:            req.Message,
 			Data:               req.Data,
+			Navigation:         req.Navigation,
 		}
 
 		err = notificationService.SendPushNotification(payload)

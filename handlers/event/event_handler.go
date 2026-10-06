@@ -729,6 +729,13 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 
 	// Create event
 	var eventID int
+	// Timestamps are stored as UTC; convert so a client-sent offset isn't silently dropped by Postgres.
+	startDateUTC := req.StartDate.UTC()
+	var endDateUTC *time.Time
+	if req.EndDate != nil {
+		t := req.EndDate.UTC()
+		endDateUTC = &t
+	}
 	insertEventQuery := `
 		INSERT INTO events (name, description, link, start_date, end_date, location, picture, creator, id_club)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -739,8 +746,8 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		req.Name,
 		req.Description,
 		req.Link,
-		req.StartDate,
-		req.EndDate,
+		startDateUTC,
+		endDateUTC,
 		req.Location,
 		req.Picture,
 		userEmail,
@@ -841,10 +848,7 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 				Message:            message,
 				Sound:              "default",
 				ChannelID:          "default",
-				Data: map[string]interface{}{
-					"screen":  "Events",
-					"eventId": eventID,
-				},
+				Navigation:         models.EventNavigation(eventID),
 			}
 
 			if err := h.notificationService.SendPushNotification(payload); err != nil {
@@ -878,6 +882,15 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 			"id_club":     req.ClubID,
 		},
 	})
+}
+
+// utcPtr converts a nullable time to UTC so Postgres doesn't drop its offset.
+func utcPtr(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	u := t.UTC()
+	return &u
 }
 
 // UpdateEvent updates event information (only creator can update)
@@ -938,8 +951,8 @@ func (h *EventHandler) UpdateEvent(c *fiber.Ctx) error {
 		{"name", "name", req.Name},
 		{"description", "description", req.Description},
 		{"link", "link", req.Link},
-		{"start_date", "start_date", req.StartDate},
-		{"end_date", "end_date", req.EndDate},
+		{"start_date", "start_date", utcPtr(req.StartDate)},
+		{"end_date", "end_date", utcPtr(req.EndDate)},
 		{"location", "location", req.Location},
 		{"picture", "picture", req.Picture},
 	}

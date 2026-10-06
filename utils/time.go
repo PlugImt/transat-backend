@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -40,6 +42,21 @@ func ParseTimeInParis(layout, value string, loc *time.Location) (time.Time, erro
 		return time.Time{}, err
 	}
 	return t.In(ParisLocation), nil
+}
+
+// ParseEventTime parses a client date and returns the instant in UTC (how timestamps are stored).
+// Values without a UTC offset are interpreted as Paris time.
+func ParseEventTime(value string) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	if t, err := time.Parse(time.RFC3339, value); err == nil {
+		return t.UTC(), nil
+	}
+	for _, layout := range []string{"2006-01-02T15:04:05", "2006-01-02T15:04", "2006-01-02 15:04:05", "2006-01-02 15:04"} {
+		if t, err := time.ParseInLocation(layout, value, ParisLocation); err == nil {
+			return t.UTC(), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("invalid date %q", value)
 }
 
 // ToParisTime converts any time to Paris timezone
