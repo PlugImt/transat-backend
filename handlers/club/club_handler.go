@@ -160,7 +160,8 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 			n.first_name,
 			n.last_name,
 			n.profile_picture,
-			n.graduation_year
+			n.graduation_year,
+			n.public_id::text
 		FROM newf_roles nr
 		JOIN roles r ON nr.id_roles = r.id_roles
 		JOIN newf n ON nr.email = n.email
@@ -187,7 +188,7 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 		}(respoRows)
 
 		for respoRows.Next() {
-			var respoEmail, respoFirstName, respoLastName string
+			var respoEmail, respoFirstName, respoLastName, respoPublicID string
 			var respoProfilePicture sql.NullString
 			var respoGraduationYear sql.NullInt64
 
@@ -197,6 +198,7 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 				&respoLastName,
 				&respoProfilePicture,
 				&respoGraduationYear,
+				&respoPublicID,
 			); err != nil {
 				utils.LogMessage(utils.LevelError, "Failed to scan responsible")
 				utils.LogLineKeyValue(utils.LevelError, "Error", err)
@@ -204,6 +206,7 @@ func (h *ClubHandler) GetClubByID(c *fiber.Ctx) error {
 			}
 
 			responsibles = append(responsibles, map[string]interface{}{
+				"public_id":       respoPublicID,
 				"email":           respoEmail,
 				"first_name":      respoFirstName,
 				"last_name":       respoLastName,
@@ -339,6 +342,7 @@ func (h *ClubHandler) GetClubMembers(c *fiber.Ctx) error {
     	n.last_name,
     	COALESCE(n.profile_picture, ''),
     	n.graduation_year,
+    	n.public_id::text,
     	EXISTS (
     	    SELECT 1
     	    FROM newf_roles nr
@@ -374,18 +378,19 @@ func (h *ClubHandler) GetClubMembers(c *fiber.Ctx) error {
 
 	var members []map[string]interface{}
 	for rows.Next() {
-		var email, firstName, lastName string
+		var email, firstName, lastName, publicID string
 		var profilePicture sql.NullString
 		var graduationYear sql.NullInt64
 		var isRespo bool
 
-		err := rows.Scan(&email, &firstName, &lastName, &profilePicture, &graduationYear, &isRespo)
+		err := rows.Scan(&email, &firstName, &lastName, &profilePicture, &graduationYear, &publicID, &isRespo)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, "Failed to scan member")
 			continue
 		}
 
 		member := map[string]interface{}{
+			"public_id":       publicID,
 			"email":           email,
 			"first_name":      firstName,
 			"last_name":       lastName,

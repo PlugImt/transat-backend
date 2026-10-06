@@ -75,20 +75,7 @@ func (h *BassineHandler) IncrementBassine(c *fiber.Ctx) error {
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch leaderboard"})
 	}
-	lb := make([]fiber.Map, 0, len(leaderboardUsers))
-	for _, u := range leaderboardUsers {
-		if u.ReservationUser == nil {
-			continue
-		}
-		lb = append(lb, fiber.Map{
-			"first_name":      u.ReservationUser.FirstName,
-			"last_name":       u.ReservationUser.LastName,
-			"email":           u.ReservationUser.Email,
-			"rank":            u.Rank,
-			"score":           u.BassineCount,
-			"profile_picture": u.ReservationUser.ProfilePicture,
-		})
-	}
+	lb := leaderboardPayload(leaderboardUsers)
 
 	// Merge overview with leaderboard in the response
 	resp := fiber.Map{
@@ -136,20 +123,7 @@ func (h *BassineHandler) GetMyBassine(c *fiber.Ctx) error {
 		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to retrieve leaderboard"})
 	}
-	lb := make([]fiber.Map, 0, len(leaderboardUsers))
-	for _, u := range leaderboardUsers {
-		if u.ReservationUser == nil {
-			continue
-		}
-		lb = append(lb, fiber.Map{
-			"first_name":      u.ReservationUser.FirstName,
-			"last_name":       u.ReservationUser.LastName,
-			"email":           u.ReservationUser.Email,
-			"rank":            u.Rank,
-			"score":           u.BassineCount,
-			"profile_picture": u.ReservationUser.ProfilePicture,
-		})
-	}
+	lb := leaderboardPayload(leaderboardUsers)
 
 	// Merge overview with leaderboard in the response
 	resp := fiber.Map{
@@ -231,4 +205,24 @@ func (h *BassineHandler) GetBassineHistory(c *fiber.Ctx) error {
 	utils.LogMessage(utils.LevelInfo, "Successfully retrieved bassine history")
 	utils.LogFooter()
 	return c.JSON(historyItem)
+}
+
+// leaderboardPayload lists the leaderboard entries with the fields the app displays.
+func leaderboardPayload(users []models.BassineUser) []fiber.Map {
+	entries := make([]fiber.Map, 0, len(users))
+	for _, u := range users {
+		if u.ReservationUser == nil {
+			continue
+		}
+		entries = append(entries, fiber.Map{
+			"public_id":       u.ReservationUser.PublicID,
+			"first_name":      u.ReservationUser.FirstName,
+			"last_name":       u.ReservationUser.LastName,
+			"email":           u.ReservationUser.Email,
+			"rank":            u.Rank,
+			"score":           u.BassineCount,
+			"profile_picture": u.ReservationUser.ProfilePicture,
+		})
+	}
+	return entries
 }

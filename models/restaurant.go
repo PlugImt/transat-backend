@@ -137,6 +137,7 @@ type CategorizedMenuResponse struct {
 
 // ReviewResponse represents a review with user details
 type ReviewResponse struct {
+	PublicID       string    `json:"public_id"`
 	FirstName      string    `json:"first_name"`
 	LastName       string    `json:"last_name"`
 	ProfilePicture string    `json:"profile_picture"`

@@ -181,6 +181,7 @@ func main() {
 	routes.SetupEventRoutes(app, db, eventHandler)
 	routes.SetupReservationRoutes(app, db, reservationDiscordService)
 	routes.SetupBassineRoutes(app, db)
+	routes.SetupProfileRoutes(app, db)
 	routes.SetupAdminRoutes(app, db, notificationService)
 
 	app.Get(middlewares.HealthPath, func(c *fiber.Ctx) error {

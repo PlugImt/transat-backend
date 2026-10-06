@@ -266,6 +266,7 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 		    n.first_name,
 		    n.last_name,
 		    COALESCE(n.profile_picture,''),
+		    n.public_id::text,
 		    re.warning_message,
 		    re.confirmation_message
 		FROM reservation_element re
@@ -306,10 +307,10 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 	for rows.Next() {
 		var item models.ReservationItem
 
-		var email, firstName, lastName, profilePicture sql.NullString
+		var email, firstName, lastName, profilePicture, publicID sql.NullString
 		var warningMessage, confirmationMessage sql.NullString
 
-		if err := rows.Scan(&item.ID, &item.Name, &item.Slot, &email, &firstName, &lastName, &profilePicture, &warningMessage, &confirmationMessage); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Slot, &email, &firstName, &lastName, &profilePicture, &publicID, &warningMessage, &confirmationMessage); err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan item: %v", err))
 			return nil, err
 		}
@@ -320,6 +321,7 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 				FirstName:      firstName.String,
 				LastName:       lastName.String,
 				ProfilePicture: profilePicture.String,
+				PublicID:       publicID.String,
 			}
 		} else {
 			item.User = nil
@@ -385,7 +387,8 @@ func (r *ReservationRepository) GetItemDetails(itemID int, date time.Time) (mode
 		       n.email,
 		       n.first_name,
 		       n.last_name,
-		       COALESCE(n.profile_picture, '')
+		       COALESCE(n.profile_picture, ''),
+		       n.public_id::text
 		FROM reservation r
 		         JOIN newf n ON r.email = n.email
 		         JOIN reservation_element re on r.id_reservation_element = re.id_reservation_element
@@ -414,7 +417,7 @@ func (r *ReservationRepository) GetItemDetails(itemID int, date time.Time) (mode
 		var item models.ReservationSlotDetail
 		var user models.ReservationUser
 		// Note: res.Name and res.Slot are already set from the first query, so we can ignore them here
-		if err := rows.Scan(&item.ID, &item.StartDate, &item.EndDate, &user.Email, &user.FirstName, &user.LastName, &user.ProfilePicture); err != nil {
+		if err := rows.Scan(&item.ID, &item.StartDate, &item.EndDate, &user.Email, &user.FirstName, &user.LastName, &user.ProfilePicture, &user.PublicID); err != nil {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to scan item details: %v", err))
 			return res, err
 		}
@@ -830,7 +833,8 @@ func (r *ReservationRepository) SearchItemsAndCategories(search string) ([]model
             n.email,
             n.first_name,
             n.last_name,
-            COALESCE(n.profile_picture,'')
+            COALESCE(n.profile_picture,''),
+            n.public_id::text
         FROM reservation_element re
         LEFT JOIN reservation r ON r.id_reservation_element = re.id_reservation_element AND re.slot = FALSE AND r.end_date IS NULL
         LEFT JOIN newf n ON n.email = r.email
@@ -845,8 +849,8 @@ func (r *ReservationRepository) SearchItemsAndCategories(search string) ([]model
 	var items []models.ReservationItem
 	for itemRows.Next() {
 		var it models.ReservationItem
-		var email, firstName, lastName, profilePicture sql.NullString
-		if err := itemRows.Scan(&it.ID, &it.Name, &it.Slot, &email, &firstName, &lastName, &profilePicture); err != nil {
+		var email, firstName, lastName, profilePicture, publicID sql.NullString
+		if err := itemRows.Scan(&it.ID, &it.Name, &it.Slot, &email, &firstName, &lastName, &profilePicture, &publicID); err != nil {
 			_ = itemRows.Close()
 			return nil, nil, err
 		}
@@ -856,6 +860,7 @@ func (r *ReservationRepository) SearchItemsAndCategories(search string) ([]model
 				FirstName:      firstName.String,
 				LastName:       lastName.String,
 				ProfilePicture: profilePicture.String,
+				PublicID:       publicID.String,
 			}
 		}
 		items = append(items, it)

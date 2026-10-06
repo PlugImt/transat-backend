@@ -442,13 +442,14 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 			n.first_name,
 			n.last_name,
 			COALESCE(n.profile_picture,''),
-			n.graduation_year
+			n.graduation_year,
+			n.public_id::text
 		FROM newf n
 		WHERE n.email = $1
 	`
 
 	var creator map[string]interface{}
-	var creatorEmail, creatorFirstName, creatorLastName string
+	var creatorEmail, creatorFirstName, creatorLastName, creatorPublicID string
 	var creatorProfilePicture sql.NullString
 	var creatorGraduationYear sql.NullInt64
 
@@ -458,10 +459,12 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 		&creatorLastName,
 		&creatorProfilePicture,
 		&creatorGraduationYear,
+		&creatorPublicID,
 	)
 
 	if err == nil {
 		creator = map[string]interface{}{
+			"public_id":       creatorPublicID,
 			"email":           creatorEmail,
 			"first_name":      creatorFirstName,
 			"last_name":       creatorLastName,
@@ -512,7 +515,8 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 			n.first_name,
 			n.last_name,
 			COALESCE(n.profile_picture,''),
-			n.graduation_year
+			n.graduation_year,
+						n.public_id::text
 		FROM events_attendents ea
 		JOIN newf n ON ea.email = n.email
 		WHERE ea.id_events = $1
@@ -539,12 +543,13 @@ func (h *EventHandler) GetEventByID(c *fiber.Ctx) error {
 	var attendees []map[string]interface{}
 	if rows != nil {
 		for rows.Next() {
-			var email, firstName, lastName string
+			var email, firstName, lastName, publicID string
 			var profilePicture sql.NullString
 			var graduationYear sql.NullInt64
 
-			if err := rows.Scan(&email, &firstName, &lastName, &profilePicture, &graduationYear); err == nil {
+			if err := rows.Scan(&email, &firstName, &lastName, &profilePicture, &graduationYear, &publicID); err == nil {
 				attendee := map[string]interface{}{
+					"public_id":       publicID,
 					"email":           email,
 					"first_name":      firstName,
 					"last_name":       lastName,
@@ -617,7 +622,8 @@ func (h *EventHandler) GetEventMembers(c *fiber.Ctx) error {
 			n.first_name,
 			n.last_name,
 			COALESCE(n.profile_picture,''),
-			n.graduation_year
+			n.graduation_year,
+						n.public_id::text
 		FROM events_attendents ea
 		JOIN newf n ON ea.email = n.email
 		WHERE ea.id_events = $1
@@ -645,17 +651,18 @@ func (h *EventHandler) GetEventMembers(c *fiber.Ctx) error {
 
 	var members []map[string]interface{}
 	for rows.Next() {
-		var email, firstName, lastName string
+		var email, firstName, lastName, publicID string
 		var profilePicture sql.NullString
 		var graduationYear sql.NullInt64
 
-		err := rows.Scan(&email, &firstName, &lastName, &profilePicture, &graduationYear)
+		err := rows.Scan(&email, &firstName, &lastName, &profilePicture, &graduationYear, &publicID)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, "Failed to scan member")
 			continue
 		}
 
 		member := map[string]interface{}{
+			"public_id":       publicID,
 			"email":           email,
 			"first_name":      firstName,
 			"last_name":       lastName,

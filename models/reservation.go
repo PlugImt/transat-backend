@@ -4,6 +4,7 @@ import "time"
 
 // ReservationUser is used in multiple places for user info
 type ReservationUser struct {
+	PublicID       string `json:"public_id,omitempty"`
 	Email          string `json:"email"`
 	FirstName      string `json:"first_name"`
 	LastName       string `json:"last_name"`

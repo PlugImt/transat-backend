@@ -39,6 +39,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 	query := `
 		SELECT
 			n.id_newf,
+			n.public_id::text,
 			n.email,
 			n.first_name,
 			n.last_name,
@@ -72,8 +73,10 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 	}
 
 	var graduationYear sql.NullInt32
+	var publicID string
 	err := h.DB.QueryRowContext(ctx, query, email).Scan(
 		&newf.ID,
+		&publicID,
 		&newf.Email,
 		&newf.FirstName,
 		&newf.LastName,
@@ -122,6 +125,7 @@ func (h *UserHandler) GetNewf(c *fiber.Ctx) error {
 	// Create response map, explicitly adding non-zero/non-empty fields
 	response := make(map[string]interface{})
 	response["id_newf"] = newf.ID
+	response["public_id"] = publicID
 	response["email"] = newf.Email
 	response["first_name"] = newf.FirstName
 	response["last_name"] = newf.LastName

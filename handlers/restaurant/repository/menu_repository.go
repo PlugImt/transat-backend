@@ -183,7 +183,7 @@ func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 
 	// Get all reviews ordered by date (most recent first)
 	reviewsQuery := `
-		SELECT n.first_name, n.last_name, COALESCE(n.profile_picture, ''), ran.note, ran.comment, ran.date
+		SELECT n.public_id::text, n.first_name, n.last_name, COALESCE(n.profile_picture, ''), ran.note, ran.comment, ran.date
 		FROM restaurant_articles_notes ran
 		JOIN newf n ON ran.email = n.email
 		WHERE ran.id_restaurant_articles = $1
@@ -220,7 +220,7 @@ func (r *MenuRepository) GetDishDetails(dishID int) (interface{}, error) {
 	for reviewRows.Next() {
 		var review models.ReviewResponse
 
-		err := reviewRows.Scan(&review.FirstName, &review.LastName, &review.ProfilePicture, &review.Rating, &review.Comment, &review.Date)
+		err := reviewRows.Scan(&review.PublicID, &review.FirstName, &review.LastName, &review.ProfilePicture, &review.Rating, &review.Comment, &review.Date)
 		if err != nil {
 			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to scan review: %v", err))
 			continue

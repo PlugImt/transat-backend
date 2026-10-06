@@ -50,6 +50,7 @@ func (r *BassineRepository) GetLeaderboard() ([]models.BassineUser, error) {
             n.first_name,
             n.last_name,
             COALESCE(n.profile_picture, '') AS profile_picture,
+            n.public_id::text AS public_id,
             s.score,
             RANK() OVER (ORDER BY s.score DESC, n.email ASC) AS rank
         FROM bassine_scores s
@@ -66,9 +67,9 @@ func (r *BassineRepository) GetLeaderboard() ([]models.BassineUser, error) {
 	users := make([]models.BassineUser, 0)
 	for rows.Next() {
 		var user models.BassineUser
-		var email, firstName, lastName, picture string
+		var email, firstName, lastName, picture, publicID string
 		var score, rank int
-		if err := rows.Scan(&email, &firstName, &lastName, &picture, &score, &rank); err != nil {
+		if err := rows.Scan(&email, &firstName, &lastName, &picture, &publicID, &score, &rank); err != nil {
 			return nil, err
 		}
 		user.ReservationUser = &models.ReservationUser{
@@ -76,6 +77,7 @@ func (r *BassineRepository) GetLeaderboard() ([]models.BassineUser, error) {
 			FirstName:      firstName,
 			LastName:       lastName,
 			ProfilePicture: picture,
+			PublicID:       publicID,
 		}
 		user.BassineCount = score
 		user.Rank = rank
@@ -97,6 +99,7 @@ func (r *BassineRepository) GetLeaderboardTop(limit int) ([]models.BassineUser, 
             n.first_name,
             n.last_name,
             COALESCE(n.profile_picture, '') AS profile_picture,
+            n.public_id::text AS public_id,
             s.score,
             RANK() OVER (ORDER BY s.score DESC, n.email ASC) AS rank
         FROM bassine_scores s
@@ -114,9 +117,9 @@ func (r *BassineRepository) GetLeaderboardTop(limit int) ([]models.BassineUser, 
 	users := make([]models.BassineUser, 0, limit)
 	for rows.Next() {
 		var user models.BassineUser
-		var email, firstName, lastName, picture string
+		var email, firstName, lastName, picture, publicID string
 		var score, rank int
-		if err := rows.Scan(&email, &firstName, &lastName, &picture, &score, &rank); err != nil {
+		if err := rows.Scan(&email, &firstName, &lastName, &picture, &publicID, &score, &rank); err != nil {
 			return nil, err
 		}
 		user.ReservationUser = &models.ReservationUser{
@@ -124,6 +127,7 @@ func (r *BassineRepository) GetLeaderboardTop(limit int) ([]models.BassineUser, 
 			FirstName:      firstName,
 			LastName:       lastName,
 			ProfilePicture: picture,
+			PublicID:       publicID,
 		}
 		user.BassineCount = score
 		user.Rank = rank
@@ -190,6 +194,7 @@ func (r *BassineRepository) GetGlobalHistory() ([]models.BassineHistoryItem, err
 			n.first_name,
 			n.last_name,
 			COALESCE(n.profile_picture, '') AS profile_picture,
+			n.public_id::text AS public_id,
 			b.date
 		FROM bassine_history b
 		JOIN newf n ON n.email = b.email
@@ -204,9 +209,9 @@ func (r *BassineRepository) GetGlobalHistory() ([]models.BassineHistoryItem, err
 
 	historyMap := make(map[string]*models.BassineHistoryItem)
 	for rows.Next() {
-		var email, firstName, lastName, picture string
+		var email, firstName, lastName, picture, publicID string
 		var date time.Time
-		if err := rows.Scan(&email, &firstName, &lastName, &picture, &date); err != nil {
+		if err := rows.Scan(&email, &firstName, &lastName, &picture, &publicID, &date); err != nil {
 			return nil, err
 		}
 
@@ -217,6 +222,7 @@ func (r *BassineRepository) GetGlobalHistory() ([]models.BassineHistoryItem, err
 					FirstName:      firstName,
 					LastName:       lastName,
 					ProfilePicture: picture,
+					PublicID:       publicID,
 				},
 				Dates: make([]time.Time, 0),
 			}
@@ -236,8 +242,8 @@ func (r *BassineRepository) GetGlobalHistory() ([]models.BassineHistoryItem, err
 }
 
 func (r *BassineRepository) GetUserHistory(email string) (models.BassineHistoryItem, error) {
-	var firstName, lastName, picture string
-	err := r.DB.QueryRow(`SELECT first_name, last_name, COALESCE(profile_picture,'') FROM newf WHERE email = $1`, email).Scan(&firstName, &lastName, &picture)
+	var firstName, lastName, picture, publicID string
+	err := r.DB.QueryRow(`SELECT first_name, last_name, COALESCE(profile_picture,''), public_id::text FROM newf WHERE email = $1`, email).Scan(&firstName, &lastName, &picture, &publicID)
 	if err != nil {
 		return models.BassineHistoryItem{}, err
 	}
@@ -266,6 +272,7 @@ func (r *BassineRepository) GetUserHistory(email string) (models.BassineHistoryI
 			FirstName:      firstName,
 			LastName:       lastName,
 			ProfilePicture: picture,
+			PublicID:       publicID,
 		},
 		Dates: dates,
 	}
