@@ -113,5 +113,28 @@ func JWTMiddleware(c *fiber.Ctx) error {
 	utils.LogMessage(utils.LevelInfo, "Token is valid")
 	utils.LogLineKeyValue(utils.LevelInfo, "Email", email)
 
+	touchLastActivity(email)
+
 	return c.Next()
+}
+
+// activitySem bounds concurrent last_activity writes.
+var activitySem = make(chan struct{}, 50)
+
+// touchLastActivity records the user's activity at most once a day; it never blocks the request,
+// and writes are skipped when too many are already in flight.
+func touchLastActivity(email string) {
+	select {
+	case activitySem <- struct{}{}:
+		go func() {
+			defer func() { <-activitySem }()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if _, err := sessionDB.ExecContext(ctx, `UPDATE newf SET last_activity = NOW() WHERE email = $1 AND (last_activity IS NULL OR last_activity < NOW() - INTERVAL '1 day')`, email); err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to update last_activity")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+			}
+		}()
+	default:
+	}
 }
