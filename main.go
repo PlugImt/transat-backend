@@ -155,6 +155,7 @@ func main() {
 	// 7. Logger middleware
 	app.Use(logger.New(logger.Config{
 		TimeFormat: "2006-01-02 15:04:05",
+		Next:       func(c *fiber.Ctx) bool { return c.Path() == middlewares.HealthPath },
 	}))
 
 	// 8. Add statistics middleware to capture all requests
@@ -182,7 +183,7 @@ func main() {
 	routes.SetupBassineRoutes(app, db)
 	routes.SetupAdminRoutes(app, db, notificationService)
 
-	app.Get("/health", func(c *fiber.Ctx) error {
+	app.Get(middlewares.HealthPath, func(c *fiber.Ctx) error {
 		return c.SendString("OK")
 	})
 

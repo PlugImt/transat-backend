@@ -10,9 +10,16 @@ import (
 	"github.com/plugimt/transat-backend/utils"
 )
 
+// HealthPath is the liveness probe; it is excluded from access logs and statistics.
+const HealthPath = "/health"
+
 // StatisticsMiddleware captures request timing and logs statistics
 func StatisticsMiddleware(statisticsService *services.StatisticsService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		if c.Path() == HealthPath {
+			return c.Next()
+		}
+
 		// Record request time
 		requestReceived := utils.Now()
 
