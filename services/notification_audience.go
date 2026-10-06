@@ -2,26 +2,29 @@ package services
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/lib/pq"
 	"github.com/plugimt/transat-backend/models"
 )
 
-// Recipients are the devices an audience resolves to.
+// Recipients are the users an audience resolves to and their registered devices.
 type Recipients struct {
 	Users  int
 	Tokens []string
+	// WithoutDevice lists users who never registered a push token and cannot be reached.
+	WithoutDevice []string
 }
 
-// ResolveAudience returns the devices of the audience's users. With a category, users who opted
-// out of it are excluded.
+// ResolveAudience returns the audience's users and their devices. With a category, users who
+// opted out of it are excluded.
 func (ns *NotificationService) ResolveAudience(audience models.NotificationAudience, category models.NotificationCategory) (Recipients, error) {
 	query := `
-		SELECT n.email, unt.token
-		FROM user_notification_tokens unt
-		JOIN newf n ON n.email = unt.email
-		WHERE unt.token != ''`
+		SELECT n.email, COALESCE(unt.token, '')
+		FROM newf n
+		LEFT JOIN user_notification_tokens unt ON unt.email = n.email
+		WHERE TRUE`
 	var args []interface{}
 	arg := func(v interface{}) string {
 		args = append(args, v)
@@ -49,19 +52,29 @@ func (ns *NotificationService) ResolveAudience(audience models.NotificationAudie
 	}
 	defer rows.Close()
 
-	users := make(map[string]struct{})
+	users := make(map[string]bool) // email -> has a device
 	var tokens []string
 	for rows.Next() {
 		var email, token string
 		if err := rows.Scan(&email, &token); err != nil {
 			return Recipients{}, fmt.Errorf("failed to scan notification recipient: %w", err)
 		}
-		users[email] = struct{}{}
-		tokens = append(tokens, token)
+		users[email] = users[email] || token != ""
+		if token != "" {
+			tokens = append(tokens, token)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return Recipients{}, fmt.Errorf("failed to read notification recipients: %w", err)
 	}
 
-	return Recipients{Users: len(users), Tokens: dedupe(tokens)}, nil
+	withoutDevice := []string{}
+	for email, hasDevice := range users {
+		if !hasDevice {
+			withoutDevice = append(withoutDevice, email)
+		}
+	}
+	sort.Strings(withoutDevice)
+
+	return Recipients{Users: len(users), Tokens: dedupe(tokens), WithoutDevice: withoutDevice}, nil
 }

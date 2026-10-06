@@ -104,10 +104,11 @@ export default function NotificationsPage() {
     return destinationId ? { type: destinationType, id: destinationId } : null;
   }, [destinationType, destinationId]);
 
-  const { data: recipients, isFetching: isCounting } = useNotificationRecipients(
-    audience,
-    service || undefined,
-  );
+  const {
+    data: recipients,
+    isFetching: isCounting,
+    isError: countFailed,
+  } = useNotificationRecipients(audience, service || undefined);
 
   const clubOptions = clubs.map((club) => ({ value: String(club.id_clubs), label: club.name }));
   const eventOptions = events.map((event) => ({
@@ -139,7 +140,7 @@ export default function NotificationsPage() {
 
     if (
       !confirm(
-        `Envoyer cette notification à ${recipients.users} utilisateur(s) (${recipients.devices} appareil(s)) ?`,
+        `Envoyer cette notification à ${recipients.users - recipients.withoutDevice.length} utilisateur(s) (${recipients.devices} appareil(s)) ?`,
       )
     ) {
       return;
@@ -153,7 +154,9 @@ export default function NotificationsPage() {
         service: service || undefined,
         navigation,
       });
-      toast.success(`Notification envoyée à ${result.users} utilisateur(s)`);
+      toast.success(
+        `Notification envoyée à ${result.users - result.withoutDevice.length} utilisateur(s)`,
+      );
       setTitle("");
       setMessage("");
     } catch (error) {
@@ -300,15 +303,33 @@ export default function NotificationsPage() {
             </select>
           </div>
 
-          <p className="text-sm text-gray-600" aria-live="polite">
-            {audience === null
-              ? "Sélectionnez les destinataires."
-              : isCounting
-                ? "Calcul des destinataires…"
-                : recipients
-                  ? `${recipients.users} utilisateur(s), ${recipients.devices} appareil(s)`
-                  : ""}
-          </p>
+          <div className="text-sm text-gray-600 space-y-1" aria-live="polite">
+            {audience === null ? (
+              <p>Sélectionnez les destinataires.</p>
+            ) : isCounting ? (
+              <p>Calcul des destinataires…</p>
+            ) : countFailed ? (
+              <p className="text-red-600">Impossible de calculer les destinataires.</p>
+            ) : (
+              recipients && (
+                <>
+                  <p>
+                    {recipients.users} utilisateur(s), {recipients.devices} appareil(s)
+                    enregistré(s)
+                  </p>
+                  {recipients.withoutDevice.length > 0 && (
+                    <p className="text-amber-700">
+                      Sans appareil enregistré (n'a jamais autorisé les notifications ou ouvert
+                      l'application sur un téléphone), donc injoignable :{" "}
+                      {recipients.withoutDevice.slice(0, 10).join(", ")}
+                      {recipients.withoutDevice.length > 10 &&
+                        ` et ${recipients.withoutDevice.length - 10} autre(s)`}
+                    </p>
+                  )}
+                </>
+              )
+            )}
+          </div>
         </section>
 
         <section className="space-y-4">

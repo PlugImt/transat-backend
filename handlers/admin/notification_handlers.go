@@ -46,12 +46,17 @@ func (h *AdminHandler) SendNotification(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to resolve audience"})
 	}
 
-	result := fiber.Map{"users": recipients.Users, "devices": len(recipients.Tokens), "sent": false}
+	result := fiber.Map{
+		"users":         recipients.Users,
+		"devices":       len(recipients.Tokens),
+		"withoutDevice": recipients.WithoutDevice,
+		"sent":          false,
+	}
 	if req.DryRun {
 		return c.JSON(result)
 	}
 	if len(recipients.Tokens) == 0 {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"error": "No recipients with notifications enabled"})
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"error": "None of the recipients has a registered device"})
 	}
 
 	err = h.Notifications.SendPushNotification(models.NotificationPayload{

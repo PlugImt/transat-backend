@@ -218,5 +218,6 @@ export interface SendNotificationRequest {
 export interface NotificationRecipients {
   users: number;
   devices: number;
+  withoutDevice: string[];
   sent: boolean;
 }

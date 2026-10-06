@@ -25,21 +25,24 @@ func TestSendNotificationDryRunCountsRecipients(t *testing.T) {
 	defer db.Close()
 
 	const email = "admin.notif@test.fr"
+	const noDevice = "admin.notif.nodevice@test.fr"
 	for _, q := range []string{
-		`DELETE FROM newf WHERE email = $1`,
-		`INSERT INTO newf (email, password, first_name, last_name) VALUES ($1, 'x', 'T', 'T')`,
-		`INSERT INTO user_notification_tokens (email, token) VALUES ($1, 'ExponentPushToken[a]'), ($1, 'ExponentPushToken[b]')`,
+		`DELETE FROM newf WHERE email IN ($1, $2)`,
+		`INSERT INTO newf (email, password, first_name, last_name) VALUES ($1, 'x', 'T', 'T'), ($2, 'x', 'T', 'T')`,
 	} {
-		if _, err := db.Exec(q, email); err != nil {
+		if _, err := db.Exec(q, email, noDevice); err != nil {
 			t.Fatal(err)
 		}
 	}
-	defer db.Exec(`DELETE FROM newf WHERE email = $1`, email)
+	if _, err := db.Exec(`INSERT INTO user_notification_tokens (email, token) VALUES ($1, 'ExponentPushToken[a]'), ($1, 'ExponentPushToken[b]')`, email); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec(`DELETE FROM newf WHERE email IN ($1, $2)`, email, noDevice)
 
 	app := fiber.New()
 	app.Post("/send", (&AdminHandler{Notifications: services.NewNotificationService(db)}).SendNotification)
 
-	body := `{"title":"t","audience":{"type":"users","emails":["` + email + `"]},"dryRun":true}`
+	body := `{"title":"t","audience":{"type":"users","emails":["` + email + `","` + noDevice + `"]},"dryRun":true}`
 	req := httptest.NewRequest("POST", "/send", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
@@ -47,12 +50,12 @@ func TestSendNotificationDryRunCountsRecipients(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != 200 || string(raw) != `{"devices":2,"sent":false,"users":1}` {
+	if resp.StatusCode != 200 || string(raw) != `{"devices":2,"sent":false,"users":2,"withoutDevice":["`+noDevice+`"]}` {
 		t.Fatalf("dry run = %d %s", resp.StatusCode, raw)
 	}
 
-	// Opted out of a category: nobody left to notify, and a real send is refused.
-	body = `{"title":"t","audience":{"type":"users","emails":["` + email + `"]},"service":"EVENTS"}`
+	// Only users without a device: they count as users, but a real send is refused.
+	body = `{"title":"t","audience":{"type":"users","emails":["` + noDevice + `"]}}`
 	req = httptest.NewRequest("POST", "/send", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = app.Test(req)
@@ -60,7 +63,7 @@ func TestSendNotificationDryRunCountsRecipients(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp.StatusCode != 422 {
-		t.Fatalf("send without opted-in recipients = %d, want 422", resp.StatusCode)
+		t.Fatalf("send without any device = %d, want 422", resp.StatusCode)
 	}
 }
 
