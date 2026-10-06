@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 )
 
@@ -19,12 +20,16 @@ const (
 	NavigationRestaurant  NavigationType = "restaurant"
 	NavigationReservation NavigationType = "reservation"
 	NavigationService     NavigationType = "service"
+	NavigationURL         NavigationType = "url"
 )
+
+const maxNavigationURLLength = 2000
 
 // navigationRule describes what a destination type needs and how pre-navigation-context apps open it.
 type navigationRule struct {
 	requiresID   bool
 	legacyScreen string
+	validateID   func(id string) error
 }
 
 var navigationRules = map[NavigationType]navigationRule{
@@ -33,6 +38,19 @@ var navigationRules = map[NavigationType]navigationRule{
 	NavigationRestaurant:  {requiresID: false, legacyScreen: "Restaurant"},
 	NavigationReservation: {requiresID: true, legacyScreen: "Reservation"},
 	NavigationService:     {requiresID: true},
+	NavigationURL:         {requiresID: true, validateID: validateWebURL},
+}
+
+// validateWebURL accepts only absolute http(s) links, so a notification can't open other schemes.
+func validateWebURL(raw string) error {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return fmt.Errorf("url must be an absolute http(s) link")
+	}
+	if len(raw) > maxNavigationURLLength {
+		return fmt.Errorf("url is too long")
+	}
+	return nil
 }
 
 // NavigationTarget is the structured destination carried by a push notification.
@@ -71,6 +89,11 @@ func ServiceNavigation(service string) *NavigationTarget {
 	return newNavigationTarget(NavigationService, service, nil)
 }
 
+// URLNavigation opens a web link in the device's default browser.
+func URLNavigation(link string) *NavigationTarget {
+	return newNavigationTarget(NavigationURL, link, nil)
+}
+
 // Validate checks a target, typically one received through the API, before it is sent to devices.
 func (n *NavigationTarget) Validate() error {
 	rule, ok := navigationRules[n.Type]
@@ -79,6 +102,9 @@ func (n *NavigationTarget) Validate() error {
 	}
 	if rule.requiresID && n.ID == "" {
 		return fmt.Errorf("navigation type %q requires an id", n.Type)
+	}
+	if rule.validateID != nil {
+		return rule.validateID(n.ID)
 	}
 	return nil
 }

@@ -191,7 +191,8 @@ export type NotificationAudience =
   | { type: "all" }
   | { type: "club"; clubId: number }
   | { type: "campus"; campus: string }
-  | { type: "users"; emails: string[] };
+  | { type: "users"; emails: string[] }
+  | { type: "cohort"; formation?: string; graduationYear?: number };
 
 export type NotificationCategory =
   | "RESTAURANT"
@@ -202,7 +203,7 @@ export type NotificationCategory =
 
 // Screen opened when the notification is tapped; types and ids match the backend NavigationTarget.
 export interface NotificationNavigation {
-  type: "event" | "club" | "restaurant" | "service";
+  type: "event" | "club" | "restaurant" | "service" | "url";
   id?: string;
 }
 

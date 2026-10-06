@@ -27,10 +27,16 @@ const AUDIENCES: { value: AudienceType; label: string }[] = [
   { value: "all", label: "Tous les utilisateurs" },
   { value: "club", label: "Membres d'un club" },
   { value: "campus", label: "Un campus" },
+  { value: "cohort", label: "Une filière et/ou une promotion" },
   { value: "users", label: "Utilisateurs précis" },
 ];
 
 const CAMPUSES = ["NANTES", "BREST", "RENNES"];
+
+// Matches the formations the backend accepts.
+const FORMATIONS = ["FISE", "FIL", "FIP", "FIT", "FID"];
+
+const WEB_LINK = /^https?:\/\/\S+$/;
 
 const CATEGORIES: { value: NotificationCategory; label: string }[] = [
   { value: "RESTAURANT", label: "Restaurant" },
@@ -46,6 +52,7 @@ const DESTINATIONS: { value: DestinationType; label: string }[] = [
   { value: "event", label: "Un événement" },
   { value: "club", label: "Un club" },
   { value: "service", label: "Un service" },
+  { value: "url", label: "Un lien web (ouvert dans le navigateur)" },
 ];
 
 // Keys understood by the app's `service` destination.
@@ -75,6 +82,8 @@ export default function NotificationsPage() {
   const [audienceType, setAudienceType] = useState<AudienceType>("all");
   const [clubId, setClubId] = useState("");
   const [campus, setCampus] = useState(CAMPUSES[0]);
+  const [formation, setFormation] = useState("");
+  const [graduationYear, setGraduationYear] = useState("");
   const [emails, setEmails] = useState<string[]>([]);
   const [service, setService] = useState<NotificationCategory | "">("");
   const [destinationType, setDestinationType] = useState<DestinationType>("");
@@ -95,12 +104,27 @@ export default function NotificationsPage() {
         return { type: "campus", campus };
       case "users":
         return emails.length > 0 ? { type: "users", emails } : null;
+      case "cohort": {
+        const year = Number(graduationYear);
+        const validYear = Number.isInteger(year) && year >= 2000 && year <= 2100;
+        if (graduationYear !== "" && !validYear) return null;
+        if (!formation && graduationYear === "") return null;
+        return {
+          type: "cohort",
+          formation: formation || undefined,
+          graduationYear: graduationYear === "" ? undefined : year,
+        };
+      }
     }
-  }, [audienceType, clubId, campus, emails]);
+  }, [audienceType, clubId, campus, emails, formation, graduationYear]);
 
   const navigation = useMemo<NotificationNavigation | undefined | null>(() => {
     if (destinationType === "") return undefined;
     if (destinationType === "restaurant") return { type: "restaurant" };
+    if (destinationType === "url") {
+      const link = destinationId.trim();
+      return WEB_LINK.test(link) ? { type: "url", id: link } : null;
+    }
     return destinationId ? { type: destinationType, id: destinationId } : null;
   }, [destinationType, destinationId]);
 
@@ -253,6 +277,34 @@ export default function NotificationsPage() {
             </select>
           )}
 
+          {audienceType === "cohort" && (
+            <div className="grid grid-cols-2 gap-4">
+              <select
+                aria-label="Filière"
+                value={formation}
+                onChange={(e) => setFormation(e.target.value)}
+                className={fieldClass}
+              >
+                <option value="">Toutes les filières</option>
+                {FORMATIONS.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <input
+                aria-label="Année de diplôme"
+                type="number"
+                min={2000}
+                max={2100}
+                placeholder="Année de diplôme (ex. 2027)"
+                value={graduationYear}
+                onChange={(e) => setGraduationYear(e.target.value)}
+                className={fieldClass}
+              />
+            </div>
+          )}
+
           {audienceType === "users" && (
             <div className="space-y-2">
               <Combobox
@@ -379,6 +431,23 @@ export default function NotificationsPage() {
                 </option>
               ))}
             </select>
+          )}
+          {destinationType === "url" && (
+            <div>
+              <input
+                aria-label="Lien"
+                type="url"
+                placeholder="https://exemple.fr/page"
+                value={destinationId}
+                onChange={(e) => setDestinationId(e.target.value)}
+                className={fieldClass}
+              />
+              {destinationId !== "" && navigation === null && (
+                <p className="text-xs text-red-600 mt-1">
+                  Le lien doit commencer par http:// ou https://
+                </p>
+              )}
+            </div>
           )}
         </section>
 

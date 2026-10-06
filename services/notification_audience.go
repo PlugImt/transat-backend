@@ -38,6 +38,13 @@ func (ns *NotificationService) ResolveAudience(audience models.NotificationAudie
 		query += " AND n.campus = " + arg(strings.ToUpper(audience.Campus))
 	case models.AudienceUsers:
 		query += " AND n.email = ANY(" + arg(pq.Array(audience.Emails)) + ")"
+	case models.AudienceCohort:
+		if audience.Formation != "" {
+			query += " AND n.formation_name = " + arg(strings.ToUpper(audience.Formation))
+		}
+		if audience.GraduationYear != 0 {
+			query += " AND n.graduation_year = " + arg(audience.GraduationYear)
+		}
 	}
 	if category != "" {
 		query += ` AND n.email IN (
