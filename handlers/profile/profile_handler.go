@@ -8,15 +8,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/lib/pq"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/utils"
 )
 
 type ProfileHandler struct {
-	DB *sql.DB
+	DB        *sql.DB
+	R2Service *services.R2Service
 }
 
-func NewProfileHandler(db *sql.DB) *ProfileHandler {
-	return &ProfileHandler{DB: db}
+func NewProfileHandler(db *sql.DB, r2Service *services.R2Service) *ProfileHandler {
+	return &ProfileHandler{DB: db, R2Service: r2Service}
 }
 
 var errProfileNotFound = errors.New("profile not found")
@@ -36,7 +38,9 @@ const profileSelect = `
 		TO_CHAR(n.creation_date AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 		COALESCE(p.bio, ''),
 		COALESCE(p.emoji, ''),
-		COALESCE(p.interests, '{}')
+		COALESCE(p.interests, '{}'),
+		COALESCE(p.decoration_image_ids, '{}'),
+		COALESCE(p.decoration_emojis, '{}')
 	FROM newf n
 	LEFT JOIN user_profiles p ON p.email = n.email
 	WHERE EXISTS (
@@ -55,12 +59,15 @@ func (h *ProfileHandler) load(filter string, arg string, viewerEmail string) (*m
 		picture, formation, campus sql.NullString
 		graduationYear             sql.NullInt64
 		interests                  []string
+		decorationImageIDs         []int64
+		decorationEmojis           []string
 	)
 
 	err := h.DB.QueryRow(profileSelect+" AND "+filter, arg).Scan(
 		&profile.ID, &memberNumber, &email, &profile.FirstName, &profile.LastName,
 		&picture, &formation, &graduationYear, &campus, &profile.JoinedAt,
 		&profile.Bio, &profile.Emoji, pq.Array(&interests),
+		pq.Array(&decorationImageIDs), pq.Array(&decorationEmojis),
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errProfileNotFound
@@ -82,12 +89,51 @@ func (h *ProfileHandler) load(filter string, arg string, viewerEmail string) (*m
 	if profile.Interests == nil {
 		profile.Interests = []string{}
 	}
+	profile.DecorationEmojis = decorationEmojis
+	if profile.DecorationEmojis == nil {
+		profile.DecorationEmojis = []string{}
+	}
+	if err := h.loadDecorationImages(&profile, email, decorationImageIDs); err != nil {
+		return nil, err
+	}
 
 	if err := h.loadActivity(&profile, email); err != nil {
 		return nil, err
 	}
 	profile.Badges = badgesFor(memberNumber, profile)
 	return &profile, nil
+}
+
+func (h *ProfileHandler) loadDecorationImages(profile *models.PublicProfile, email string, ids []int64) error {
+	profile.DecorationImages = []models.ProfileDecorationImage{}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	rows, err := h.DB.Query(`
+		SELECT selected.file_id, f.path
+		FROM unnest($1::integer[]) WITH ORDINALITY AS selected(file_id, position)
+		JOIN files f ON f.id_files = selected.file_id AND f.email = $2
+			AND LOWER(f.path) ~ '[.](jpg|jpeg|png|webp)$'
+		ORDER BY selected.position
+	`, pq.Array(ids), email)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var path string
+		if err := rows.Scan(&id, &path); err != nil {
+			return err
+		}
+		profile.DecorationImages = append(profile.DecorationImages, models.ProfileDecorationImage{
+			ID:  id,
+			URL: h.R2Service.GetPublicURL(path),
+		})
+	}
+	return rows.Err()
 }
 
 // loadActivity fills data that is already visible elsewhere in the app (club and event member lists,
@@ -211,15 +257,41 @@ func (h *ProfileHandler) UpdateMyProfile(c *fiber.Ctx) error {
 	if req.Interests != nil {
 		interests = pq.Array(*req.Interests)
 	}
+	var decorationImageIDs interface{}
+	if req.DecorationImageIDs != nil {
+		if len(*req.DecorationImageIDs) > 0 {
+			var owned int
+			if err := h.DB.QueryRow(`
+				SELECT COUNT(*) FROM files
+				WHERE email = $1 AND id_files = ANY($2::integer[])
+					AND LOWER(path) ~ '[.](jpg|jpeg|png|webp)$'
+			`, email, pq.Array(*req.DecorationImageIDs)).Scan(&owned); err != nil {
+				utils.LogMessage(utils.LevelError, "Failed to verify profile decoration images")
+				utils.LogLineKeyValue(utils.LevelError, "Error", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save profile"})
+			}
+			if owned != len(*req.DecorationImageIDs) {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Decoration images must belong to your account"})
+			}
+		}
+		decorationImageIDs = pq.Array(*req.DecorationImageIDs)
+	}
+	var decorationEmojis interface{}
+	if req.DecorationEmojis != nil {
+		decorationEmojis = pq.Array(*req.DecorationEmojis)
+	}
 	_, err := h.DB.Exec(`
-		INSERT INTO user_profiles (email, bio, emoji, interests)
-		VALUES ($1, COALESCE($2::text, ''), COALESCE($3::text, ''), COALESCE($4::text[], '{}'))
+		INSERT INTO user_profiles (email, bio, emoji, interests, decoration_image_ids, decoration_emojis)
+		VALUES ($1, COALESCE($2::text, ''), COALESCE($3::text, ''), COALESCE($4::text[], '{}'),
+			COALESCE($5::integer[], '{}'), COALESCE($6::text[], '{}'))
 		ON CONFLICT (email) DO UPDATE SET
 			bio = COALESCE($2::text, user_profiles.bio),
 			emoji = COALESCE($3::text, user_profiles.emoji),
 			interests = COALESCE($4::text[], user_profiles.interests),
+			decoration_image_ids = COALESCE($5::integer[], user_profiles.decoration_image_ids),
+			decoration_emojis = COALESCE($6::text[], user_profiles.decoration_emojis),
 			updated_at = CURRENT_TIMESTAMP
-	`, email, req.Bio, req.Emoji, interests)
+	`, email, req.Bio, req.Emoji, interests, decorationImageIDs, decorationEmojis)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to save profile")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)

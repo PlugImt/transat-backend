@@ -9,11 +9,13 @@ import (
 )
 
 const (
-	MaxBioLength       = 160
-	MaxEmojiRunes      = 10 // enough for ZWJ sequences such as family or profession emojis
-	MaxInterests       = 6
-	PioneerMemberLimit = 100 // accounts numbered up to this value are pioneers
-	CriticReviews      = 10  // RU reviews needed for the "critic" badge
+	MaxBioLength        = 160
+	MaxEmojiRunes       = 10 // enough for ZWJ sequences such as family or profession emojis
+	MaxInterests        = 6
+	MaxDecorationImages = 3
+	MaxDecorationEmojis = 4
+	PioneerMemberLimit  = 100 // accounts numbered up to this value are pioneers
+	CriticReviews       = 10  // RU reviews needed for the "critic" badge
 )
 
 // Interests a user can pick. The app maps each id to an icon and a label.
@@ -41,6 +43,11 @@ type ProfileClub struct {
 	IsRespo bool   `json:"is_respo"`
 }
 
+type ProfileDecorationImage struct {
+	ID  int    `json:"id"`
+	URL string `json:"url"`
+}
+
 type ProfileBassine struct {
 	Score int `json:"score"`
 	Rank  int `json:"rank"`
@@ -55,29 +62,33 @@ type ProfileStats struct {
 // PublicProfile is everything another student may see about a user. It never contains an email,
 // phone number, language, roles or any authentication data.
 type PublicProfile struct {
-	ID             string        `json:"id"`
-	FirstName      string        `json:"first_name"`
-	LastName       string        `json:"last_name"`
-	ProfilePicture *string       `json:"profile_picture"`
-	FormationName  *string       `json:"formation_name"`
-	GraduationYear *int          `json:"graduation_year"`
-	Campus         *string       `json:"campus"`
-	JoinedAt       string        `json:"joined_at"`
-	MemberNumber   int           `json:"member_number"`
-	Badges         []string      `json:"badges"`
-	Bio            string        `json:"bio"`
-	Emoji          string        `json:"emoji"`
-	Interests      []string      `json:"interests"`
-	Clubs          []ProfileClub `json:"clubs"`
-	Stats          ProfileStats  `json:"stats"`
-	IsMe           bool          `json:"is_me"`
+	ID               string                   `json:"id"`
+	FirstName        string                   `json:"first_name"`
+	LastName         string                   `json:"last_name"`
+	ProfilePicture   *string                  `json:"profile_picture"`
+	FormationName    *string                  `json:"formation_name"`
+	GraduationYear   *int                     `json:"graduation_year"`
+	Campus           *string                  `json:"campus"`
+	JoinedAt         string                   `json:"joined_at"`
+	MemberNumber     int                      `json:"member_number"`
+	Badges           []string                 `json:"badges"`
+	Bio              string                   `json:"bio"`
+	Emoji            string                   `json:"emoji"`
+	Interests        []string                 `json:"interests"`
+	DecorationImages []ProfileDecorationImage `json:"decoration_images"`
+	DecorationEmojis []string                 `json:"decoration_emojis"`
+	Clubs            []ProfileClub            `json:"clubs"`
+	Stats            ProfileStats             `json:"stats"`
+	IsMe             bool                     `json:"is_me"`
 }
 
 // ProfileUpdateRequest holds the profile fields a user may edit; nil fields are left unchanged.
 type ProfileUpdateRequest struct {
-	Bio       *string   `json:"bio"`
-	Emoji     *string   `json:"emoji"`
-	Interests *[]string `json:"interests"`
+	Bio                *string   `json:"bio"`
+	Emoji              *string   `json:"emoji"`
+	Interests          *[]string `json:"interests"`
+	DecorationImageIDs *[]int64  `json:"decoration_image_ids"`
+	DecorationEmojis   *[]string `json:"decoration_emojis"`
 }
 
 // Normalize trims and validates the request in place.
@@ -123,6 +134,43 @@ func (r *ProfileUpdateRequest) Normalize() error {
 			}
 		}
 		r.Interests = &unique
+	}
+
+	if r.DecorationImageIDs != nil {
+		if len(*r.DecorationImageIDs) > MaxDecorationImages {
+			return fmt.Errorf("at most %d decoration images", MaxDecorationImages)
+		}
+		seen := make(map[int64]bool, len(*r.DecorationImageIDs))
+		unique := make([]int64, 0, len(*r.DecorationImageIDs))
+		for _, id := range *r.DecorationImageIDs {
+			if id <= 0 {
+				return fmt.Errorf("invalid decoration image id")
+			}
+			if !seen[id] {
+				seen[id] = true
+				unique = append(unique, id)
+			}
+		}
+		r.DecorationImageIDs = &unique
+	}
+
+	if r.DecorationEmojis != nil {
+		if len(*r.DecorationEmojis) > MaxDecorationEmojis {
+			return fmt.Errorf("at most %d decoration emojis", MaxDecorationEmojis)
+		}
+		seen := make(map[string]bool, len(*r.DecorationEmojis))
+		unique := make([]string, 0, len(*r.DecorationEmojis))
+		for _, raw := range *r.DecorationEmojis {
+			emoji := strings.TrimSpace(raw)
+			if emoji == "" || !isEmoji(emoji) {
+				return fmt.Errorf("decoration values must be emojis")
+			}
+			if !seen[emoji] {
+				seen[emoji] = true
+				unique = append(unique, emoji)
+			}
+		}
+		r.DecorationEmojis = &unique
 	}
 	return nil
 }

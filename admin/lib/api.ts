@@ -1,4 +1,3 @@
-import axios from "axios";
 import type {
   ActiveUsersPeriod,
   ActiveUsersPoint,
@@ -23,24 +22,78 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-});
+// API response shapes are validated by their existing consumers, not this transport layer.
+// biome-ignore lint/suspicious/noExplicitAny: Preserve the current unvalidated JSON boundary.
+type UncheckedJson = any;
+type ApiResponse<T = UncheckedJson> = { data: T };
+type RequestConfig = { params?: Record<string, string | number | undefined> };
+
+const request = async <T = UncheckedJson>(
+  method: string,
+  path: string,
+  body?: unknown,
+  config: RequestConfig = {},
+  headers: Record<string, string> = {},
+): Promise<ApiResponse<T>> => {
+  const url = new URL(path.replace(/^\/+/, ""), `${API_BASE_URL.replace(/\/+$/, "")}/`);
+  for (const [key, value] of Object.entries(config.params ?? {})) {
+    if (value !== undefined) url.searchParams.set(key, String(value));
+  }
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
+  const requestHeaders: Record<string, string> = {
+    Accept: "application/json",
+    ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...headers,
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers: requestHeaders,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (cause) {
+    throw new Error("Network request failed", { cause });
+  }
+
+  const text = await response.text();
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : undefined;
+  } catch {
+    data = text;
+  }
+
+  if (!response.ok) {
+    const serverMessage =
+      data && typeof data === "object" && "error" in data
+        ? String(data.error)
+        : `Request failed with status ${response.status}`;
+    const error = new Error(serverMessage) as Error & {
+      response: { status: number; data: unknown };
+    };
+    error.response = { status: response.status, data };
+    throw error;
+  }
+
+  return { data: data as T };
+};
+
+const api = {
+  get: <T = UncheckedJson>(path: string, config?: RequestConfig) =>
+    request<T>("GET", path, undefined, config),
+  post: <T = UncheckedJson>(path: string, body?: unknown) => request<T>("POST", path, body),
+  patch: <T = UncheckedJson>(path: string, body?: unknown) => request<T>("PATCH", path, body),
+  delete: <T = UncheckedJson>(path: string, config?: { data?: unknown }) =>
+    request<T>("DELETE", path, config?.data),
+};
 
 function asArray<T>(data: T[] | null | undefined): T[] {
   return data ?? [];
 }
-
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("adminToken");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
-});
 
 export const authApi = {
   login: async (email: string, password: string) => {
@@ -48,8 +101,8 @@ export const authApi = {
     return response.data;
   },
   verify: async (token: string) => {
-    const response = await api.get("/newf/me", {
-      headers: { Authorization: `Bearer ${token}` },
+    const response = await request("GET", "/newf/me", undefined, undefined, {
+      Authorization: `Bearer ${token}`,
     });
     return response.data;
   },
