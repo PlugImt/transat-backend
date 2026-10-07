@@ -183,10 +183,23 @@ func isEmoji(s string) bool {
 	if utf8.RuneCountInString(s) > MaxEmojiRunes {
 		return false
 	}
+	hasKeycap := strings.ContainsRune(s, '\u20e3')
+	hasSymbol := false
 	for _, c := range s {
-		if c < 0x80 || unicode.IsLetter(c) || unicode.IsDigit(c) || unicode.IsSpace(c) || unicode.IsControl(c) || unicode.IsPunct(c) {
+		if unicode.IsSymbol(c) {
+			hasSymbol = true
+			continue
+		}
+		if c == '\u200d' || c == '\ufe0e' || c == '\ufe0f' || c == '\u20e3' || (c >= '\U000e0020' && c <= '\U000e007f') {
+			continue
+		}
+		if hasKeycap && (unicode.IsDigit(c) || c == '#' || c == '*') {
+			hasSymbol = true
+			continue
+		}
+		if !hasSymbol || unicode.IsLetter(c) || unicode.IsSpace(c) || unicode.IsControl(c) || unicode.IsPunct(c) {
 			return false
 		}
 	}
-	return true
+	return hasSymbol
 }
