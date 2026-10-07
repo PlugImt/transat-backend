@@ -33,10 +33,14 @@ func NewFileHandler(db *sql.DB, r2Service *services.R2Service) (*FileHandler, er
 // UploadFile handles file uploads, saves them, and records them in the database.
 func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	utils.LogHeader("📄 Upload File")
+	uploadID := c.Get("X-Upload-ID")
+	utils.LogLineKeyValue(utils.LevelInfo, "Upload ID", uploadID)
+	utils.LogLineKeyValue(utils.LevelInfo, "Stage", "request_received")
 
 	// Get user email from JWT (set by middleware)
 	email, ok := c.Locals("email").(string)
 	if !ok || email == "" {
+		utils.LogLineKeyValue(utils.LevelError, "Stage", "authentication_failed")
 		utils.LogMessage(utils.LevelWarn, "User email not found in token during upload")
 		utils.LogFooter()
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -48,6 +52,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 
 	// Check if the request is multipart form
 	if !strings.HasPrefix(c.Get("Content-Type"), "multipart/form-data") {
+		utils.LogLineKeyValue(utils.LevelError, "Stage", "multipart_validation_failed")
 		utils.LogMessage(utils.LevelError, "Invalid Content-Type, expected multipart/form-data")
 		utils.LogFooter()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -59,6 +64,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		if fileHeader, err = c.FormFile("image"); err != nil {
+			utils.LogLineKeyValue(utils.LevelError, "Stage", "file_part_missing")
 			utils.LogMessage(utils.LevelError, "No file uploaded with key 'file' or 'image'")
 			utils.LogLineKeyValue(utils.LevelError, "Error", err)
 			utils.LogFooter()
@@ -74,6 +80,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	utils.LogLineKeyValue(utils.LevelInfo, "Original Filename", fileHeader.Filename)
 	utils.LogLineKeyValue(utils.LevelInfo, "File Size", fileHeader.Size)
 	utils.LogLineKeyValue(utils.LevelInfo, "MIME Header", fileHeader.Header.Get("Content-Type"))
+	utils.LogLineKeyValue(utils.LevelInfo, "Stage", "file_received")
 
 	// Generate unique filename
 	originalFilename := filepath.Base(fileHeader.Filename)
@@ -89,6 +96,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	// Open the uploaded file
 	file, err := fileHeader.Open()
 	if err != nil {
+		utils.LogLineKeyValue(utils.LevelError, "Stage", "file_open_failed")
 		utils.LogMessage(utils.LevelError, "Failed to open uploaded file")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
@@ -99,6 +107,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 	defer file.Close()
 
 	// Upload to R2
+	utils.LogLineKeyValue(utils.LevelInfo, "Stage", "r2_upload_started")
 	contentType := fileHeader.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -106,6 +115,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 
 	publicURL, err := h.R2Service.UploadFile(finalFilename, file, contentType)
 	if err != nil {
+		utils.LogLineKeyValue(utils.LevelError, "Stage", "r2_upload_failed")
 		utils.LogMessage(utils.LevelError, "Failed to upload file to R2")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 		utils.LogFooter()
@@ -113,6 +123,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 			"error": "Failed to store file",
 		})
 	}
+	utils.LogLineKeyValue(utils.LevelInfo, "Stage", "r2_upload_completed")
 
 	// Store in database - only store the filename, not the full URL
 	var fileID int
@@ -123,6 +134,7 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 
 	err = h.DB.QueryRow(insertQuery, originalFilename, finalFilename, email).Scan(&fileID)
 	if err != nil {
+		utils.LogLineKeyValue(utils.LevelError, "Stage", "database_insert_failed")
 		utils.LogMessage(utils.LevelError, "Failed to record file in database")
 		utils.LogLineKeyValue(utils.LevelError, "Original Name", originalFilename)
 		utils.LogLineKeyValue(utils.LevelError, "Path", finalFilename)
@@ -139,9 +151,11 @@ func (h *FileHandler) UploadFile(c *fiber.Ctx) error {
 			"error": "Failed to record file in database",
 		})
 	}
+	utils.LogLineKeyValue(utils.LevelInfo, "Stage", "database_insert_completed")
 
 	utils.LogMessage(utils.LevelInfo, "File uploaded successfully")
 	utils.LogLineKeyValue(utils.LevelInfo, "File ID", fileID)
+	utils.LogLineKeyValue(utils.LevelInfo, "Stage", "upload_completed")
 	utils.LogFooter()
 
 	return c.JSON(fiber.Map{
