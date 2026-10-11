@@ -104,45 +104,6 @@ func (r *PhotosRepository) Gallery(ctx context.Context, after *PhotoCursor, limi
 		after, limit, albumKeyOf(after))
 }
 
-// GalleryNewer returns up to limit photos strictly newer than the cursor, oldest first (the closest ones). Uses
-// idx_photos_gallery_event backwards.
-func (r *PhotosRepository) GalleryNewer(ctx context.Context, than *PhotoCursor, limit int) ([]PhotoRow, error) {
-	return r.photos(ctx, `SELECT `+photoColumns+`
-		WHERE p.deleted_at IS NULL AND p.duplicate_of IS NULL AND p.media_type <> 'other'
-		  AND (p.sort_at, COALESCE(p.album_id, 0), p.drive_file_id) > ($1, $4::bigint, $2)
-		ORDER BY p.sort_at, COALESCE(p.album_id, 0), p.drive_file_id LIMIT $3`, than, limit, albumKeyOf(than))
-}
-
-// TimelineDay is one calendar day (Paris time, the zone EXIF times are read in) that holds gallery photos.
-type TimelineDay struct {
-	Day    time.Time
-	Count  int
-	Latest time.Time
-}
-
-// Timeline lists the days that really hold photos, newest first, with the same filter as Gallery.
-func (r *PhotosRepository) Timeline(ctx context.Context) ([]TimelineDay, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT (p.sort_at AT TIME ZONE 'Europe/Paris')::date AS day, COUNT(*), MAX(p.sort_at)
-		FROM photos p
-		WHERE p.deleted_at IS NULL AND p.duplicate_of IS NULL AND p.media_type <> 'other'
-		GROUP BY 1 ORDER BY 1 DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := []TimelineDay{}
-	for rows.Next() {
-		var d TimelineDay
-		if err := rows.Scan(&d.Day, &d.Count, &d.Latest); err != nil {
-			return nil, err
-		}
-		out = append(out, d)
-	}
-	return out, rows.Err()
-}
-
 // AlbumPhotos lists an album newest first; a copy is hidden only when its original sits in the same album.
 // Uses idx_photos_album backwards.
 func (r *PhotosRepository) AlbumPhotos(ctx context.Context, albumID int64, after *PhotoCursor, limit int) ([]PhotoRow, error) {

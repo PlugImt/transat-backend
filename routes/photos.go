@@ -25,7 +25,6 @@ func SetupPhotosRoutes(router fiber.Router, db *sql.DB, sync *photos.SyncService
 	group.Get("", handler.GetGallery)
 	group.Get("/", handler.GetGallery)
 	// Static segments before "/:id".
-	group.Get("/timeline", handler.GetTimeline)
 	group.Get("/albums", handler.GetAlbums)
 	group.Get("/albums/:id", handler.GetAlbum)
 	group.Get("/albums/:id/photos", handler.GetAlbumPhotos)
