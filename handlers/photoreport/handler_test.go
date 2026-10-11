@@ -170,14 +170,16 @@ func TestSubmitRejectsInvalidInput(t *testing.T) {
 		body any
 		want int
 	}{
-		"unknown reason": {map[string]any{"photo_id": photoID, "reason": "spam"}, 400},
-		"empty reason":   {map[string]any{"photo_id": photoID}, 400},
-		"short photo id": {map[string]any{"photo_id": "x", "reason": "other"}, 400},
-		"missing photo":  {map[string]any{"reason": "other"}, 400},
-		"unknown photo":  {map[string]any{"photo_id": "UNKNOWN-0000000", "reason": "other"}, 404},
-		"comment length": {map[string]any{"photo_id": photoID, "reason": "other", "comment": strings.Repeat("a", 1001)}, 400},
-		"not json":       {"{nope", 400},
-		"wrong types":    {map[string]any{"photo_id": 5, "reason": []int{1}}, 400},
+		"unknown reason":        {map[string]any{"photo_id": photoID, "reason": "spam"}, 400},
+		"empty reason":          {map[string]any{"photo_id": photoID}, 400},
+		"short photo id":        {map[string]any{"photo_id": "x", "reason": "other"}, 400},
+		"missing photo":         {map[string]any{"reason": "other"}, 400},
+		"unknown photo":         {map[string]any{"photo_id": "UNKNOWN-0000000", "reason": "other", "comment": "details"}, 404},
+		"comment length":        {map[string]any{"photo_id": photoID, "reason": "other", "comment": strings.Repeat("a", 1001)}, 400},
+		"other without comment": {map[string]any{"photo_id": photoID, "reason": "other"}, 400},
+		"other, blank comment":  {map[string]any{"photo_id": photoID, "reason": "other", "comment": " \n\t "}, 400},
+		"not json":              {"{nope", 400},
+		"wrong types":           {map[string]any{"photo_id": 5, "reason": []int{1}}, 400},
 	}
 	for name, c := range cases {
 		if got := post(c.body); got.status != c.want {
@@ -190,7 +192,12 @@ func TestEveryReasonIsAcceptedAndMailed(t *testing.T) {
 	for _, reason := range []string{"appears_in_photo", "inappropriate", "poor_quality", "other"} {
 		t.Run(reason, func(t *testing.T) {
 			a := newAPI(t)
-			got := a.report("student@x.test", reason, "")
+			// Only "other" needs words: the three others stand on their own.
+			comment := ""
+			if reason == "other" {
+				comment = "details"
+			}
+			got := a.report("student@x.test", reason, comment)
 			if got.status != http.StatusCreated {
 				t.Fatalf("status %d: %s", got.status, got.body)
 			}
@@ -325,8 +332,8 @@ func TestAdminReportsAreAdministratorOnly(t *testing.T) {
 		t.Fatalf("unknown album: %d", got.status)
 	}
 
-	// With the album unlinked from its club, the owner no longer hears about its photos.
+	// An unlinked album falls back to the default club, whose owner and the administrator both hear about it.
 	before := a.m.count()
 	a.report("admin@x.test", "poor_quality", "after unlink")
-	a.waitMails(before + 1)
+	a.waitMails(before + 2)
 }

@@ -47,6 +47,7 @@ var (
 	ErrInvalidReason   = errors.New("invalid report reason")
 	ErrInvalidPhotoID  = errors.New("invalid photo id")
 	ErrCommentTooLong  = errors.New("comment too long")
+	ErrCommentRequired = errors.New("comment required")
 	ErrPhotoNotFound   = errors.New("photo not found")
 	ErrUnknownReporter = errors.New("unknown reporter")
 )
@@ -60,6 +61,9 @@ func (e *RateLimitedError) Error() string { return "too many reports" }
 type Mailer interface {
 	SendEmail(mail models.Email, data interface{}) error
 }
+
+// defaultClubName is the club every photo belongs to unless its album says otherwise.
+const defaultClubName = "Club Photo"
 
 // Service stores reports and delivers them. A nil mailer keeps every report pending until one is configured.
 type Service struct {
@@ -150,6 +154,10 @@ func (s *Service) Submit(ctx context.Context, in Submission) (Receipt, error) {
 	if err != nil {
 		return Receipt{}, err
 	}
+	// "Other" says nothing by itself: the reviewers need the words.
+	if in.Reason == ReasonOther && comment == "" {
+		return Receipt{}, ErrCommentRequired
+	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -234,8 +242,8 @@ func loadReporter(ctx context.Context, tx *sql.Tx, email string) (reporter, erro
 	return r, err
 }
 
-// loadPhoto reads the photo and, through its album, the club it belongs to. The club comes from the album
-// (or its parent event) and never from the request.
+// loadPhoto reads the photo and the club it belongs to: its album's club, else its parent event's, else the
+// default club. The club never comes from the request.
 func loadPhoto(ctx context.Context, tx *sql.Tx, id string) (photoContext, error) {
 	pc := photoContext{}
 	err := tx.QueryRowContext(ctx, `
@@ -245,8 +253,9 @@ func loadPhoto(ctx context.Context, tx *sql.Tx, id string) (photoContext, error)
 		FROM photos p
 		LEFT JOIN photo_albums a ON a.id_photo_albums = p.album_id AND a.deleted_at IS NULL
 		LEFT JOIN photo_albums parent ON parent.id_photo_albums = a.parent_album_id
-		LEFT JOIN clubs c ON c.id_clubs = COALESCE(a.club_id, parent.club_id)
-		WHERE p.drive_file_id = $1 AND p.deleted_at IS NULL AND p.media_type <> 'other'`, id).
+		LEFT JOIN clubs c ON c.id_clubs = COALESCE(a.club_id, parent.club_id,
+			(SELECT id_clubs FROM clubs WHERE lower(name) = lower($2) LIMIT 1))
+		WHERE p.drive_file_id = $1 AND p.deleted_at IS NULL AND p.media_type <> 'other'`, id, defaultClubName).
 		Scan(&pc.photoID, &pc.photoName, &pc.photoURL, &pc.albumID, &pc.albumTitle, &pc.albumURL, &pc.clubID, &pc.clubName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return pc, ErrPhotoNotFound

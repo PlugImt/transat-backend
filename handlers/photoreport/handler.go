@@ -49,6 +49,8 @@ func (h *Handler) Submit(c *fiber.Ctx) error {
 		return fail(c, fiber.StatusBadRequest, "Invalid report reason", nil)
 	case errors.Is(err, service.ErrCommentTooLong):
 		return fail(c, fiber.StatusBadRequest, "Comment too long", nil)
+	case errors.Is(err, service.ErrCommentRequired):
+		return fail(c, fiber.StatusBadRequest, "A comment is required for this reason", nil)
 	case errors.Is(err, service.ErrPhotoNotFound):
 		return fail(c, fiber.StatusNotFound, "Photo not found", nil)
 	case errors.As(err, &limited):

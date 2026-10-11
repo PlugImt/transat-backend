@@ -202,25 +202,68 @@ func TestEveryReasonReachesTheClubOwnerAndAllAdmins(t *testing.T) {
 	}
 }
 
-func TestPhotoWithoutClubGoesToAdministratorsOnly(t *testing.T) {
-	f, _ := standard(t)
+func TestPhotosWithoutAClubBelongToTheDefaultClub(t *testing.T) {
+	f, defaultClub := standard(t)
 	album := f.album("Sans club", nil, nil)
 	f.photo("PHOTO-0000000002", &album)
 	f.photo("PHOTO-0000000003", nil) // not even in an album
 
 	for _, id := range []string{"PHOTO-0000000002", "PHOTO-0000000003"} {
-		if _, err := f.submit("reporter@x.test", id, ReasonOther, ""); err != nil {
+		rec, err := f.submit("reporter@x.test", id, ReasonOther, "details")
+		if err != nil {
 			t.Fatal(err)
+		}
+		if r, _ := f.svc.Get(context.Background(), rec.ID); r.ClubName != "Club Photo" || r.ClubID == nil || *r.ClubID != defaultClub {
+			t.Fatalf("%s: club %+v, want the default club", id, r)
 		}
 	}
 	f.deliver()
-	if got := f.m.recipients(); fmt.Sprint(got) != "[admin1@x.test admin1@x.test admin2@x.test admin2@x.test]" {
-		t.Fatalf("recipients %v, want administrators only", got)
+	if got := fmt.Sprint(f.m.recipients()); got != "[admin1@x.test admin1@x.test admin2@x.test admin2@x.test owner@x.test owner@x.test]" {
+		t.Fatalf("recipients %s, want the photo club's owner and the administrators", got)
+	}
+}
+
+func TestAnAlbumsOwnClubBeatsTheDefault(t *testing.T) {
+	f, _ := standard(t)
+	f.user("sport@x.test", "Sam", "sport_respo")
+	sport := f.club("Sport")
+	album := f.album("Tournoi", &sport, nil)
+	f.photo("PHOTO-0000000002", &album)
+
+	if _, err := f.submit("reporter@x.test", "PHOTO-0000000002", ReasonInappropriate, ""); err != nil {
+		t.Fatal(err)
+	}
+	f.deliver()
+	if got := fmt.Sprint(f.m.recipients()); got != "[admin1@x.test admin2@x.test sport@x.test]" {
+		t.Fatalf("recipients %s: the default club's owner must not be told", got)
+	}
+}
+
+func TestWithoutADefaultClubPhotosGoToAdministratorsOnly(t *testing.T) {
+	f, _ := standard(t)
+	f.exec(`UPDATE clubs SET name = 'Autre club'`) // the photo club does not exist
+	f.photo("PHOTO-0000000003", nil)
+	if _, err := f.submit("reporter@x.test", "PHOTO-0000000003", ReasonOther, "details"); err != nil {
+		t.Fatal(err)
+	}
+	f.deliver()
+	if got := fmt.Sprint(f.m.recipients()); got != "[admin1@x.test admin2@x.test]" {
+		t.Fatalf("recipients %s, want administrators only", got)
 	}
 	for _, s := range f.m.sent {
 		if s.data.HasClub || s.data.IsClubOwner {
 			t.Fatalf("no club expected: %+v", s.data)
 		}
+	}
+
+	f.exec(`UPDATE clubs SET name = 'club PHOTO'`) // matched without regard to case
+	f.photo("PHOTO-0000000004", nil)
+	if _, err := f.submit("reporter@x.test", "PHOTO-0000000004", ReasonOther, "details"); err != nil {
+		t.Fatal(err)
+	}
+	f.deliver()
+	if f.m.calls["owner@x.test"] != 1 {
+		t.Fatalf("owner mailed %d times, want 1", f.m.calls["owner@x.test"])
 	}
 }
 
@@ -250,7 +293,7 @@ func TestClubWithoutOwnerAndSubAlbumInheritance(t *testing.T) {
 func TestOwnerWhoIsAlsoAdminReceivesOneEmail(t *testing.T) {
 	f, _ := standard(t)
 	f.user("both@x.test", "Bo", "clubphoto_respo", "ADMIN")
-	if _, err := f.submit("reporter@x.test", photoID, ReasonOther, ""); err != nil {
+	if _, err := f.submit("reporter@x.test", photoID, ReasonOther, "details"); err != nil {
 		t.Fatal(err)
 	}
 	f.deliver()
@@ -262,7 +305,7 @@ func TestOwnerWhoIsAlsoAdminReceivesOneEmail(t *testing.T) {
 func TestRecipientLanguageIsUsed(t *testing.T) {
 	f, _ := standard(t)
 	f.exec(`UPDATE newf SET language = (SELECT id_languages FROM languages WHERE code = 'en') WHERE email = 'admin1@x.test'`)
-	if _, err := f.submit("reporter@x.test", photoID, ReasonOther, ""); err != nil {
+	if _, err := f.submit("reporter@x.test", photoID, ReasonOther, "details"); err != nil {
 		t.Fatal(err)
 	}
 	f.deliver()
@@ -294,14 +337,16 @@ func TestValidation(t *testing.T) {
 	}{
 		{"unknown reason", photoID, "spam", "", "reporter@x.test", ErrInvalidReason},
 		{"empty reason", photoID, "", "", "reporter@x.test", ErrInvalidReason},
-		{"short photo id", "abc", ReasonOther, "", "reporter@x.test", ErrInvalidPhotoID},
-		{"empty photo id", "", ReasonOther, "", "reporter@x.test", ErrInvalidPhotoID},
-		{"unknown photo", "NOPE-0000000000", ReasonOther, "", "reporter@x.test", ErrPhotoNotFound},
-		{"deleted photo", "DELETED-000001", ReasonOther, "", "reporter@x.test", ErrPhotoNotFound},
-		{"not an image or video", "DOCUMENT-00001", ReasonOther, "", "reporter@x.test", ErrPhotoNotFound},
+		{"short photo id", "abc", ReasonOther, "details", "reporter@x.test", ErrInvalidPhotoID},
+		{"empty photo id", "", ReasonOther, "details", "reporter@x.test", ErrInvalidPhotoID},
+		{"unknown photo", "NOPE-0000000000", ReasonOther, "details", "reporter@x.test", ErrPhotoNotFound},
+		{"deleted photo", "DELETED-000001", ReasonOther, "details", "reporter@x.test", ErrPhotoNotFound},
+		{"not an image or video", "DOCUMENT-00001", ReasonOther, "details", "reporter@x.test", ErrPhotoNotFound},
 		{"comment too long", photoID, ReasonOther, strings.Repeat("é", MaxCommentRunes+1), "reporter@x.test", ErrCommentTooLong},
 		{"huge comment", photoID, ReasonOther, strings.Repeat("a", 100000), "reporter@x.test", ErrCommentTooLong},
-		{"unknown reporter", photoID, ReasonOther, "", "ghost@x.test", ErrUnknownReporter},
+		{"unknown reporter", photoID, ReasonOther, "details", "ghost@x.test", ErrUnknownReporter},
+		{"other without comment", photoID, ReasonOther, "", "reporter@x.test", ErrCommentRequired},
+		{"other with a blank comment", photoID, ReasonOther, " \x00\r\n\t ", "reporter@x.test", ErrCommentRequired},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -316,6 +361,13 @@ func TestValidation(t *testing.T) {
 		t.Fatalf("%d reports stored from invalid submissions", n)
 	}
 
+	// Only "other" needs a comment.
+	for _, reason := range []Reason{ReasonAppearsInPhoto, ReasonInappropriate, ReasonPoorQuality} {
+		if _, err := f.submit("reporter@x.test", photoID, reason, ""); err != nil {
+			t.Fatalf("%s without comment: %v", reason, err)
+		}
+	}
+
 	// The limit itself is accepted; control characters are dropped, line breaks kept.
 	if _, err := f.submit("reporter@x.test", photoID, ReasonOther, strings.Repeat("é", MaxCommentRunes)); err != nil {
 		t.Fatalf("a comment of exactly %d characters: %v", MaxCommentRunes, err)
@@ -324,7 +376,7 @@ func TestValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stored string
-	_ = f.db.QueryRow(`SELECT comment FROM photo_reports WHERE reason = 'poor_quality'`).Scan(&stored)
+	_ = f.db.QueryRow(`SELECT comment FROM photo_reports WHERE reason = 'poor_quality' AND comment <> ''`).Scan(&stored)
 	if stored != "ab\nc" {
 		t.Fatalf("stored %q", stored)
 	}
@@ -476,7 +528,7 @@ func TestEmailFailureKeepsTheReportAndRetriesOnlyWhatFailed(t *testing.T) {
 func TestExhaustedAttemptsAreFailedUntilAnAdministratorRetries(t *testing.T) {
 	f, _ := standard(t)
 	f.m.set("owner@x.test", true)
-	rec, _ := f.submit("reporter@x.test", photoID, ReasonOther, "")
+	rec, _ := f.submit("reporter@x.test", photoID, ReasonOther, "details")
 	for i := 0; i < MaxAttempts+2; i++ {
 		f.due()
 		f.deliver()
@@ -505,7 +557,7 @@ func TestExhaustedAttemptsAreFailedUntilAnAdministratorRetries(t *testing.T) {
 func TestPanickingSenderIsAFailureNotACrash(t *testing.T) {
 	f, _ := standard(t)
 	f.m.panics["owner@x.test"] = true
-	rec, _ := f.submit("reporter@x.test", photoID, ReasonOther, "")
+	rec, _ := f.submit("reporter@x.test", photoID, ReasonOther, "details")
 	if n := f.deliver(); n != 2 {
 		t.Fatalf("delivered %d", n)
 	}
@@ -517,7 +569,7 @@ func TestPanickingSenderIsAFailureNotACrash(t *testing.T) {
 func TestWithoutMailerReportsStayPending(t *testing.T) {
 	f, _ := standard(t)
 	f.svc.mailer = nil
-	rec, err := f.submit("reporter@x.test", photoID, ReasonOther, "")
+	rec, err := f.submit("reporter@x.test", photoID, ReasonOther, "details")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -534,7 +586,7 @@ func TestWithoutMailerReportsStayPending(t *testing.T) {
 
 func TestInterruptedSenderIsReclaimed(t *testing.T) {
 	f, _ := standard(t)
-	rec, _ := f.submit("reporter@x.test", photoID, ReasonOther, "")
+	rec, _ := f.submit("reporter@x.test", photoID, ReasonOther, "details")
 	f.exec(`UPDATE photo_report_deliveries SET status = 'sending', attempts = 1, lease_until = now() + interval '5 minutes'`)
 	if f.deliver() != 0 {
 		t.Fatal("a leased delivery belongs to its sender")
@@ -555,7 +607,7 @@ func TestConcurrentDeliveryNeverMailsTwice(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		f.user(fmt.Sprintf("extra%d@x.test", i), "X", "ADMIN")
 	}
-	if _, err := f.submit("reporter@x.test", photoID, ReasonOther, ""); err != nil {
+	if _, err := f.submit("reporter@x.test", photoID, ReasonOther, "details"); err != nil {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
@@ -719,7 +771,7 @@ func TestEmailTemplateEscapesUserTextInEveryLanguage(t *testing.T) {
 func TestSubjectCannotCarryLineBreaks(t *testing.T) {
 	f, _ := standard(t)
 	f.exec(`UPDATE photo_albums SET title = E'Gala\r\nBcc: evil@x.test ' || repeat('x', 200)`)
-	if _, err := f.submit("reporter@x.test", photoID, ReasonOther, ""); err != nil {
+	if _, err := f.submit("reporter@x.test", photoID, ReasonOther, "details"); err != nil {
 		t.Fatal(err)
 	}
 	f.deliver()

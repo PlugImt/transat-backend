@@ -138,7 +138,8 @@ export default function PhotoReportModal({ reportId, onClose }: PhotoReportModal
             </div>
             <div className="text-xs text-gray-500">
               Club au moment du signalement :{" "}
-              {report.club_name || "aucun (administrateurs uniquement)"}
+              {report.club_name ||
+                "aucun (administrateurs uniquement : club par défaut introuvable)"}
             </div>
             {report.album_id && (
               <label className="block text-xs text-gray-600">
@@ -150,7 +151,7 @@ export default function PhotoReportModal({ reportId, onClose }: PhotoReportModal
                   onChange={(e) => handleClubChange(e.target.value)}
                   className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
                 >
-                  <option value="">Aucun club (administrateurs uniquement)</option>
+                  <option value="">Club par défaut (Club Photo)</option>
                   {clubs.map((club) => (
                     <option key={club.id_clubs} value={club.id_clubs}>
                       {club.name}
