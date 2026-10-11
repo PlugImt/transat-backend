@@ -23,8 +23,9 @@ const (
 	albumLimit   = 50
 	maxAlbums    = 100
 
-	gridSize    = 400
-	previewSize = 1600
+	gridSize    = 320
+	coverSize   = 400
+	previewSize = 1200
 
 	listMaxAge   = 60
 	detailMaxAge = 300
@@ -151,7 +152,7 @@ func toAlbumDTO(a repository.AlbumRow) albumDTO {
 		d.EventDate = strPtr(a.EventDate.Time.Format("2006-01-02"))
 	}
 	if a.CoverID.Valid {
-		d.CoverURL = strPtr(expand(thumbTemplate, a.CoverID.String, gridSize))
+		d.CoverURL = strPtr(expand(thumbTemplate, a.CoverID.String, coverSize))
 	}
 	if a.FirstTakenAt.Valid {
 		d.FirstTakenAt = &a.FirstTakenAt.Time
