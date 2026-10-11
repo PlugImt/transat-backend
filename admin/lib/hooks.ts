@@ -14,6 +14,7 @@ import {
   eventsApi,
   menuApi,
   notificationsApi,
+  photoReportsApi,
   reservationApi,
   reviewsApi,
   rolesApi,
@@ -28,6 +29,7 @@ import type {
   Event,
   NotificationAudience,
   NotificationCategory,
+  PhotoReportsFilter,
   SendNotificationRequest,
   TraqArticle,
   User,
@@ -546,5 +548,47 @@ export const useNotificationRecipients = (
 export const useSendNotification = () => {
   return useMutation({
     mutationFn: (request: SendNotificationRequest) => notificationsApi.send(request),
+  });
+};
+
+// Photo reports hooks
+export const usePhotoReports = (filter: PhotoReportsFilter) => {
+  return useQuery({
+    queryKey: ["photo-reports", filter],
+    queryFn: () => photoReportsApi.list(filter),
+    placeholderData: keepPreviousData,
+  });
+};
+
+export const usePhotoReport = (id: number | null) => {
+  return useQuery({
+    queryKey: ["photo-report", id],
+    queryFn: () => photoReportsApi.get(id as number),
+    enabled: id !== null,
+  });
+};
+
+export const useRetryPhotoReport = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: photoReportsApi.retry,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["photo-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["photo-report"] });
+    },
+  });
+};
+
+export const useSetAlbumClub = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ albumId, clubId }: { albumId: number; clubId: number | null }) =>
+      photoReportsApi.setAlbumClub(albumId, clubId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["photo-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["photo-report"] });
+    },
   });
 };

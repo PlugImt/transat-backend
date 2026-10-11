@@ -61,6 +61,8 @@ type photoDTO struct {
 	Height    int    `json:"height"`
 	SortAt    string `json:"sort_at"`
 	AlbumID   *int64 `json:"album_id"`
+	// The event's name, from the same album as AlbumID (null when the photo has no published event).
+	AlbumTitle *string `json:"album_title"`
 	// Null when Drive has no thumbnail for the file (RAW images, …): show a placeholder.
 	ThumbnailURL         *string `json:"thumbnail_url"`
 	ThumbnailFallbackURL *string `json:"thumbnail_fallback_url"`
@@ -109,6 +111,19 @@ type albumDTO struct {
 type photosPage struct {
 	Photos     []photoDTO `json:"photos"`
 	NextCursor *string    `json:"next_cursor"`
+	// Only on gallery pages that start mid-library (at=, after=): the position to load newer photos from.
+	PrevCursor *string `json:"prev_cursor"`
+}
+
+type timelineDayDTO struct {
+	Day   string `json:"day"`
+	Count int    `json:"count"`
+	// Instant of the day's latest photo: GET /photos?at=<at> starts the gallery on that day.
+	At string `json:"at"`
+}
+
+type timelineResponse struct {
+	Days []timelineDayDTO `json:"days"`
 }
 
 type albumsPage struct {
@@ -125,6 +140,9 @@ func toPhotoDTO(p repository.PhotoRow) photoDTO {
 	}
 	if p.AlbumID.Valid {
 		d.AlbumID = &p.AlbumID.Int64
+	}
+	if p.AlbumTitle.Valid {
+		d.AlbumTitle = &p.AlbumTitle.String
 	}
 	if p.HasThumbnail {
 		d.ThumbnailURL = strPtr(expand(thumbTemplate, p.ID, gridSize))
@@ -176,14 +194,14 @@ func decodeCursor(s string, n int) ([]string, error) {
 }
 
 func photoCursor(p repository.PhotoRow) string {
-	return encodeCursor(p.SortAt.UTC().Format(time.RFC3339Nano), p.ID)
+	return encodeCursor(p.SortAt.UTC().Format(time.RFC3339Nano), strconv.FormatInt(p.AlbumKey, 10), p.ID)
 }
 
 func parsePhotoCursor(s string) (*repository.PhotoCursor, error) {
 	if s == "" {
 		return nil, nil
 	}
-	parts, err := decodeCursor(s, 2)
+	parts, err := decodeCursor(s, 3)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +209,11 @@ func parsePhotoCursor(s string) (*repository.PhotoCursor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &repository.PhotoCursor{SortAt: t, ID: parts[1]}, nil
+	key, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &repository.PhotoCursor{SortAt: t, AlbumKey: key, ID: parts[2]}, nil
 }
 
 func albumCursor(a repository.AlbumRow) string {
@@ -287,16 +309,95 @@ func send(c *fiber.Ctx, maxAge int, body []byte) error {
 	return c.Send(body)
 }
 
-// GetGallery handles GET /photos?cursor=&limit= (general gallery, newest first).
+// GetGallery handles GET /photos?cursor=&limit= (general gallery, newest first). at=<RFC3339> starts at that
+// instant and after=<cursor> pages towards newer photos, so the app can open the gallery on any date.
 func (h *PhotosHandler) GetGallery(c *fiber.Ctx) error {
 	cursor, err := parsePhotoCursor(c.Query("cursor"))
 	if err != nil {
 		return fail(c, fiber.StatusBadRequest, "Invalid cursor", nil)
 	}
+	newer, err := parsePhotoCursor(c.Query("after"))
+	if err != nil {
+		return fail(c, fiber.StatusBadRequest, "Invalid cursor", nil)
+	}
+	var at *time.Time
+	if raw := c.Query("at"); raw != "" {
+		t, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return fail(c, fiber.StatusBadRequest, "Invalid date", nil)
+		}
+		at = &t
+	}
+	modes := 0
+	for _, used := range []bool{cursor != nil, newer != nil, at != nil} {
+		if used {
+			modes++
+		}
+	}
+	if modes > 1 {
+		return fail(c, fiber.StatusBadRequest, "cursor, after and at are exclusive", nil)
+	}
 	limit := limitParam(c, defaultLimit, maxLimit)
+
 	return h.serve(c, listMaxAge, func(ctx context.Context) (any, error) {
-		rows, err := h.repo.Gallery(ctx, cursor, limit+1)
-		return photosResponse(rows, limit), err
+		switch {
+		case newer != nil:
+			rows, err := h.repo.GalleryNewer(ctx, newer, limit+1)
+			if err != nil {
+				return nil, err
+			}
+			more := len(rows) > limit
+			if more {
+				rows = rows[:limit]
+			}
+			out := photosPage{Photos: make([]photoDTO, 0, len(rows))}
+			for i := len(rows) - 1; i >= 0; i-- {
+				out.Photos = append(out.Photos, toPhotoDTO(rows[i]))
+			}
+			if more {
+				out.PrevCursor = strPtr(photoCursor(rows[limit-1]))
+			}
+			return out, nil
+		case at != nil:
+			// sort_at <= at: the keyset is strict, so step one microsecond past the instant with the lowest id.
+			start := &repository.PhotoCursor{SortAt: at.Add(time.Microsecond)}
+			rows, err := h.repo.Gallery(ctx, start, limit+1)
+			if err != nil {
+				return nil, err
+			}
+			out := photosResponse(rows, limit)
+			if len(rows) > 0 {
+				first := &repository.PhotoCursor{SortAt: rows[0].SortAt, AlbumKey: rows[0].AlbumKey, ID: rows[0].ID}
+				newerRows, err := h.repo.GalleryNewer(ctx, first, 1)
+				if err != nil {
+					return nil, err
+				}
+				if len(newerRows) > 0 {
+					out.PrevCursor = strPtr(photoCursor(rows[0]))
+				}
+			}
+			return out, nil
+		default:
+			rows, err := h.repo.Gallery(ctx, cursor, limit+1)
+			return photosResponse(rows, limit), err
+		}
+	})
+}
+
+// GetTimeline handles GET /photos/timeline: the days that hold photos, for the date scrubber.
+func (h *PhotosHandler) GetTimeline(c *fiber.Ctx) error {
+	return h.serve(c, listMaxAge, func(ctx context.Context) (any, error) {
+		days, err := h.repo.Timeline(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := timelineResponse{Days: make([]timelineDayDTO, 0, len(days))}
+		for _, d := range days {
+			out.Days = append(out.Days, timelineDayDTO{
+				Day: d.Day.Format("2006-01-02"), Count: d.Count, At: d.Latest.UTC().Format(time.RFC3339Nano),
+			})
+		}
+		return out, nil
 	})
 }
 
@@ -336,7 +437,7 @@ func (h *PhotosHandler) GetAlbum(c *fiber.Ctx) error {
 	})
 }
 
-// GetAlbumPhotos handles GET /photos/albums/:id/photos?cursor=&limit= (chronological).
+// GetAlbumPhotos handles GET /photos/albums/:id/photos?cursor=&limit= (newest first).
 func (h *PhotosHandler) GetAlbumPhotos(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil {

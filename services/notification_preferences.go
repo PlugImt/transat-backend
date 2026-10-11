@@ -12,6 +12,22 @@ import (
 // ErrUnknownNotificationCategory is returned when a category has no row in the `services` table.
 var ErrUnknownNotificationCategory = errors.New("unknown notification category")
 
+// SubscribeToDefaultCategories gives a new user every notification category except the opt-in ones, which stay
+// off until the user switches them on.
+func SubscribeToDefaultCategories(db interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}, email string) error {
+	optIn := make([]string, len(models.OptInNotificationCategories))
+	for i, c := range models.OptInNotificationCategories {
+		optIn[i] = string(c)
+	}
+	_, err := db.Exec(`
+		INSERT INTO notifications (email, id_services)
+		SELECT $1, id_services FROM services WHERE name <> ALL($2)
+		ON CONFLICT (email, id_services) DO NOTHING`, email, pq.Array(optIn))
+	return err
+}
+
 func categoryNames() []string {
 	names := make([]string, len(models.NotificationCategories))
 	for i, c := range models.NotificationCategories {

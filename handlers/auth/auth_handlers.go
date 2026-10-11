@@ -208,12 +208,8 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	if !alreadyExists {
-		// Subscribe user to all available notification services
-		subscribeToAllServicesQuery := `
-		INSERT INTO notifications (email, id_services)
-		SELECT $1, id_services FROM services;
-	`
-		_, err = tx.Exec(subscribeToAllServicesQuery, newf.Email)
+		// Subscribe the user to the default notification categories; opt-in ones (Photos) stay off.
+		err = services.SubscribeToDefaultCategories(tx, newf.Email)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, "Failed to subscribe user to all notification services")
 			utils.LogLineKeyValue(utils.LevelError, "Email", newf.Email)

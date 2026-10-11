@@ -20,6 +20,7 @@ const (
 	NavigationRestaurant  NavigationType = "restaurant"
 	NavigationReservation NavigationType = "reservation"
 	NavigationService     NavigationType = "service"
+	NavigationPhotoAlbum  NavigationType = "photo_album"
 	NavigationURL         NavigationType = "url"
 )
 
@@ -38,6 +39,7 @@ var navigationRules = map[NavigationType]navigationRule{
 	NavigationRestaurant:  {requiresID: false, legacyScreen: "Restaurant"},
 	NavigationReservation: {requiresID: true, legacyScreen: "Reservation"},
 	NavigationService:     {requiresID: true},
+	NavigationPhotoAlbum:  {requiresID: true, validateID: validateAlbumID},
 	NavigationURL:         {requiresID: true, validateID: validateWebURL},
 }
 
@@ -49,6 +51,14 @@ func validateWebURL(raw string) error {
 	}
 	if len(raw) > maxNavigationURLLength {
 		return fmt.Errorf("url is too long")
+	}
+	return nil
+}
+
+// validateAlbumID accepts the numeric id of a photo album.
+func validateAlbumID(id string) error {
+	if n, err := strconv.ParseInt(id, 10, 64); err != nil || n <= 0 {
+		return fmt.Errorf("album id must be a positive integer")
 	}
 	return nil
 }
@@ -87,6 +97,11 @@ func ReservationNavigation(itemID int, params map[string]string) *NavigationTarg
 // ServiceNavigation opens the landing page of a service by key (e.g. "laundry").
 func ServiceNavigation(service string) *NavigationTarget {
 	return newNavigationTarget(NavigationService, service, nil)
+}
+
+// PhotoAlbumNavigation opens a photo album by its id; the title is only a heading shown while it loads.
+func PhotoAlbumNavigation(albumID int64, title string) *NavigationTarget {
+	return newNavigationTarget(NavigationPhotoAlbum, strconv.FormatInt(albumID, 10), map[string]string{"title": title})
 }
 
 // URLNavigation opens a web link in the device's default browser.

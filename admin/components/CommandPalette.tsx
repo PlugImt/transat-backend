@@ -7,6 +7,7 @@ import {
   Bell,
   Building,
   Calendar,
+  Flag,
   LogOut,
   Plus,
   Search,
@@ -163,6 +164,14 @@ function CommandPalette() {
         icon: Bell,
         action: () => router.push("/notifications"),
         keywords: ["notifications", "push", "envoyer", "message", "annonce"],
+      },
+      {
+        id: "nav-photo-reports",
+        label: "Signalements photos",
+        description: "Voir les photos signalées par les utilisateurs",
+        icon: Flag,
+        action: () => router.push("/photo-reports"),
+        keywords: ["photos", "signalement", "report", "modération", "nsfw"],
       },
 
       // Actions

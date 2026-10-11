@@ -56,6 +56,8 @@ type SyncService struct {
 	driveID        string
 	reconcileEvery time.Duration
 	now            func() time.Time
+	// Optional: announces new albums after each tick. Nil when album notifications are off.
+	notifier *AlbumNotifier
 }
 
 // NewSyncService: reconcileEvery is how often a full resync corrects drift the changes feed cannot express.

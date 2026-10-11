@@ -8,8 +8,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"time"
 
+	"github.com/lib/pq"
 	appI18n "github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/models"
 
@@ -27,6 +29,9 @@ type NotificationService struct {
 	db          *sql.DB
 	expoPushURL string
 	client      *http.Client
+	// A request that fails on the network, with 429 or with 5xx is retried this many times in all.
+	maxAttempts int
+	retryDelay  time.Duration
 }
 
 // NewNotificationService creates a new NotificationService.
@@ -35,6 +40,8 @@ func NewNotificationService(db *sql.DB) *NotificationService {
 		db:          db,
 		expoPushURL: expoPushURL,
 		client:      &http.Client{Timeout: 15 * time.Second},
+		maxAttempts: 3,
+		retryDelay:  2 * time.Second,
 	}
 }
 
@@ -133,6 +140,16 @@ func (ns *NotificationService) SendLocalized(
 type expoTicket struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
+	Details struct {
+		Error string `json:"error"`
+	} `json:"details"`
+}
+
+// PushResult counts what Expo accepted. InvalidTokens are devices Expo says no longer exist; they are removed.
+type PushResult struct {
+	Accepted      int
+	Failed        int
+	InvalidTokens []string
 }
 
 // SendPushNotification sends a push notification to the payload's tokens through Expo, in batches.
@@ -141,10 +158,20 @@ func (ns *NotificationService) SendPushNotification(payload models.NotificationP
 	if len(tokens) == 0 {
 		return fmt.Errorf("no valid notification tokens found")
 	}
+	result, err := ns.SendPush(payload)
+	if result.Failed > 0 {
+		return fmt.Errorf("failed to send %d/%d notifications: %w", result.Failed, len(tokens), err)
+	}
+	return err
+}
 
-	data := payload.ExpoData()
-	failed := 0
+// SendPush is SendPushNotification with the outcome per device. A device that fails does not stop the others;
+// tokens Expo reports as unregistered are deleted so they are not tried again.
+func (ns *NotificationService) SendPush(payload models.NotificationPayload) (PushResult, error) {
+	tokens := dedupe(payload.NotificationTokens)
+	var result PushResult
 	var lastErr error
+	data := payload.ExpoData()
 
 	for start := 0; start < len(tokens); start += expoBatchSize {
 		batch := tokens[start:min(start+expoBatchSize, len(tokens))]
@@ -166,60 +193,103 @@ func (ns *NotificationService) SendPushNotification(payload models.NotificationP
 			messages[i] = message
 		}
 
-		batchFailed, err := ns.sendBatch(messages)
+		accepted, failed, invalid, err := ns.sendBatch(messages, batch)
+		result.Accepted += accepted
+		result.Failed += failed
+		result.InvalidTokens = append(result.InvalidTokens, invalid...)
 		if err != nil {
 			lastErr = err
 		}
-		failed += batchFailed
 	}
 
-	if failed > 0 {
-		return fmt.Errorf("failed to send %d/%d notifications: %w", failed, len(tokens), lastErr)
-	}
-	return nil
+	ns.pruneTokens(result.InvalidTokens)
+	return result, lastErr
 }
 
-// sendBatch posts one Expo request and returns how many of its messages failed.
-func (ns *NotificationService) sendBatch(messages []map[string]interface{}) (int, error) {
+func (ns *NotificationService) pruneTokens(tokens []string) {
+	if len(tokens) == 0 {
+		return
+	}
+	res, err := ns.db.Exec(`DELETE FROM user_notification_tokens WHERE token = ANY($1)`, pq.Array(tokens))
+	if err != nil {
+		log.Printf("Failed to remove %d unregistered push tokens: %v", len(tokens), err)
+		return
+	}
+	removed, _ := res.RowsAffected()
+	log.Printf("Removed %d unregistered push token rows", removed)
+}
+
+// sendBatch posts one Expo request, retrying transient failures, and returns how many of its messages were
+// accepted or failed, and which tokens are no longer valid.
+func (ns *NotificationService) sendBatch(messages []map[string]interface{}, tokens []string) (accepted, failed int, invalid []string, err error) {
 	body, err := json.Marshal(messages)
 	if err != nil {
-		return len(messages), fmt.Errorf("failed to encode expo messages: %w", err)
+		return 0, len(messages), nil, fmt.Errorf("failed to encode expo messages: %w", err)
 	}
 
+	var raw []byte
+	for attempt := 1; ; attempt++ {
+		var retry bool
+		raw, retry, err = ns.post(body)
+		if err == nil {
+			break
+		}
+		if !retry || attempt >= ns.maxAttempts {
+			return 0, len(messages), nil, err
+		}
+		time.Sleep(time.Duration(attempt) * ns.retryDelay)
+	}
+
+	var parsed struct {
+		Data []expoTicket `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil || len(parsed.Data) != len(messages) {
+		return len(messages), 0, nil, nil // Accepted by Expo; the receipt format is not worth failing the send for.
+	}
+
+	var lastErr error
+	for i, ticket := range parsed.Data {
+		if ticket.Status == "ok" {
+			accepted++
+			continue
+		}
+		failed++
+		lastErr = fmt.Errorf("expo returned error: %s", redactTokens(ticket.Message))
+		if ticket.Details.Error == "DeviceNotRegistered" {
+			invalid = append(invalid, tokens[i])
+		}
+	}
+	return accepted, failed, invalid, lastErr
+}
+
+// post sends one request. retry says whether the failure is worth another attempt.
+func (ns *NotificationService) post(body []byte) (raw []byte, retry bool, err error) {
 	req, err := http.NewRequest(http.MethodPost, ns.expoPushURL, bytes.NewReader(body))
 	if err != nil {
-		return len(messages), fmt.Errorf("failed to build expo request: %w", err)
+		return nil, false, fmt.Errorf("failed to build expo request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := ns.client.Do(req)
 	if err != nil {
-		return len(messages), fmt.Errorf("expo request failed: %w", err)
+		return nil, true, fmt.Errorf("expo request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, _ = io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return len(messages), fmt.Errorf("expo push failed with status %d: %s", resp.StatusCode, raw)
+		transient := resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500
+		return nil, transient, fmt.Errorf("expo push failed with status %d: %s", resp.StatusCode, redactTokens(string(raw)))
 	}
+	return raw, false, nil
+}
 
-	var parsed struct {
-		Data []expoTicket `json:"data"`
-	}
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return 0, nil // Accepted by Expo; the receipt format is not worth failing the send for.
-	}
+var pushTokenPattern = regexp.MustCompile(`Expo(?:nent)?PushToken\[[^\]]*\]`)
 
-	failed := 0
-	var lastErr error
-	for _, ticket := range parsed.Data {
-		if ticket.Status != "ok" {
-			failed++
-			lastErr = fmt.Errorf("expo returned error: %s", ticket.Message)
-		}
-	}
-	return failed, lastErr
+// redactTokens keeps device tokens out of logs and error messages.
+func redactTokens(text string) string {
+	return pushTokenPattern.ReplaceAllString(text, "[push token]")
 }
 
 func dedupe(values []string) []string {

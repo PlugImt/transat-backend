@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{call .T "photo_report_email.title"}}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1c1f24;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:24px 12px;">
+    <tr>
+        <td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;">
+                <tr>
+                    <td style="background-color:#0049a8;padding:20px 28px;color:#ffffff;">
+                        <div style="font-size:13px;opacity:0.85;">Transat</div>
+                        <div style="font-size:20px;font-weight:700;margin-top:4px;">{{call .T "photo_report_email.title"}}</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:24px 28px 8px 28px;font-size:15px;line-height:1.5;">
+                        {{if .Data.IsClubOwner}}
+                        <p style="margin:0 0 12px 0;">{{call .T "photo_report_email.intro_owner"}}</p>
+                        {{else}}
+                        <p style="margin:0 0 12px 0;">{{call .T "photo_report_email.intro_admin"}}</p>
+                        {{if not .Data.HasClub}}<p style="margin:0 0 12px 0;color:#6b7280;">{{call .T "photo_report_email.no_club_note"}}</p>{{end}}
+                        {{end}}
+                        <p style="margin:0 0 4px 0;color:#6b7280;">{{call .T "photo_report_email.no_automatic_action"}}</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:8px 28px 8px 28px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;line-height:1.45;">
+                            <tr>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;width:34%;color:#6b7280;vertical-align:top;">{{call .T "photo_report_email.reason"}}</td>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;font-weight:600;vertical-align:top;">{{call .T (printf "photo_report_email.reason_%s" .Data.ReasonCode)}}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;color:#6b7280;vertical-align:top;">{{call .T "photo_report_email.comment"}}</td>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;vertical-align:top;white-space:pre-wrap;word-break:break-word;">{{if .Data.Comment}}{{.Data.Comment}}{{else}}<span style="color:#6b7280;">{{call .T "photo_report_email.no_comment"}}</span>{{end}}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;color:#6b7280;vertical-align:top;">{{call .T "photo_report_email.photo"}}</td>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;vertical-align:top;word-break:break-word;">{{.Data.PhotoName}}<br><span style="color:#6b7280;font-size:12px;">ID {{.Data.PhotoID}}</span></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;color:#6b7280;vertical-align:top;">{{call .T "photo_report_email.event"}}</td>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;vertical-align:top;">{{if .Data.AlbumTitle}}{{.Data.AlbumTitle}}<br><span style="color:#6b7280;font-size:12px;">ID {{.Data.AlbumID}}</span>{{else}}<span style="color:#6b7280;">{{call .T "photo_report_email.no_event"}}</span>{{end}}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;color:#6b7280;vertical-align:top;">{{call .T "photo_report_email.club"}}</td>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;vertical-align:top;">{{if .Data.HasClub}}{{.Data.ClubName}}{{else}}<span style="color:#6b7280;">{{call .T "photo_report_email.no_club"}}</span>{{end}}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;color:#6b7280;vertical-align:top;">{{call .T "photo_report_email.reporter"}}</td>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;vertical-align:top;word-break:break-word;">{{.Data.ReporterName}}{{if .Data.ReporterMail}}<br>{{.Data.ReporterMail}}{{end}}<br><span style="color:#6b7280;font-size:12px;">ID {{.Data.ReporterID}}{{if .Data.Formation}} · {{.Data.Formation}}{{end}}{{if .Data.ReporterYear}} · {{.Data.ReporterYear}}{{end}}</span></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;color:#6b7280;vertical-align:top;">{{call .T "photo_report_email.submitted"}}</td>
+                                <td style="padding:10px 0;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;vertical-align:top;">{{.Data.SubmittedAt}} <span style="color:#6b7280;font-size:12px;">(#{{.Data.ReportID}})</span></td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:16px 28px 28px 28px;font-size:14px;">
+                        <a href="{{.Data.PhotoURL}}" style="display:inline-block;background-color:#0049a8;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;margin:0 8px 8px 0;">{{call .T "photo_report_email.open_photo"}}</a>
+                        {{if .Data.AlbumURL}}<a href="{{.Data.AlbumURL}}" style="display:inline-block;background-color:#e8eefb;color:#0049a8;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;margin:0 8px 8px 0;">{{call .T "photo_report_email.open_album"}}</a>{{end}}
+                        {{if .Data.AdminURL}}<a href="{{.Data.AdminURL}}" style="display:inline-block;background-color:#e8eefb;color:#0049a8;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;margin:0 8px 8px 0;">{{call .T "photo_report_email.open_admin"}}</a>{{end}}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:16px 28px;background-color:#f9fafb;font-size:12px;color:#6b7280;">{{call .T "photo_report_email.footer"}}</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

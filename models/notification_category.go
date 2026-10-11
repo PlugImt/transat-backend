@@ -11,6 +11,7 @@ const (
 	NotificationEvents         NotificationCategory = "EVENTS"
 	NotificationEventReminders NotificationCategory = "EVENT_REMINDERS"
 	NotificationReservations   NotificationCategory = "RESERVATIONS"
+	NotificationPhotos         NotificationCategory = "PHOTOS"
 )
 
 // NotificationCategories lists every category, in display order.
@@ -20,6 +21,20 @@ var NotificationCategories = []NotificationCategory{
 	NotificationEvents,
 	NotificationEventReminders,
 	NotificationReservations,
+	NotificationPhotos,
+}
+
+// OptInNotificationCategories are off until the user switches them on. They are never granted by a migration
+// or by registration, which subscribes every other category by default.
+var OptInNotificationCategories = []NotificationCategory{NotificationPhotos}
+
+func (c NotificationCategory) IsOptIn() bool {
+	for _, optIn := range OptInNotificationCategories {
+		if c == optIn {
+			return true
+		}
+	}
+	return false
 }
 
 func (c NotificationCategory) IsValid() bool {

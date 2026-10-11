@@ -13,6 +13,9 @@ import type {
   MenuItem,
   MenuItemReview,
   NotificationRecipients,
+  PhotoReport,
+  PhotoReportsFilter,
+  PhotoReportsPage,
   SendNotificationRequest,
   TraqArticle,
   TraqType,
@@ -86,6 +89,7 @@ const api = {
   get: <T = UncheckedJson>(path: string, config?: RequestConfig) =>
     request<T>("GET", path, undefined, config),
   post: <T = UncheckedJson>(path: string, body?: unknown) => request<T>("POST", path, body),
+  put: <T = UncheckedJson>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T = UncheckedJson>(path: string, body?: unknown) => request<T>("PATCH", path, body),
   delete: <T = UncheckedJson>(path: string, config?: { data?: unknown }) =>
     request<T>("DELETE", path, config?.data),
@@ -431,5 +435,31 @@ export const reservationApi = {
   deleteItem: async (id: number) => {
     const response = await api.delete(`/admin/reservations/items/${id}`);
     return response.data;
+  },
+};
+
+export const photoReportsApi = {
+  list: async (filter: PhotoReportsFilter): Promise<PhotoReportsPage> => {
+    const response = await api.get("/admin/photos/reports", {
+      params: {
+        reason: filter.reason || undefined,
+        delivery: filter.delivery || undefined,
+        limit: filter.limit,
+        offset: filter.offset,
+      },
+    });
+    return response.data;
+  },
+  get: async (id: number): Promise<PhotoReport> => {
+    const response = await api.get(`/admin/photos/reports/${id}`);
+    return response.data;
+  },
+  retry: async (id: number): Promise<{ retried: number }> => {
+    const response = await api.post(`/admin/photos/reports/${id}/retry`);
+    return response.data;
+  },
+  // A null clubId removes the link: reports of that album then go to administrators only.
+  setAlbumClub: async (albumId: number, clubId: number | null) => {
+    await api.put(`/admin/photos/albums/${albumId}/club`, { club_id: clubId });
   },
 };

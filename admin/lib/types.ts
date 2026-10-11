@@ -222,3 +222,63 @@ export interface NotificationRecipients {
   withoutDevice: string[];
   sent: boolean;
 }
+
+export type PhotoReportReason = "appears_in_photo" | "inappropriate" | "poor_quality" | "other";
+
+export type PhotoReportDeliveryStatus = "sent" | "pending" | "failed" | "no_recipients";
+
+export interface PhotoReportReporter {
+  id: number;
+  public_id: string | null;
+  name: string;
+  // Null once the reporter deleted their account.
+  email: string | null;
+  graduation_year: number | null;
+  formation: string;
+}
+
+export interface PhotoReportDelivery {
+  email: string;
+  role: "club_owner" | "admin";
+  status: "pending" | "sending" | "sent" | "failed";
+  attempts: number;
+  sent_at: string | null;
+  last_error: string | null;
+}
+
+export interface PhotoReport {
+  id: number;
+  created_at: string;
+  reason: PhotoReportReason;
+  comment: string;
+  photo_id: string;
+  photo_name: string;
+  // Opens the file in Google Drive, where it can be deleted.
+  photo_url: string;
+  // False once the photo is gone from the Drive index.
+  photo_available: boolean;
+  album_id: number | null;
+  album_title: string;
+  album_url: string;
+  club_id: number | null;
+  club_name: string;
+  reporter: PhotoReportReporter;
+  delivery_status: PhotoReportDeliveryStatus;
+  recipients: number;
+  recipients_sent: number;
+  recipients_failed: number;
+  // Only on the detail response.
+  deliveries?: PhotoReportDelivery[];
+}
+
+export interface PhotoReportsPage {
+  reports: PhotoReport[];
+  total: number;
+}
+
+export interface PhotoReportsFilter {
+  reason?: PhotoReportReason | "";
+  delivery?: PhotoReportDeliveryStatus | "";
+  limit: number;
+  offset: number;
+}

@@ -7,6 +7,7 @@ import {
   Building,
   Calendar,
   CalendarCheck,
+  Flag,
   Gamepad2,
   LogOut,
   Menu,
@@ -39,6 +40,7 @@ function Sidebar() {
       { href: "/traq", label: "Traq", icon: Beer },
       { href: "/games", label: "Jeux", icon: Gamepad2 },
       { href: "/notifications", label: "Notifications", icon: Bell },
+      { href: "/photo-reports", label: "Signalements photos", icon: Flag },
     ],
     [],
   );

@@ -16,6 +16,7 @@ import (
 	_ "github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/plugimt/transat-backend/handlers"
 	"github.com/plugimt/transat-backend/handlers/club"
+	reportHandler "github.com/plugimt/transat-backend/handlers/photoreport"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/internal/config"
@@ -24,6 +25,7 @@ import (
 	"github.com/plugimt/transat-backend/routes"
 	"github.com/plugimt/transat-backend/scheduler"
 	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/services/photoreport"
 	photosService "github.com/plugimt/transat-backend/services/photos"
 	"github.com/plugimt/transat-backend/utils"
 	"github.com/robfig/cron/v3"
@@ -128,7 +130,22 @@ func main() {
 	} else if photosSync == nil {
 		log.Println("Info: ℹ️ Photos sync disabled: GOOGLE_DRIVE_CREDENTIALS_JSON and PHOTOS_DRIVE_ID are not set")
 	} else {
+		photosSync.EnableAlbumNotifications(func(_ context.Context, n photosService.AlbumNotice) (photosService.Delivery, error) {
+			d, err := notificationService.NotifyNewPhotoAlbum(n.AlbumID, n.Title, n.EventDate)
+			return photosService.Delivery{Users: d.Users, Devices: d.Devices}, err
+		})
 		photosSync.Schedule(c)
+	}
+
+	// Reports are stored before any email is sent; this job retries the ones the email service refused.
+	photoReportService := photoreport.NewService(db, emailService, os.Getenv("ADMIN_PANEL_URL"))
+	photoReports := reportHandler.NewHandler(photoReportService)
+	if _, err := c.AddFunc("@every 5m", func() {
+		if _, err := photoReportService.DeliverDue(context.Background()); err != nil {
+			log.Printf("Photo report delivery job failed: %v", err)
+		}
+	}); err != nil {
+		log.Printf("Photo report delivery scheduling failed: %v", err)
 	}
 
 	// ---- SECURITY MIDDLEWARES ----
@@ -192,7 +209,7 @@ func main() {
 	routes.SetupEventRoutes(app, db, eventHandler)
 	routes.SetupReservationRoutes(app, db, reservationDiscordService)
 	routes.SetupBassineRoutes(app, db)
-	routes.SetupPhotosRoutes(app, db, photosSync)
+	routes.SetupPhotosRoutes(app, db, photosSync, photoReports)
 	routes.SetupProfileRoutes(app, db, r2Service)
 	routes.SetupAdminRoutes(app, db, notificationService)
 
