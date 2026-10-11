@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/plugimt/transat-backend/routes"
 	"github.com/plugimt/transat-backend/scheduler"
 	"github.com/plugimt/transat-backend/services"
+	photosService "github.com/plugimt/transat-backend/services/photos"
 	"github.com/plugimt/transat-backend/utils"
 	"github.com/robfig/cron/v3"
 )
@@ -120,6 +122,15 @@ func main() {
 	c.Start()
 	defer c.Stop()
 
+	photosSync, err := photosService.FromEnv(context.Background(), db)
+	if err != nil {
+		log.Printf("Warning: Photos sync disabled: %v", err)
+	} else if photosSync == nil {
+		log.Println("Info: ℹ️ Photos sync disabled: GOOGLE_DRIVE_CREDENTIALS_JSON and PHOTOS_DRIVE_ID are not set")
+	} else {
+		photosSync.Schedule(c)
+	}
+
 	// ---- SECURITY MIDDLEWARES ----
 	// 1. Add security headers to all responses
 	app.Use(middlewares.SecurityHeadersMiddleware())
@@ -181,6 +192,7 @@ func main() {
 	routes.SetupEventRoutes(app, db, eventHandler)
 	routes.SetupReservationRoutes(app, db, reservationDiscordService)
 	routes.SetupBassineRoutes(app, db)
+	routes.SetupPhotosRoutes(app, db, photosSync)
 	routes.SetupProfileRoutes(app, db, r2Service)
 	routes.SetupAdminRoutes(app, db, notificationService)
 
