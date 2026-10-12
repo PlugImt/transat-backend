@@ -28,6 +28,9 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB, notifications *services.N
 
 	// Custom push notifications
 	adminGroup.Post("/notifications/send", adminHandler.SendNotification)
+	// Delivery diagnostics of the queued push notifications
+	adminGroup.Get("/notifications/messages", adminHandler.GetPushMessages)
+	adminGroup.Get("/notifications/messages/:id", adminHandler.GetPushMessage)
 
 	adminGroup.Get("/events", adminHandler.GetAllEvents)
 	adminGroup.Post("/events", adminHandler.CreateEvent)

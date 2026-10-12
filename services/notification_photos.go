@@ -52,6 +52,9 @@ func (ns *NotificationService) photoAlbumTargets() ([]models.NotificationTargetW
 // NotifyNewPhotoAlbum announces an album to the users who opted in. It returns an error only when nothing could
 // be delivered at all, which is when the caller should try again; a partly delivered announcement is final.
 func (ns *NotificationService) NotifyNewPhotoAlbum(albumID int64, title string, eventDate *time.Time) (PhotoAlbumDelivery, error) {
+	if ns.pipeline != nil {
+		return ns.queuePhotoAlbum(albumID, title, eventDate)
+	}
 	targets, err := ns.photoAlbumTargets()
 	if err != nil {
 		return PhotoAlbumDelivery{}, err

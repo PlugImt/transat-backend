@@ -1,7 +1,9 @@
 package scheduler
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 	appI18n "github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/services/push"
 )
 
 // EventScheduler handles scheduled tasks for events
@@ -117,12 +120,43 @@ func (es *EventScheduler) checkAndSendEventNotifications() {
 
 	// Send notifications for each event
 	for _, event := range eventsToNotify {
-		es.sendEventReminderNotification(event.ID, event.Name, event.Location, event.ClubID)
+		es.sendEventReminderNotification(event.ID, event.Name, event.Location, event.ClubID, event.StartDate)
 	}
 }
 
 // sendEventReminderNotification sends a reminder notification 1h before an event
-func (es *EventScheduler) sendEventReminderNotification(eventID int, eventName string, location string, clubID int) {
+func (es *EventScheduler) sendEventReminderNotification(eventID int, eventName string, location string, clubID int, startDate time.Time) {
+	compose := func(l *i18n.Localizer) (string, string) {
+		data := map[string]interface{}{"EventName": eventName, "Location": location}
+		return appI18n.Localize(l, "event_notification.reminder_title", "Event in 1h", nil),
+			appI18n.Localize(l, "event_notification.reminder_message", "{{.EventName}} - {{.Location}}", data)
+	}
+
+	if es.notificationService.OutboxEnabled() {
+		// The reminder is worthless once the event has started, so that is its deadline. It is marked as done only
+		// when it is safely queued: a failure here is retried by the next tick, and the dedupe key makes a second
+		// attempt harmless.
+		_, err := es.notificationService.Announce(context.Background(), services.Announcement{
+			Kind:      "event_reminder",
+			Category:  models.NotificationEventReminders,
+			DedupeKey: fmt.Sprintf("event_reminder_1h:%d", eventID),
+			Audience: push.Audience{
+				NotificationAudience: models.NotificationAudience{Type: models.AudienceAll},
+				InterestedEventID:    eventID,
+				InterestedClubID:     clubID,
+			},
+			Compose:    func(_ string, l *i18n.Localizer) (string, string) { return compose(l) },
+			Navigation: models.EventNavigation(eventID),
+			ExpiresAt:  startDate,
+		})
+		if err != nil {
+			log.Printf("Failed to queue the 1h reminder of event %d: %v", eventID, err)
+			return
+		}
+		es.markNotificationSent(eventID, "1h_before")
+		return
+	}
+
 	// Get users interested in the event or club with their language preferences
 	users, err := es.notificationService.GetUsersInterestedInEventOrClubWithLanguage(eventID, clubID, models.NotificationEventReminders)
 	if err != nil {
@@ -137,11 +171,7 @@ func (es *EventScheduler) sendEventReminderNotification(eventID int, eventName s
 		return
 	}
 
-	sent := es.notificationService.SendLocalized(users, func(l *i18n.Localizer) (string, string) {
-		data := map[string]interface{}{"EventName": eventName, "Location": location}
-		return appI18n.Localize(l, "event_notification.reminder_title", "Event in 1h", nil),
-			appI18n.Localize(l, "event_notification.reminder_message", "{{.EventName}} - {{.Location}}", data)
-	}, models.EventNavigation(eventID))
+	sent := es.notificationService.SendLocalized(users, compose, models.EventNavigation(eventID))
 
 	log.Printf("Sent 1h reminder for event %d to %d devices", eventID, sent)
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/plugimt/transat-backend/handlers/event"
@@ -16,6 +17,7 @@ import (
 	_ "github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/plugimt/transat-backend/handlers"
 	"github.com/plugimt/transat-backend/handlers/club"
+	devicesHandler "github.com/plugimt/transat-backend/handlers/devices"
 	reportHandler "github.com/plugimt/transat-backend/handlers/photoreport"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/i18n"
@@ -25,8 +27,10 @@ import (
 	"github.com/plugimt/transat-backend/routes"
 	"github.com/plugimt/transat-backend/scheduler"
 	"github.com/plugimt/transat-backend/services"
+	devicesService "github.com/plugimt/transat-backend/services/devices"
 	"github.com/plugimt/transat-backend/services/photoreport"
 	photosService "github.com/plugimt/transat-backend/services/photos"
+	"github.com/plugimt/transat-backend/services/push"
 	"github.com/plugimt/transat-backend/utils"
 	"github.com/robfig/cron/v3"
 )
@@ -66,6 +70,16 @@ func main() {
 	app.Use(utils.SentryHandler)
 
 	notificationService := services.NewNotificationService(db)
+	deviceConfig := devicesService.ConfigFromEnv()
+	// PUSH_PIPELINE=legacy goes back to sending straight from the request or the scheduler, without the worker.
+	if strings.ToLower(os.Getenv("PUSH_PIPELINE")) != "legacy" {
+		pipeline := push.New(db, push.NewExpoProvider(push.ExpoConfigFromEnv()), push.ConfigFromEnv(), deviceConfig)
+		notificationService.SetPipeline(pipeline)
+		pushWorker := pipeline.Start()
+		defer pushWorker.Stop()
+	} else {
+		log.Println("Info: PUSH_PIPELINE=legacy, push notifications are sent without the delivery pipeline")
+	}
 	translationService, err := services.NewTranslationService()
 	if err != nil {
 		log.Fatalf("💥 Failed to create Translation Service: %v", err)
@@ -197,6 +211,7 @@ func main() {
 	// API Group --- NEW ROUTES
 	routes.SetupAuthRoutes(app, db, jwtSecret, emailService, discordService)
 	routes.SetupUserRoutes(app, db, notificationService)
+	routes.SetupDeviceRoutes(app, devicesHandler.NewHandler(devicesService.NewService(db, deviceConfig)))
 	routes.SetupTraqRoutes(app, db)
 	routes.SetupFileRoutes(app, db, r2Service)
 	routes.SetupRestaurantRoutes(app, restHandler)

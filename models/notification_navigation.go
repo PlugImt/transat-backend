@@ -129,16 +129,29 @@ func (n *NavigationTarget) normalized() *NavigationTarget {
 	return newNavigationTarget(n.Type, n.ID, n.Params)
 }
 
-// ExpoData builds the `data` object delivered with the push, or nil without navigation.
-// "screen" is kept only so apps predating the navigation context still open the right tab.
+// ExpoData builds the `data` object delivered with the push, or nil when there is nothing to carry.
+//
+// The contract with the app (title and body travel beside it, never inside):
+//
+//	type        what produced the notification ("event_created", "photo_album"...); informational
+//	navigation  {v, type, id, params}: where a tap goes; the id is the stable id of the entity, never a name or link
+//	screen      kept only so apps predating the navigation context still open the right tab
+//
+// An image is not part of `data`: it is sent as the provider's `richContent.image`.
+// The data holds no personal information, and the app re-checks access to the entity with the user's own session.
 func (p NotificationPayload) ExpoData() map[string]interface{} {
-	if p.Navigation == nil {
-		return nil
+	data := map[string]interface{}{}
+	if p.Kind != "" {
+		data["type"] = p.Kind
 	}
-
-	data := map[string]interface{}{"navigation": p.Navigation.normalized()}
-	if rule, ok := navigationRules[p.Navigation.Type]; ok && rule.legacyScreen != "" {
-		data["screen"] = rule.legacyScreen
+	if p.Navigation != nil {
+		data["navigation"] = p.Navigation.normalized()
+		if rule, ok := navigationRules[p.Navigation.Type]; ok && rule.legacyScreen != "" {
+			data["screen"] = rule.legacyScreen
+		}
+	}
+	if len(data) == 0 {
+		return nil
 	}
 	return data
 }

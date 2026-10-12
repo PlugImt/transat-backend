@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -264,6 +265,30 @@ func (r *MenuRepository) shouldSendMenuNotification(today string) (bool, error) 
 
 // sendMenuUpdateNotification sends a notification for menu updates and records it
 func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
+	compose := func(l *i18n.Localizer) (string, string) {
+		return appI18n.Localize(l, "restaurant_notification.title", "🍽️ NEW MENU AVAILABLE!", nil),
+			appI18n.Localize(l, "restaurant_notification.message", "A delicious new menu awaits you at the cafeteria! Discover today's dishes and leave your reviews. Enjoy your meal!", nil)
+	}
+
+	if r.NotifService.OutboxEnabled() {
+		// Queueing is durable and idempotent, so the day is recorded only once the notification is safely queued.
+		if _, err := r.NotifService.Announce(context.Background(), services.Announcement{
+			Kind:       "restaurant_menu",
+			Category:   models.NotificationRestaurant,
+			DedupeKey:  "restaurant_menu:" + today,
+			Compose:    func(_ string, l *i18n.Localizer) (string, string) { return compose(l) },
+			Navigation: models.RestaurantNavigation(),
+			ExpiresAt:  time.Now().Add(3 * time.Hour),
+		}); err != nil {
+			return fmt.Errorf("failed to queue the menu notification: %w", err)
+		}
+		if _, err := r.DB.Exec(`INSERT INTO restaurant_notifications (date, notification_sent) VALUES (CURRENT_TIMESTAMP, true)`); err != nil {
+			return fmt.Errorf("failed to record notification: %w", err)
+		}
+		utils.LogMessage(utils.LevelInfo, "Menu notification queued")
+		return nil
+	}
+
 	// Get subscribers to RESTAURANT service with their language preferences
 	subscribers, err := r.NotifService.GetSubscribedUsersWithLanguage(models.NotificationRestaurant)
 	if err != nil {
@@ -275,10 +300,7 @@ func (r *MenuRepository) sendMenuUpdateNotification(today string) error {
 		return nil
 	}
 
-	sent := r.NotifService.SendLocalized(subscribers, func(l *i18n.Localizer) (string, string) {
-		return appI18n.Localize(l, "restaurant_notification.title", "🍽️ NEW MENU AVAILABLE!", nil),
-			appI18n.Localize(l, "restaurant_notification.message", "A delicious new menu awaits you at the cafeteria! Discover today's dishes and leave your reviews. Enjoy your meal!", nil)
-	}, models.RestaurantNavigation())
+	sent := r.NotifService.SendLocalized(subscribers, compose, models.RestaurantNavigation())
 
 	_, err = r.DB.Exec(`
 		INSERT INTO restaurant_notifications (date, notification_sent) 

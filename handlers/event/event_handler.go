@@ -1,9 +1,11 @@
 package event
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -795,21 +797,38 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 	}
 
 	// Notify users who enabled new-event notifications (with translations)
-	go func() {
-		users, err := h.notificationService.GetSubscribedUsersWithLanguage(models.NotificationEvents)
-		if err != nil {
-			log.Printf("Failed to get subscribed users for new event notification: %v", err)
-			return
+	composeNewEvent := func(l *i18n.Localizer) (string, string) {
+		data := map[string]interface{}{"EventName": req.Name, "Location": req.Location}
+		return appI18n.Localize(l, "event_notification.new_event_title", "New event", nil),
+			appI18n.Localize(l, "event_notification.new_event_message", "{{.EventName}} - {{.Location}}", data)
+	}
+	if h.notificationService.OutboxEnabled() {
+		// Only queued here: the delivery pipeline sends it, so the request does not wait for any push.
+		if _, err := h.notificationService.Announce(context.Background(), services.Announcement{
+			Kind:       "event_created",
+			Category:   models.NotificationEvents,
+			DedupeKey:  fmt.Sprintf("event_created:%d", eventID),
+			Compose:    func(_ string, l *i18n.Localizer) (string, string) { return composeNewEvent(l) },
+			Navigation: models.EventNavigation(eventID),
+			// The poster is user content: only one on our own storage is sent, anything else gives a text notification.
+			ImageURL:  models.OwnedImageURL(req.Picture, os.Getenv("R2_PUBLIC_DOMAIN")),
+			ExpiresAt: time.Now().Add(6 * time.Hour),
+		}); err != nil {
+			log.Printf("Failed to queue the new event notification: %v", err)
 		}
+	} else {
+		go func() {
+			users, err := h.notificationService.GetSubscribedUsersWithLanguage(models.NotificationEvents)
+			if err != nil {
+				log.Printf("Failed to get subscribed users for new event notification: %v", err)
+				return
+			}
 
-		sent := h.notificationService.SendLocalized(users, func(l *i18n.Localizer) (string, string) {
-			data := map[string]interface{}{"EventName": req.Name, "Location": req.Location}
-			return appI18n.Localize(l, "event_notification.new_event_title", "New event", nil),
-				appI18n.Localize(l, "event_notification.new_event_message", "{{.EventName}} - {{.Location}}", data)
-		}, models.EventNavigation(eventID))
+			sent := h.notificationService.SendLocalized(users, composeNewEvent, models.EventNavigation(eventID))
 
-		log.Printf("Sent new event notification to %d devices", sent)
-	}()
+			log.Printf("Sent new event notification to %d devices", sent)
+		}()
+	}
 
 	utils.LogMessage(utils.LevelInfo, "Event created successfully")
 	utils.LogLineKeyValue(utils.LevelInfo, "Event ID", eventID)
