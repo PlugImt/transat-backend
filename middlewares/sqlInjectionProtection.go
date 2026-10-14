@@ -21,6 +21,10 @@ func SQLInjectionProtectionMiddleware() fiber.Handler {
 		if strings.HasSuffix(path, "/join") || strings.HasSuffix(path, "/leave") {
 			return c.Next()
 		}
+		// Push tokens may contain "--"; the device handlers check every field against a strict format.
+		if strings.HasPrefix(path, "/devices/") {
+			return c.Next()
+		}
 
 		// If body is empty, skip validation
 		if len(c.Body()) == 0 {

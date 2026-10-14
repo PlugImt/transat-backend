@@ -15,10 +15,21 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-// Open returns a database whose search_path is a fresh schema. Tests are skipped unless TRANSAT_TEST_DSN is set,
-// e.g. "host=/tmp port=54329 user=postgres dbname=transat_test sslmode=disable". The database name must contain
-// "test" so a real database is never touched.
+// Open returns a database whose search_path is a fresh schema with every migration applied. Tests are skipped
+// unless TRANSAT_TEST_DSN is set, e.g. "host=/tmp port=54329 user=postgres dbname=transat_test sslmode=disable".
+// The database name must contain "test" so a real database is never touched.
 func Open(t testing.TB) *sql.DB {
+	t.Helper()
+	db, dir := OpenEmpty(t)
+	if err := goose.Up(db, dir); err != nil {
+		t.Fatalf("migrations: %v", err)
+	}
+	return db
+}
+
+// OpenEmpty is Open without any migration applied: it returns the database and the migrations directory, for
+// tests that migrate step by step.
+func OpenEmpty(t testing.TB) (*sql.DB, string) {
 	t.Helper()
 	dsn := os.Getenv("TRANSAT_TEST_DSN")
 	if dsn == "" {
@@ -55,8 +66,5 @@ func Open(t testing.TB) *sql.DB {
 		t.Fatal(err)
 	}
 	goose.SetLogger(goose.NopLogger())
-	if err := goose.Up(db, dir); err != nil {
-		t.Fatalf("migrations: %v", err)
-	}
-	return db
+	return db, dir
 }

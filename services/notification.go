@@ -14,6 +14,7 @@ import (
 	"github.com/lib/pq"
 	appI18n "github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services/push"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
@@ -32,6 +33,8 @@ type NotificationService struct {
 	// A request that fails on the network, with 429 or with 5xx is retried this many times in all.
 	maxAttempts int
 	retryDelay  time.Duration
+	// pipeline, when set, replaces direct sending by queueing; see SetPipeline.
+	pipeline *push.Pipeline
 }
 
 // NewNotificationService creates a new NotificationService.

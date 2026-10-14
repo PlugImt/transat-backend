@@ -11,7 +11,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/services" // For NotificationService
-	"github.com/plugimt/transat-backend/utils"    // For logger
+	"github.com/plugimt/transat-backend/services/devices"
+	"github.com/plugimt/transat-backend/utils" // For logger
 )
 
 // UserHandler handles user profile and related actions.
@@ -227,6 +228,11 @@ func (h *UserHandler) UpdateNewf(c *fiber.Ctx) error {
 			// Log but continue with other fields
 		} else {
 			utils.LogMessage(utils.LevelInfo, "Notification token saved successfully")
+		}
+		// App versions without device registration get their device row here.
+		if err := devices.RegisterLegacyToken(c.Context(), h.DB, email, req.NotificationToken); err != nil {
+			utils.LogMessage(utils.LevelWarn, "Failed to register legacy device")
+			utils.LogLineKeyValue(utils.LevelWarn, "Error", err)
 		}
 	}
 	if req.Language != "" { // Allow updating language preference

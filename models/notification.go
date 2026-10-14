@@ -12,6 +12,8 @@ type NotificationPayload struct {
 	NotificationTokens []string
 	Title              string
 	Message            string
+	// Kind says what produced the notification; it is sent to the app as data.type.
+	Kind string
 	// Navigation is the optional screen opened when the notification is tapped.
 	Navigation *NavigationTarget
 }

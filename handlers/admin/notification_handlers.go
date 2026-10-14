@@ -22,6 +22,8 @@ type sendNotificationRequest struct {
 	Service models.NotificationCategory `json:"service,omitempty"`
 	// Navigation is the optional screen opened on tap.
 	Navigation *models.NavigationTarget `json:"navigation,omitempty"`
+	// ImageURL is an optional https image. Only the delivery pipeline sends it; the direct Expo path ignores it.
+	ImageURL string `json:"imageUrl,omitempty"`
 	// DryRun only counts the recipients.
 	DryRun bool `json:"dryRun,omitempty"`
 }
@@ -37,6 +39,10 @@ func (h *AdminHandler) SendNotification(c *fiber.Ctx) error {
 	req.Message = strings.TrimSpace(req.Message)
 	if err := validateNotificationRequest(req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if h.Notifications.OutboxEnabled() {
+		return h.queueNotification(c, req)
 	}
 
 	recipients, err := h.Notifications.ResolveAudience(req.Audience, req.Service)
@@ -90,6 +96,11 @@ func validateNotificationRequest(req sendNotificationRequest) error {
 	}
 	if err := req.Audience.Validate(); err != nil {
 		return err
+	}
+	if req.ImageURL != "" {
+		if err := models.ValidateImageURL(req.ImageURL); err != nil {
+			return err
+		}
 	}
 	if req.Navigation != nil {
 		return req.Navigation.Validate()
