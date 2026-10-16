@@ -4,6 +4,7 @@ import { Bell, Send, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Combobox from "@/components/Combobox";
+import { notificationsApi } from "@/lib/api";
 import {
   useClubs,
   useEvents,
@@ -74,6 +75,33 @@ const fieldClass =
 function errorMessage(error: unknown): string {
   const data = (error as { response?: { data?: { error?: string } } }).response?.data;
   return data?.error ?? "Échec de l'envoi de la notification";
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The server only queues the message: look at what the delivery worker did with it, and say so.
+async function reportDelivery(id: number) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await sleep(5000);
+    try {
+      const summary = await notificationsApi.message(id);
+      const failed = summary.deliveries.failed ?? 0;
+      const taken = (summary.deliveries.accepted ?? 0) + (summary.deliveries.handed_off ?? 0);
+      if (failed > 0) {
+        const codes = Object.keys(summary.errors ?? {}).join(", ") || "erreur inconnue";
+        toast.error(`Échec de la remise à Expo pour ${failed} appareil(s) : ${codes}`, {
+          duration: 10000,
+        });
+        return;
+      }
+      if (taken > 0 && (summary.deliveries.pending ?? 0) === 0) {
+        toast.success(`Remise à Expo pour ${taken} appareil(s)`);
+        return;
+      }
+    } catch {
+      return;
+    }
+  }
 }
 
 export default function NotificationsPage() {
@@ -179,8 +207,9 @@ export default function NotificationsPage() {
         navigation,
       });
       toast.success(
-        `Notification envoyée à ${result.users - result.withoutDevice.length} utilisateur(s)`,
+        `Notification mise en file d'attente pour ${result.users - result.withoutDevice.length} utilisateur(s)`,
       );
+      if (result.id) void reportDelivery(result.id);
       setTitle("");
       setMessage("");
     } catch (error) {

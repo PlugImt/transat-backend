@@ -16,6 +16,7 @@ import type {
   PhotoReport,
   PhotoReportsFilter,
   PhotoReportsPage,
+  PushMessageSummary,
   SendNotificationRequest,
   TraqArticle,
   TraqType,
@@ -253,6 +254,10 @@ export const rolesApi = {
 export const notificationsApi = {
   send: async (request: SendNotificationRequest): Promise<NotificationRecipients> => {
     const response = await api.post("/admin/notifications/send", request);
+    return response.data;
+  },
+  message: async (id: number): Promise<PushMessageSummary> => {
+    const response = await api.get(`/admin/notifications/messages/${id}`);
     return response.data;
   },
 };

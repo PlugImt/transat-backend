@@ -221,6 +221,17 @@ export interface NotificationRecipients {
   devices: number;
   withoutDevice: string[];
   sent: boolean;
+  // Set when the message was queued for the delivery worker; `id` follows it.
+  queued?: boolean;
+  id?: number;
+}
+
+// Delivery diagnostics of one queued message: counts and codes only.
+export interface PushMessageSummary {
+  id: number;
+  status: string;
+  deliveries: Record<string, number>;
+  errors?: Record<string, number>;
 }
 
 export type PhotoReportReason = "appears_in_photo" | "inappropriate" | "poor_quality" | "other";
