@@ -23,6 +23,16 @@ Pour simplifier le développement, il est possible d'utiliser Docker Compose pou
 docker compose up -d
 ```
 
+## Jeu de données de démonstration (réservations)
+Le serveur doit avoir tourné une fois sur la base (migrations appliquées). Le script crée des éléments « [Démo] » et au moins 6 réservations par utilisateur (passées, en cours, à venir, prêts rendus et en retard). Il peut être relancé sans doublon.
+
+```bash
+./scripts/seed_reservations.sh                                  # base décrite par DB_* dans .env
+DATABASE_URL="postgres://user:mdp@hote:5432/base" ./scripts/seed_reservations.sh
+```
+
+Pour tout retirer : `DELETE FROM reservation_element WHERE name LIKE '[Démo] %'; DELETE FROM reservation_category WHERE name LIKE '[Démo] %';`
+
 ## Schéma MCD
 Le schéma MCD est disponible dans le fichier `MCD.lo1`, conçu avec le logiciel [Looping](https://www.looping-mcd.fr/).
 
