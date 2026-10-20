@@ -5,6 +5,16 @@ import { useMemo, useState } from "react";
 import { useAdminReservations } from "@/lib/reservationHooks";
 import type { AdminItem, AdminReservation } from "@/lib/reservationTypes";
 import { CancelReservationModal, type ReservationTarget } from "./ActionModals";
+import { DayPlanning } from "./DayPlanning";
+import {
+  cellOf,
+  hourLabel,
+  hoursWith,
+  mondayOf,
+  shiftDay,
+  toUtcDate,
+  weekday,
+} from "./planningDates";
 import { targetOf } from "./ReservationsList";
 import {
   EmptyState,
@@ -16,35 +26,48 @@ import {
   SkeletonRows,
 } from "./ui";
 
-// The app offers hourly slots from 08:00 to 01:00 (Paris time); the row 24 is the slot starting at midnight.
-const HOURS = Array.from({ length: 17 }, (_, index) => 8 + index);
-const DAY_MS = 86_400_000;
-
-const toUtcDate = (day: string) => new Date(`${day}T00:00:00Z`);
-const shiftDay = (day: string, days: number) =>
-  new Date(toUtcDate(day).getTime() + days * DAY_MS).toISOString().slice(0, 10);
-const mondayOf = (day: string) => shiftDay(day, -((toUtcDate(day).getUTCDay() + 6) % 7));
-
-const weekday = new Intl.DateTimeFormat("fr-FR", {
-  timeZone: "UTC",
-  weekday: "short",
-  day: "2-digit",
-  month: "2-digit",
-});
-
-/** Paris calendar day and hour row of a slot; the midnight slot belongs to the evening before. */
-const cellOf = (iso: string) => {
-  const hour = parisHour(iso);
-  const day = parisDay(iso);
-  return hour === 0 ? { day: shiftDay(day, -1), hour: 24 } : { day, hour };
-};
-
 interface PlanningViewProps {
   items: AdminItem[];
   onOpenItem: (itemId: number) => void;
 }
 
+type Mode = "day" | "week";
+
+const MODES: { id: Mode; label: string }[] = [
+  { id: "day", label: "Jour · tous les éléments" },
+  { id: "week", label: "Semaine · un élément" },
+];
+
 export function PlanningView({ items, onOpenItem }: PlanningViewProps) {
+  const [mode, setMode] = useState<Mode>("day");
+  return (
+    <div className="space-y-4">
+      <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5" role="tablist">
+        {MODES.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={mode === id}
+            onClick={() => setMode(id)}
+            className={`rounded px-3 py-1.5 text-sm font-medium ${
+              mode === id ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === "day" ? (
+        <DayPlanning items={items} onOpenItem={onOpenItem} />
+      ) : (
+        <WeekPlanning items={items} onOpenItem={onOpenItem} />
+      )}
+    </div>
+  );
+}
+
+function WeekPlanning({ items, onOpenItem }: PlanningViewProps) {
   const slotItems = useMemo(
     () => items.filter((item) => item.slot).sort((a, b) => a.name.localeCompare(b.name, "fr")),
     [items],
@@ -79,6 +102,11 @@ export function PlanningView({ items, onOpenItem }: PlanningViewProps) {
     }
     return map;
   }, [data]);
+
+  const hours = useMemo(
+    () => hoursWith(data?.items ?? [], (value) => days.includes(value)),
+    [data, days],
+  );
 
   if (slotItems.length === 0) {
     return (
@@ -174,10 +202,10 @@ export function PlanningView({ items, onOpenItem }: PlanningViewProps) {
               </tr>
             </thead>
             <tbody>
-              {HOURS.map((hour) => (
+              {hours.map((hour) => (
                 <tr key={hour}>
                   <td className="border-b border-gray-100 px-2 py-1 text-right text-gray-400">
-                    {String(hour % 24).padStart(2, "0")}:00
+                    {hourLabel(hour)}
                   </td>
                   {days.map((day) => {
                     const reservation = cells.get(`${day}|${hour}`);

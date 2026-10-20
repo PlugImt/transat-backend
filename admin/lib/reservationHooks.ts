@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { reservationApi } from "./api";
-import type { ReservationFilters } from "./reservationTypes";
+import type { AdminReservation, ReservationFilters } from "./reservationTypes";
 
 // Prefix shared with the category tree: the existing mutations that invalidate it refresh these views too.
 const KEY = "reservation-tree";
@@ -35,6 +35,33 @@ export const useAdminReservations = (
     queryFn: () => reservationApi.list(filters),
     placeholderData: keepPreviousData,
     enabled: options?.enabled ?? true,
+  });
+
+const PAGE = 200;
+const MAX_PAGES = 10;
+
+/** Every slot reservation (all items) starting in [from, to), whatever the page size of the API. */
+export const useSlotReservations = (from: string, to: string) =>
+  useQuery({
+    queryKey: [KEY, "planning", from, to],
+    queryFn: async () => {
+      const all: AdminReservation[] = [];
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const result = await reservationApi.list({
+          kind: "slot",
+          from,
+          to,
+          order: "asc",
+          limit: PAGE,
+          offset: page * PAGE,
+        });
+        all.push(...result.items);
+        if (result.items.length < PAGE || all.length >= result.total) break;
+      }
+      return all;
+    },
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
   });
 
 export const useAdminWaitlist = (
