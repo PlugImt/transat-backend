@@ -37,13 +37,10 @@ func initI18n(t *testing.T) {
 // fakeNotifier records what would be queued in the delivery pipeline.
 type fakeNotifier struct {
 	mu          sync.Mutex
-	off         bool
 	unreachable map[string]bool
 	fail        error
 	sent        []services.Announcement
 }
-
-func (n *fakeNotifier) OutboxEnabled() bool { return !n.off }
 
 func (n *fakeNotifier) Announce(_ context.Context, a services.Announcement) (push.EnqueueResult, error) {
 	n.mu.Lock()
@@ -210,7 +207,7 @@ func TestAdminCancelsAThirdPartySlotAndTheUserIsToldWithTheAdminsName(t *testing
 	start := t0.Add(26 * time.Hour)
 	f.book("bob@x.test", room, start)
 
-	res, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: room.ID, Start: &start, ActorEmail: "admin@x.test"})
+	res, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: room.ID, Start: &start, ActorEmail: "admin@x.test", AsAdmin: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +260,7 @@ func TestAnAdminCancellingTheirOwnReservationNotifiesNobody(t *testing.T) {
 	start := t0.Add(26 * time.Hour)
 	f.book("admin@x.test", room, start)
 
-	res, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: room.ID, Start: &start, ActorEmail: "admin@x.test"})
+	res, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: room.ID, Start: &start, ActorEmail: "admin@x.test", AsAdmin: true})
 	if err != nil || res.ByAdmin {
 		t.Fatalf("result = %+v, %v", res, err)
 	}
@@ -303,6 +300,47 @@ func TestAUserCancelsTheirOwnSlotButNotSomebodyElses(t *testing.T) {
 	}
 }
 
+func TestAnAdministratorOutsideTheAdminRoutesIsAnOrdinaryUser(t *testing.T) {
+	f := newFx(t)
+	f.user("admin@x.test", "Ada", "Lovelace", 1, "ADMIN")
+	f.user("bob@x.test", "Bob", "Martin", 1)
+	room := f.item("Salle", true)
+	cable := f.item("Câble HDMI", false)
+	start := t0.Add(26 * time.Hour)
+	f.book("bob@x.test", room, start)
+	f.lend("bob@x.test", cable, t0.Add(-48*time.Hour))
+	ctx := context.Background()
+
+	if _, err := f.svc.Cancel(ctx, CancelRequest{ItemID: room.ID, Start: &start, ActorEmail: "admin@x.test"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("an administrator cancelled a slot through the user route: %v", err)
+	}
+	if _, err := f.svc.Cancel(ctx, CancelRequest{ItemID: cable.ID, ActorEmail: "admin@x.test"}); !errors.Is(err, ErrNotSlotItem) {
+		t.Fatalf("an administrator ended a loan through the user route: %v", err)
+	}
+	if f.holder(room, &start) != "bob@x.test" || f.holder(cable, nil) != "bob@x.test" {
+		t.Fatal("a reservation was removed")
+	}
+	if len(f.ntf.all()) != 0 || len(f.mail.sent) != 0 {
+		t.Fatal("a refused cancellation notified somebody")
+	}
+
+	// Their own reservation, they can cancel, and it is an ordinary cancellation.
+	f.book("admin@x.test", f.item("Salle B", true), start)
+	own := f.count(`SELECT id_reservation_element FROM reservation WHERE email = 'admin@x.test'`)
+	res, err := f.svc.Cancel(ctx, CancelRequest{ItemID: own, Start: &start, ActorEmail: "admin@x.test"})
+	if err != nil || res.ByAdmin {
+		t.Fatalf("own cancellation: %+v, %v", res, err)
+	}
+
+	// The admin flag does not replace the role.
+	if _, err := f.svc.Cancel(ctx, CancelRequest{ItemID: room.ID, Start: &start, ActorEmail: "bob@x.test", AsAdmin: true}); !errors.Is(err, ErrNotAdmin) {
+		t.Fatalf("a user without the role cancelled as an administrator: %v", err)
+	}
+	if f.holder(room, &start) != "bob@x.test" {
+		t.Fatal("the reservation was removed")
+	}
+}
+
 func TestOnlyAnAdminCanEndSomebodysLoanOfAnItemWithoutSlot(t *testing.T) {
 	f := newFx(t)
 	f.user("admin@x.test", "Ada", "Lovelace", 1, "ADMIN")
@@ -318,7 +356,7 @@ func TestOnlyAnAdminCanEndSomebodysLoanOfAnItemWithoutSlot(t *testing.T) {
 		t.Fatal("the loan was ended")
 	}
 
-	res, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: cable.ID, ActorEmail: "admin@x.test"})
+	res, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: cable.ID, ActorEmail: "admin@x.test", AsAdmin: true})
 	if err != nil || !res.ByAdmin || res.Owner != "bob@x.test" {
 		t.Fatalf("result = %+v, %v", res, err)
 	}
@@ -341,7 +379,7 @@ func TestOnlyAnAdminCanEndSomebodysLoanOfAnItemWithoutSlot(t *testing.T) {
 	}
 
 	// Nothing left to end.
-	if _, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: cable.ID, ActorEmail: "admin@x.test"}); !errors.Is(err, ErrNotFound) {
+	if _, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: cable.ID, ActorEmail: "admin@x.test", AsAdmin: true}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("second cancel: %v", err)
 	}
 }
@@ -355,7 +393,7 @@ func TestACancellationNeverFailsBecauseTheNotificationFailed(t *testing.T) {
 	f.book("bob@x.test", room, start)
 	f.ntf.fail = errors.New("queue down")
 
-	if _, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: room.ID, Start: &start, ActorEmail: "admin@x.test"}); err != nil {
+	if _, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: room.ID, Start: &start, ActorEmail: "admin@x.test", AsAdmin: true}); err != nil {
 		t.Fatal(err)
 	}
 	if f.holder(room, &start) != "" {
@@ -501,7 +539,7 @@ func TestNoLoanReminderOnceTheItemIsReturnedOrCancelled(t *testing.T) {
 	f.lend("bob@x.test", returned, t0.Add(-25*time.Hour))
 	f.lend("amy@x.test", cancelled, t0.Add(-25*time.Hour))
 	f.exec(`UPDATE reservation SET end_date = $1 WHERE id_reservation_element = $2`, t0.Add(-time.Hour), returned.ID)
-	if _, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: cancelled.ID, ActorEmail: "admin@x.test"}); err != nil {
+	if _, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: cancelled.ID, ActorEmail: "admin@x.test", AsAdmin: true}); err != nil {
 		t.Fatal(err)
 	}
 	f.ntf.reset()
@@ -987,27 +1025,6 @@ func TestTheQueueIsLimitedPerUser(t *testing.T) {
 	f.lend("owner@x.test", extra, t0.Add(-time.Hour))
 	if _, err := f.svc.Join(ctx, "q1@x.test", extra.ID, nil); !errors.Is(err, ErrQueueFull) {
 		t.Fatalf("error = %v", err)
-	}
-}
-
-func TestWithoutThePushPipelineNothingIsQueued(t *testing.T) {
-	f := newFx(t)
-	f.ntf.off = true
-	f.user("owner@x.test", "O", "X", 1)
-	f.user("q1@x.test", "Q", "X", 1)
-	room := f.item("Salle", true)
-	start := t0.Add(26 * time.Hour)
-	f.book("owner@x.test", room, start)
-	f.svc.Join(context.Background(), "q1@x.test", room.ID, &start)
-	res, err := f.svc.Cancel(context.Background(), CancelRequest{ItemID: room.ID, Start: &start, ActorEmail: "owner@x.test"})
-	if err != nil || res.NextNotified {
-		t.Fatalf("%+v, %v", res, err)
-	}
-	if st, _ := f.svc.Status(context.Background(), "q1@x.test", room.ID, &start); st.Notified {
-		t.Fatal("the baton was handed over without a notification")
-	}
-	if sent, err := f.svc.SendDueReminders(context.Background()); err != nil || sent != 0 {
-		t.Fatalf("reminders: %d, %v", sent, err)
 	}
 }
 

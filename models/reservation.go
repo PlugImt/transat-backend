@@ -85,6 +85,8 @@ type ReservationCreateItemRequest struct {
 	Location         *string `json:"location,omitempty"`
 	IDClubParent     *int    `json:"id_club_parent,omitempty"`
 	IDCategoryParent *int    `json:"id_category_parent,omitempty"`
+	// Status is active (default), maintenance or inactive; the last two hide the item and stop its booking.
+	Status *string `json:"status,omitempty"`
 }
 
 // ReservationItemComplete represents a complete reservation item with category
@@ -104,4 +106,9 @@ type UserReservation struct {
 type UserReservationsResponse struct {
 	Current []UserReservation `json:"current"`
 	Past    []UserReservation `json:"past"`
+}
+
+// IsReservationItemStatus reports whether s is a status an item can have.
+func IsReservationItemStatus(s string) bool {
+	return s == "active" || s == "maintenance" || s == "inactive"
 }

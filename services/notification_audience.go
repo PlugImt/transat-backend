@@ -20,9 +20,37 @@ type Recipients struct {
 // ResolveAudience returns the audience's users and their devices. With a category, users who
 // opted out of it are excluded.
 func (ns *NotificationService) ResolveAudience(audience models.NotificationAudience, category models.NotificationCategory) (Recipients, error) {
+	targets, err := ns.resolveTargets(audience, category)
+	if err != nil {
+		return Recipients{}, err
+	}
+	users := make(map[string]bool) // email -> has a device
+	var tokens []string
+	for _, t := range targets {
+		users[t.Email] = users[t.Email] || t.NotificationToken != ""
+		if t.NotificationToken != "" {
+			tokens = append(tokens, t.NotificationToken)
+		}
+	}
+
+	withoutDevice := []string{}
+	for email, hasDevice := range users {
+		if !hasDevice {
+			withoutDevice = append(withoutDevice, email)
+		}
+	}
+	sort.Strings(withoutDevice)
+
+	return Recipients{Users: len(users), Tokens: dedupe(tokens), WithoutDevice: withoutDevice}, nil
+}
+
+// resolveTargets lists one row per user and device token of the audience, with the user's language; a user without
+// a device has one row with an empty token.
+func (ns *NotificationService) resolveTargets(audience models.NotificationAudience, category models.NotificationCategory) ([]models.NotificationTargetWithLanguage, error) {
 	query := `
-		SELECT n.email, COALESCE(unt.token, '')
+		SELECT n.email, COALESCE(unt.token, ''), COALESCE(l.code, '')
 		FROM newf n
+		LEFT JOIN languages l ON l.id_languages = n.language
 		LEFT JOIN user_notification_tokens unt ON unt.email = n.email
 		WHERE TRUE`
 	var args []interface{}
@@ -55,33 +83,20 @@ func (ns *NotificationService) ResolveAudience(audience models.NotificationAudie
 
 	rows, err := ns.db.Query(query, args...)
 	if err != nil {
-		return Recipients{}, fmt.Errorf("failed to resolve notification audience: %w", err)
+		return nil, fmt.Errorf("failed to resolve notification audience: %w", err)
 	}
 	defer rows.Close()
 
-	users := make(map[string]bool) // email -> has a device
-	var tokens []string
+	var targets []models.NotificationTargetWithLanguage
 	for rows.Next() {
-		var email, token string
-		if err := rows.Scan(&email, &token); err != nil {
-			return Recipients{}, fmt.Errorf("failed to scan notification recipient: %w", err)
+		var t models.NotificationTargetWithLanguage
+		if err := rows.Scan(&t.Email, &t.NotificationToken, &t.LanguageCode); err != nil {
+			return nil, fmt.Errorf("failed to scan notification recipient: %w", err)
 		}
-		users[email] = users[email] || token != ""
-		if token != "" {
-			tokens = append(tokens, token)
-		}
+		targets = append(targets, t)
 	}
 	if err := rows.Err(); err != nil {
-		return Recipients{}, fmt.Errorf("failed to read notification recipients: %w", err)
+		return nil, fmt.Errorf("failed to read notification recipients: %w", err)
 	}
-
-	withoutDevice := []string{}
-	for email, hasDevice := range users {
-		if !hasDevice {
-			withoutDevice = append(withoutDevice, email)
-		}
-	}
-	sort.Strings(withoutDevice)
-
-	return Recipients{Users: len(users), Tokens: dedupe(tokens), WithoutDevice: withoutDevice}, nil
+	return targets, nil
 }

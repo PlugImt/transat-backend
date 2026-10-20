@@ -10,7 +10,7 @@ import (
 	"github.com/plugimt/transat-backend/utils"
 )
 
-func SetupAdminRoutes(router fiber.Router, db *sql.DB, notifications *services.NotificationService) {
+func SetupAdminRoutes(router fiber.Router, db *sql.DB, notifications *services.NotificationService) fiber.Router {
 	adminHandler := admin.NewAdminHandler(db, notifications)
 
 	adminGroup := router.Group("/admin",
@@ -65,4 +65,5 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB, notifications *services.N
 	adminGroup.Delete("/reservations/items/:id", adminHandler.DeleteReservationItemAdmin)
 	adminGroup.Patch("/reservations/items/:id", adminHandler.UpdateReservationItemAdmin)
 
+	return adminGroup
 }

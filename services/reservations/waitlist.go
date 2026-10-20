@@ -53,6 +53,9 @@ func (s *Service) Join(ctx context.Context, email string, itemID int, start *tim
 	if err != nil {
 		return 0, err
 	}
+	if item.Status != "active" {
+		return 0, ErrNotBookable
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -172,6 +175,9 @@ func (s *Service) Reserve(ctx context.Context, email string, itemID int, start *
 		return ReserveResult{}, err
 	}
 	res := ReserveResult{Item: item}
+	if item.Status != "active" {
+		return res, ErrNotBookable
+	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -312,13 +318,16 @@ func (s *Service) List(ctx context.Context, email string) ([]WaitlistEntry, erro
 	return out, rows.Err()
 }
 
-// notifyNext tells the first person of the queue that the resource is free, and nobody else. It does nothing when
-// the resource is not free (somebody booked it first), when the queue is empty, or when the push pipeline is
-// off. People who could not receive the push (no device, notifications of reservations switched off) are passed
-// over, so that the baton does not stall with somebody who will never see it. It reports whether somebody was
-// notified.
+// notifyNext tells the first person of the queue that the resource is free, and nobody else, and gives them until
+// turnDeadline to answer. It does nothing when the resource is not free (somebody booked it first), when the queue
+// is empty, or when there is no notifier. People who could not receive the push (no device, notifications of
+// reservations switched off) are passed over, so that the baton does not stall with somebody who will never see it.
+// It reports whether somebody was notified.
 func (s *Service) notifyNext(ctx context.Context, item Item, start *time.Time) (bool, error) {
-	if s.notifier == nil || !s.notifier.OutboxEnabled() {
+	if s.notifier == nil {
+		return false, nil
+	}
+	if item.Status != "active" {
 		return false, nil
 	}
 	if item.Slot && (start == nil || !start.After(s.now())) {
@@ -372,8 +381,8 @@ func (s *Service) notifyNext(ctx context.Context, item Item, start *time.Time) (
 		}
 		var stamp int64
 		if err := tx.QueryRowContext(ctx, `
-			UPDATE reservation_waitlist SET notified_at = now() WHERE id = $1
-			RETURNING (extract(epoch FROM notified_at) * 1000000)::bigint`, q.id).Scan(&stamp); err != nil {
+			UPDATE reservation_waitlist SET notified_at = now(), turn_expires_at = $2 WHERE id = $1
+			RETURNING (extract(epoch FROM notified_at) * 1000000)::bigint`, q.id, s.turnDeadline(start)).Scan(&stamp); err != nil {
 			return false, err
 		}
 		if err := tx.Commit(); err != nil {
@@ -381,7 +390,7 @@ func (s *Service) notifyNext(ctx context.Context, item Item, start *time.Time) (
 		}
 		if err := s.announceAvailable(ctx, item, start, q.email, q.id, stamp); err != nil {
 			// Not queued: this person never heard of it, so they must not keep the baton.
-			if _, rerr := s.db.ExecContext(ctx, `UPDATE reservation_waitlist SET notified_at = NULL WHERE id = $1`, q.id); rerr != nil {
+			if _, rerr := s.db.ExecContext(ctx, `UPDATE reservation_waitlist SET notified_at = NULL, turn_expires_at = NULL WHERE id = $1`, q.id); rerr != nil {
 				log.Printf("Waiting list entry %d: baton not released: %v", q.id, rerr)
 			}
 			return false, err

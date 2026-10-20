@@ -50,12 +50,18 @@ type reminder struct {
 	milestone string
 }
 
-// Tick does the periodic work: it sends the reminders that are due and forgets the waiting list entries of slots
-// that are over. It is safe to call as often as wanted, and from several processes.
+// Tick does the periodic work: it passes the turn of waiting list people who did not answer in time, forgets the
+// waiting list entries of slots that are over, and sends the reminders that are due. It is safe to call as often as
+// wanted, and from several processes.
 func (s *Service) Tick(ctx context.Context) (sent int, err error) {
 	if _, err := s.db.ExecContext(ctx,
 		`DELETE FROM reservation_waitlist WHERE slot_start IS NOT NULL AND slot_start <= $1`, s.now().UTC()); err != nil {
 		log.Printf("Reservation waiting list cleanup failed: %v", err)
+	}
+	if passed, err := s.ExpireWaitlistTurns(ctx); err != nil {
+		log.Printf("Reservation waiting list turns could not be checked: %v", err)
+	} else if passed > 0 {
+		log.Printf("Waiting list: %d turn(s) expired and passed on", passed)
 	}
 	return s.SendDueReminders(ctx)
 }
@@ -68,10 +74,10 @@ func (s *Service) Tick(ctx context.Context) (sent int, err error) {
 //
 // Each reminder is claimed with an insert into reservation_reminders, whose primary key makes a second claim of
 // the same milestone impossible; only the claim that inserted the row sends. A reservation that was cancelled or
-// returned does not match the claim query, so it gets nothing. A claim whose push could not be queued is
+// returned does not match the claim query, so it gets nothing. A claim whose push could not be sent is
 // released, and the next run tries again.
 func (s *Service) SendDueReminders(ctx context.Context) (int, error) {
-	if s.notifier == nil || !s.notifier.OutboxEnabled() {
+	if s.notifier == nil {
 		return 0, nil
 	}
 	now := s.now().UTC()

@@ -3,12 +3,30 @@ package utils
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret []byte
+var (
+	jwtSecret   []byte
+	jwtSecretMu sync.Mutex
+)
+
+// loadJWTSecret reads JWT_SECRET once; requests run concurrently, and an unset secret is never cached.
+func loadJWTSecret() ([]byte, error) {
+	jwtSecretMu.Lock()
+	defer jwtSecretMu.Unlock()
+	if jwtSecret == nil {
+		secret := []byte(os.Getenv("JWT_SECRET"))
+		if len(secret) == 0 {
+			return nil, fmt.Errorf("JWT secret is not set")
+		}
+		jwtSecret = secret
+	}
+	return jwtSecret, nil
+}
 
 // JWTClaims represents the claims in a JWT token with enhanced security fields
 type JWTClaims struct {
@@ -21,11 +39,9 @@ type JWTClaims struct {
 
 // GenerateJWT creates a secure JWT token with enhanced claims
 func GenerateJWT(email string, roles []string, fingerprint string) (string, error) {
-	if jwtSecret == nil {
-		jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-		if len(jwtSecret) == 0 {
-			return "", fmt.Errorf("JWT secret is not set")
-		}
+	secret, err := loadJWTSecret()
+	if err != nil {
+		return "", err
 	}
 
 	// Default lifetime is 4 years; JWT_EXPIRATION_HOURS overrides it.
@@ -68,7 +84,7 @@ func GenerateJWT(email string, roles []string, fingerprint string) (string, erro
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// Generate signed token
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := token.SignedString(secret)
 	if err != nil {
 		return "", err
 	}
@@ -78,11 +94,9 @@ func GenerateJWT(email string, roles []string, fingerprint string) (string, erro
 
 // ValidateJWT validates a JWT token with enhanced security checks
 func ValidateJWT(tokenString string) (*jwt.Token, error) {
-	if jwtSecret == nil {
-		jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-		if len(jwtSecret) == 0 {
-			return nil, fmt.Errorf("JWT secret is not set")
-		}
+	secret, err := loadJWTSecret()
+	if err != nil {
+		return nil, err
 	}
 
 	// Parse token with custom claims
@@ -91,7 +105,7 @@ func ValidateJWT(tokenString string) (*jwt.Token, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return jwtSecret, nil
+		return secret, nil
 	}, jwt.WithLeeway(time.Minute)) // tolerate clock skew on legacy tokens that carry nbf
 
 	if err != nil {

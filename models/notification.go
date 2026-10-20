@@ -16,4 +16,6 @@ type NotificationPayload struct {
 	Kind string
 	// Navigation is the optional screen opened when the notification is tapped.
 	Navigation *NavigationTarget
+	// ActionCategory is the interactive category (action buttons) the app shows with the notification; empty for none.
+	ActionCategory string
 }

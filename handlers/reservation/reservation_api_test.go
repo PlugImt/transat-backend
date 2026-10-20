@@ -87,7 +87,10 @@ type api struct {
 	tokens   map[string]string
 }
 
-func newAPI(t *testing.T) *api {
+func newAPI(t *testing.T) *api { return newAPIWith(t, false) }
+
+// newAPIWith builds the API; legacy runs it without the delivery pipeline (PUSH_PIPELINE=legacy).
+func newAPIWith(t *testing.T, legacy bool) *api {
 	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
 	db := dbtest.Open(t)
 	middlewares.InitJWTMiddleware(db)
@@ -97,7 +100,9 @@ func newAPI(t *testing.T) *api {
 	cfg := push.DefaultConfig()
 	cfg.MaxPerSecond = 0
 	a.pipeline = push.New(db, a.provider, cfg, devices.DefaultConfig())
-	ns.SetPipeline(a.pipeline)
+	if !legacy {
+		ns.SetPipeline(a.pipeline)
+	}
 
 	a.svc = reservations.New(db, ns, a.mail)
 	a.svc.SetBackground(func(f func()) { f() })
@@ -228,99 +233,52 @@ func recipients(sent []push.Outbound) string {
 	return strings.Join(out, ",")
 }
 
-func TestAnAdminCancelsAThirdPartysSlotAndAUserCannot(t *testing.T) {
+func TestTheAppsRouteCancelsOnlyTheCallersOwnReservationEvenForAnAdmin(t *testing.T) {
 	a := newAPI(t)
 	a.user("admin@x.test", "Ada", "Lovelace", "ADMIN")
 	a.user("bob@x.test", "Bob", "Martin")
 	a.user("carol@x.test", "Carol", "Dupont")
 	room := a.item("Salle Ampère", true)
+	cable := a.item("Câble HDMI", false)
 	_, start := slot()
 	path := fmt.Sprintf("/reservation/item/%d", room)
+	loan := fmt.Sprintf("/reservation/item/%d", cable)
 
 	if r := a.call(http.MethodPatch, path, "bob@x.test", map[string]string{"start_date": start}); r.status != 200 {
 		t.Fatalf("booking: %d %v", r.status, r.body)
 	}
+	now := time.Now().UTC().Add(-time.Minute).Format(reservations.APITimeLayout)
+	if r := a.call(http.MethodPatch, loan, "bob@x.test", map[string]string{"start_date": now}); r.status != 200 {
+		t.Fatalf("loan: %d %v", r.status, r.body)
+	}
 
-	// A student cannot cancel somebody else's reservation.
-	r := a.call(http.MethodDelete, path, "carol@x.test", map[string]string{"start_date": start})
-	if r.status != 404 || a.rows(room) != 1 {
-		t.Fatalf("carol: %d %v, %d rows", r.status, r.body, a.rows(room))
+	// Neither a student nor an administrator can cancel somebody else's reservation here: the admin site has its own route.
+	for _, who := range []string{"carol@x.test", "admin@x.test"} {
+		if r := a.call(http.MethodDelete, path, who, map[string]string{"start_date": start}); r.status != 404 || a.rows(room) != 1 {
+			t.Fatalf("%s: %d %v, %d rows", who, r.status, r.body, a.rows(room))
+		}
+		if r := a.call(http.MethodDelete, loan, who, nil); r.status != 400 || a.holder(cable, false) != "bob@x.test" {
+			t.Fatalf("%s on the loan: %d %v", who, r.status, r.body)
+		}
 	}
 	if len(a.deliver()) != 0 || len(a.mail.sent) != 0 {
 		t.Fatal("a refused cancellation notified somebody")
 	}
 
-	// An administrator can.
-	r = a.call(http.MethodDelete, path, "admin@x.test", map[string]string{"start_date": start})
-	if r.status != 200 || r.body["cancelled_by_admin"] != true || a.rows(room) != 0 {
-		t.Fatalf("admin: %d %v, %d rows", r.status, r.body, a.rows(room))
-	}
-
-	// The user got the push notification, naming the item, the slot and the administrator.
-	sent := a.deliver()
-	if len(sent) != 1 || sent[0].Token != a.tokenOf("bob@x.test") {
-		t.Fatalf("pushes = %v", recipients(sent))
-	}
-	if sent[0].Title != "Réservation annulée" || !strings.Contains(sent[0].Body, "Ada Lovelace") || !strings.Contains(sent[0].Body, "Salle Ampère") {
-		t.Fatalf("push = %q / %q", sent[0].Title, sent[0].Body)
-	}
-	nav, _ := sent[0].Data["navigation"].(*models.NavigationTarget)
-	if sent[0].Data["type"] != "reservation_cancelled" || nav == nil || nav.Type != models.NavigationReservation || nav.ID != fmt.Sprint(room) {
-		t.Fatalf("data = %v", sent[0].Data)
-	}
-
-	// And the email, with the same information.
-	if len(a.mail.sent) != 1 {
-		t.Fatalf("%d emails", len(a.mail.sent))
-	}
-	m := a.mail.sent[0]
-	if m.mail.Recipient != "bob@x.test" || m.data.AdminName != "Ada Lovelace" || m.data.ItemName != "Salle Ampère" || !m.data.HasSlot {
-		t.Fatalf("email = %+v", m)
-	}
-
-	// The owner can still cancel their own slot, and that tells nobody.
-	if r := a.call(http.MethodPatch, path, "bob@x.test", map[string]string{"start_date": start}); r.status != 200 {
-		t.Fatalf("booking again: %d", r.status)
-	}
-	if r := a.call(http.MethodDelete, path, "bob@x.test", map[string]string{"start_date": start}); r.status != 200 || r.body["cancelled_by_admin"] != false {
+	// The owner can cancel their own slot, and that tells nobody.
+	if r := a.call(http.MethodDelete, path, "bob@x.test", map[string]string{"start_date": start}); r.status != 200 || r.body["cancelled_by_admin"] != false || a.rows(room) != 0 {
 		t.Fatalf("owner cancel: %d %v", r.status, r.body)
 	}
-	if len(a.deliver()) != 0 || len(a.mail.sent) != 1 {
+	if len(a.deliver()) != 0 || len(a.mail.sent) != 0 {
 		t.Fatal("cancelling one's own reservation notified somebody")
 	}
-}
 
-func TestAnAdminEndsALoanWithoutBodyAndAStudentCannot(t *testing.T) {
-	a := newAPI(t)
-	a.user("admin@x.test", "Ada", "Lovelace", "ADMIN")
-	a.user("bob@x.test", "Bob", "Martin")
-	a.user("carol@x.test", "Carol", "Dupont")
-	cable := a.item("Câble HDMI", false)
-	path := fmt.Sprintf("/reservation/item/%d", cable)
-
-	now := time.Now().UTC().Add(-time.Minute).Format(reservations.APITimeLayout)
-	if r := a.call(http.MethodPatch, path, "bob@x.test", map[string]string{"start_date": now}); r.status != 200 {
-		t.Fatalf("loan: %d %v", r.status, r.body)
+	// An administrator keeps the right to cancel their own.
+	if r := a.call(http.MethodPatch, path, "admin@x.test", map[string]string{"start_date": start}); r.status != 200 {
+		t.Fatalf("admin booking: %d %v", r.status, r.body)
 	}
-	if r := a.call(http.MethodDelete, path, "carol@x.test", nil); r.status != 400 {
-		t.Fatalf("carol: %d %v", r.status, r.body)
-	}
-	if a.holder(cable, false) != "bob@x.test" {
-		t.Fatal("the loan was ended by a student")
-	}
-	r := a.call(http.MethodDelete, path, "admin@x.test", nil)
-	if r.status != 200 || r.body["cancelled_by_admin"] != true {
-		t.Fatalf("admin: %d %v", r.status, r.body)
-	}
-	if a.holder(cable, false) != "" {
-		t.Fatal("the loan is still open")
-	}
-	sent := a.deliver()
-	if len(sent) != 1 || sent[0].Token != a.tokenOf("bob@x.test") || !strings.Contains(sent[0].Body, "Ada Lovelace") || !strings.Contains(sent[0].Body, "Câble HDMI") {
-		t.Fatalf("pushes = %+v", sent)
-	}
-	if len(a.mail.sent) != 1 || a.mail.sent[0].data.HasSlot {
-		t.Fatalf("emails = %+v", a.mail.sent)
+	if r := a.call(http.MethodDelete, path, "admin@x.test", map[string]string{"start_date": start}); r.status != 200 || r.body["cancelled_by_admin"] != false || a.rows(room) != 0 {
+		t.Fatalf("admin own cancel: %d %v", r.status, r.body)
 	}
 }
 

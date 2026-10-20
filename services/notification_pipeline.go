@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -45,9 +44,13 @@ type Announcement struct {
 
 // Announce queues an announcement and returns at once. The recipients are not chosen here: they are worked out
 // by the pipeline's worker, which also checks every device again right before sending.
+// When the pipeline is off (PUSH_PIPELINE=legacy) the announcement is sent straight to Expo before returning: the
+// recipients are resolved from the legacy token table, and an image is dropped, which that path cannot carry. The
+// action buttons and the navigation travel the same way; an app that does not know the category shows a plain
+// notification that opens the same screen.
 func (ns *NotificationService) Announce(ctx context.Context, a Announcement) (push.EnqueueResult, error) {
 	if ns.pipeline == nil {
-		return push.EnqueueResult{}, errors.New("the delivery pipeline is not enabled")
+		return push.EnqueueResult{}, ns.announceDirect(a)
 	}
 	languages, err := ns.languageCodes(ctx)
 	if err != nil {
@@ -75,12 +78,12 @@ func (ns *NotificationService) Announce(ctx context.Context, a Announcement) (pu
 // CanReach reports whether a notification of the category sent to this user would go to at least one device now:
 // the user did not switch the category off and has a device with a valid session, a token and a permission.
 func (ns *NotificationService) CanReach(ctx context.Context, email string, category models.NotificationCategory) (bool, error) {
+	audience := models.NotificationAudience{Type: models.AudienceUsers, Emails: []string{email}}
 	if ns.pipeline == nil {
-		return false, nil
+		recipients, err := ns.ResolveAudience(audience, category)
+		return len(recipients.Tokens) > 0, err
 	}
-	res, err := ns.pipeline.Resolve(ctx, push.Audience{
-		NotificationAudience: models.NotificationAudience{Type: models.AudienceUsers, Emails: []string{email}},
-	}, category)
+	res, err := ns.pipeline.Resolve(ctx, push.Audience{NotificationAudience: audience}, category)
 	if err != nil {
 		return false, err
 	}

@@ -190,6 +190,9 @@ func (ns *NotificationService) SendPush(payload models.NotificationPayload) (Pus
 			if payload.Message != "" {
 				message["body"] = payload.Message
 			}
+			if payload.ActionCategory != "" {
+				message["categoryId"] = payload.ActionCategory
+			}
 			if data != nil {
 				message["data"] = data
 			}

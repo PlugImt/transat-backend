@@ -20,6 +20,9 @@ type CancelRequest struct {
 	// Start identifies the slot to cancel; required for a slot item, ignored for a loan item.
 	Start      *time.Time
 	ActorEmail string
+	// AsAdmin is set by the administration routes only. Without it the actor can cancel nothing but their own
+	// reservation, whatever their role: the app's route never sets it.
+	AsAdmin bool
 }
 
 // CancelResult describes what was cancelled.
@@ -35,8 +38,9 @@ type CancelResult struct {
 	NextNotified bool
 }
 
-// Cancel cancels a reservation. A user may cancel a slot of their own; an administrator may cancel any slot, and
-// is the only one who may end somebody's loan of an item without a slot (the owner returns it themselves).
+// Cancel cancels a reservation. Without AsAdmin the actor may cancel a slot of their own and nothing else. With
+// AsAdmin, which the administration routes set and which still requires the ADMIN role, any slot may be cancelled
+// and the loan of an item without a slot may be ended (the borrower returns it themselves otherwise).
 // When an administrator cancels the reservation of somebody else, that person gets a push notification and an
 // email naming the administrator. Whoever cancels, the head of the waiting list is told that the resource is free.
 func (s *Service) Cancel(ctx context.Context, req CancelRequest) (CancelResult, error) {
@@ -44,9 +48,14 @@ func (s *Service) Cancel(ctx context.Context, req CancelRequest) (CancelResult, 
 	if err != nil {
 		return CancelResult{}, err
 	}
-	admin, err := s.IsAdmin(ctx, req.ActorEmail)
-	if err != nil {
-		return CancelResult{}, fmt.Errorf("failed to check the admin role: %w", err)
+	admin := false
+	if req.AsAdmin {
+		if admin, err = s.IsAdmin(ctx, req.ActorEmail); err != nil {
+			return CancelResult{}, fmt.Errorf("failed to check the admin role: %w", err)
+		}
+		if !admin {
+			return CancelResult{}, ErrNotAdmin
+		}
 	}
 
 	var rows *sql.Rows
@@ -99,6 +108,18 @@ func (s *Service) Cancel(ctx context.Context, req CancelRequest) (CancelResult, 
 		return res, ErrNotFound
 	}
 	res.Owner = owners[0]
+
+	end := s.now().UTC()
+	if item.Slot {
+		end = res.Start.Add(time.Hour)
+	}
+	for _, owner := range owners {
+		kind := "cancelled"
+		if owner != req.ActorEmail {
+			kind = "cancelled_by_admin"
+		}
+		s.logCancellation(ctx, item.ID, owner, res.Start, end, kind, req.ActorEmail)
+	}
 
 	// The reservation is gone. What follows must not fail the request: log and move on.
 	var start *time.Time
@@ -156,7 +177,7 @@ func (s *Service) notifyAdminCancellation(ctx context.Context, item Item, start 
 	lang := s.userLanguage(ctx, owner)
 	var errs []error
 
-	if s.notifier != nil && s.notifier.OutboxEnabled() {
+	if s.notifier != nil {
 		now := s.now()
 		var slotStart *time.Time
 		if item.Slot {

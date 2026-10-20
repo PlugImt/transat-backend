@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services/reservations"
 	"github.com/plugimt/transat-backend/utils"
 )
 
@@ -181,6 +182,12 @@ func (r *ReservationRepository) CreateItem(item models.ReservationCreateItemRequ
 		args = append(args, *item.Location)
 		paramNum++
 	}
+	if item.Status != nil {
+		columns = append(columns, "status")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", paramNum))
+		args = append(args, *item.Status)
+		paramNum++
+	}
 
 	query := fmt.Sprintf(`
 		INSERT INTO reservation_element 
@@ -281,13 +288,13 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 	args := []interface{}{}
 
 	if IDCategoryParent != nil {
-		query += " WHERE id_reservation_category = $1;"
+		query += " WHERE re.status = 'active' AND id_reservation_category = $1;"
 		args = append(args, *IDCategoryParent)
 	} else if ClubID != nil {
-		query += " WHERE re.id_clubs = $1 AND id_reservation_category IS NULL;"
+		query += " WHERE re.status = 'active' AND re.id_clubs = $1 AND id_reservation_category IS NULL;"
 		args = append(args, *ClubID)
 	} else {
-		query += " WHERE id_reservation_category IS NULL;"
+		query += " WHERE re.status = 'active' AND id_reservation_category IS NULL;"
 	}
 
 	rows, err := r.DB.Query(query, args...)
@@ -498,6 +505,18 @@ func (r *ReservationRepository) IsItemAvailable(IDItem int, TimeStamp time.Time)
 	return isAvailable, nil
 }
 
+// isFreeForBooking tells whether nobody holds the loan (no slot) or the slot, inside the booking transaction.
+func (r *ReservationRepository) isFreeForBooking(tx *sql.Tx, IDItem int, perSlot bool, start time.Time) (bool, error) {
+	var free bool
+	var err error
+	if perSlot {
+		err = tx.QueryRow(`SELECT NOT EXISTS (SELECT 1 FROM reservation WHERE id_reservation_element = $1 AND start_date = $2)`, IDItem, start).Scan(&free)
+	} else {
+		err = tx.QueryRow(`SELECT NOT EXISTS (SELECT 1 FROM reservation WHERE id_reservation_element = $1 AND end_date IS NULL)`, IDItem).Scan(&free)
+	}
+	return free, err
+}
+
 func (r *ReservationRepository) IsItemPerSlot(IDItem int) (bool, error) {
 	query := "SELECT slot FROM reservation_element WHERE id_reservation_element = $1"
 	row := r.DB.QueryRow(query, IDItem)
@@ -549,7 +568,25 @@ func (r *ReservationRepository) DoesReservationCanBeEnded(ItemID int, UserEmail 
 func (r *ReservationRepository) CreateReservation(item models.ReservationManagementRequestTime, IDItem int, ItemPerSlot bool, UserEmail string) (models.ReservationItem, error) {
 	var res models.ReservationItem
 
-	isAvailable, err := r.IsItemAvailable(IDItem, *item.StartDate)
+	var status string
+	if err := r.DB.QueryRow(`SELECT status FROM reservation_element WHERE id_reservation_element = $1`, IDItem).Scan(&status); err != nil {
+		return res, err
+	}
+	if status != "active" {
+		return res, fmt.Errorf("item is not bookable")
+	}
+
+	// The waiting list takes the same lock: a booking and a "Réserver" of the same item or slot cannot both succeed.
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return res, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`SELECT pg_advisory_xact_lock($1::int, $2::int)`, reservations.ItemLockNamespace, IDItem); err != nil {
+		return res, err
+	}
+
+	isAvailable, err := r.isFreeForBooking(tx, IDItem, ItemPerSlot, *item.StartDate)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Error checking item availability: %v", err))
 		return res, err
@@ -587,7 +624,7 @@ func (r *ReservationRepository) CreateReservation(item models.ReservationManagem
 	res.User = &models.ReservationUser{}
 	var profilePicture sql.NullString
 
-	row := r.DB.QueryRow(query, args...)
+	row := tx.QueryRow(query, args...)
 	if err := row.Scan(
 		&res.User.Email,
 		&res.User.FirstName,
@@ -599,6 +636,9 @@ func (r *ReservationRepository) CreateReservation(item models.ReservationManagem
 			return res, nil
 		}
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create reservation: %v", err))
+		return res, err
+	}
+	if err := tx.Commit(); err != nil {
 		return res, err
 	}
 
@@ -838,7 +878,7 @@ func (r *ReservationRepository) SearchItemsAndCategories(search string) ([]model
         FROM reservation_element re
         LEFT JOIN reservation r ON r.id_reservation_element = re.id_reservation_element AND re.slot = FALSE AND r.end_date IS NULL
         LEFT JOIN newf n ON n.email = r.email
-        WHERE LOWER(re.name) LIKE $1 OR LOWER(COALESCE(re.description,'')) LIKE $1 OR LOWER(COALESCE(re.location,'')) LIKE $1
+        WHERE re.status = 'active' AND (LOWER(re.name) LIKE $1 OR LOWER(COALESCE(re.description,'')) LIKE $1 OR LOWER(COALESCE(re.location,'')) LIKE $1)
         ORDER BY re.name ASC;
     `
 	itemRows, err := r.DB.Query(itemQuery, like)

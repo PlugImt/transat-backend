@@ -1,4 +1,14 @@
 import type {
+  AdminItem,
+  AdminWaitlist,
+  CancelReservationRequest,
+  CancelReservationResult,
+  ItemStatus,
+  ReservationFilters,
+  ReservationPage,
+  ReservationStats,
+} from "./reservationTypes";
+import type {
   ActiveUsersPeriod,
   ActiveUsersPoint,
   ActivityHeatmapRange,
@@ -358,6 +368,7 @@ export interface CreateItemRequest {
   location?: string;
   id_club_parent?: number;
   id_category_parent?: number;
+  status?: ItemStatus;
 }
 
 export interface UpdateItemRequest {
@@ -367,6 +378,8 @@ export interface UpdateItemRequest {
   location?: string | null;
   warning_message?: string | null;
   confirmation_message?: string | null;
+  status?: ItemStatus;
+  status_note?: string | null;
 }
 
 export const traqApi = {
@@ -418,7 +431,7 @@ export const reservationApi = {
     return asArray<ReservationTreeItem>(response.data);
   },
   createCategory: async (category: CreateCategoryRequest) => {
-    const response = await api.post("/reservation/category", category);
+    const response = await api.post("/admin/reservations/categories", category);
     return response.data;
   },
   updateCategory: async (id: number, category: UpdateCategoryRequest) => {
@@ -430,7 +443,7 @@ export const reservationApi = {
     return response.data;
   },
   createItem: async (item: CreateItemRequest) => {
-    const response = await api.post("/reservation/item", item);
+    const response = await api.post("/admin/reservations/items", item);
     return response.data;
   },
   updateItem: async (id: number, item: UpdateItemRequest) => {
@@ -439,6 +452,61 @@ export const reservationApi = {
   },
   deleteItem: async (id: number) => {
     const response = await api.delete(`/admin/reservations/items/${id}`);
+    return response.data;
+  },
+  getCatalogue: async (): Promise<AdminItem[]> => {
+    const response = await api.get("/admin/reservations/items");
+    return asArray<AdminItem>(response.data);
+  },
+  getStats: async (): Promise<ReservationStats> => {
+    const response = await api.get("/admin/reservations/stats");
+    return response.data;
+  },
+  list: async (filters: ReservationFilters): Promise<ReservationPage> => {
+    const response = await api.get("/admin/reservations", {
+      params: {
+        status: filters.status || undefined,
+        kind: filters.kind || undefined,
+        item_id: filters.item_id,
+        q: filters.q || undefined,
+        from: filters.from,
+        to: filters.to,
+        overdue_days: filters.overdue_days,
+        order: filters.order,
+        limit: filters.limit,
+        offset: filters.offset,
+      },
+    });
+    return response.data;
+  },
+  cancel: async (request: CancelReservationRequest): Promise<CancelReservationResult> => {
+    const response = await api.post("/admin/reservations/cancel", request);
+    return response.data;
+  },
+  markReturned: async (
+    itemId: number,
+  ): Promise<{ owner: string; waitlist_notified: boolean; message: string }> => {
+    const response = await api.post(`/admin/reservations/items/${itemId}/return`);
+    return response.data;
+  },
+  getWaitlist: async (itemId: number, startDate?: string): Promise<AdminWaitlist> => {
+    const response = await api.get("/admin/reservations/waitlist", {
+      params: { item_id: itemId, start_date: startDate },
+    });
+    return { ...response.data, entries: asArray(response.data?.entries) };
+  },
+  removeWaitlistEntry: async (id: number): Promise<{ message: string; next_notified: boolean }> => {
+    const response = await api.delete(`/admin/reservations/waitlist/${id}`);
+    return response.data;
+  },
+  advanceWaitlist: async (
+    itemId: number,
+    startDate?: string,
+  ): Promise<{ message: string; next_notified: boolean }> => {
+    const response = await api.post("/admin/reservations/waitlist/advance", {
+      item_id: itemId,
+      start_date: startDate,
+    });
     return response.data;
   },
 };

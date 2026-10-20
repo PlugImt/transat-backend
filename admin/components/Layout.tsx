@@ -48,6 +48,8 @@ function Layout({ children }: LayoutProps) {
           {
             email: userData.email,
             roles: userData.roles || [],
+            firstName: userData.first_name,
+            lastName: userData.last_name,
           },
           token,
         );

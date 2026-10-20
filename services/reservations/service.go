@@ -33,8 +33,8 @@ const (
 	emailSubjectKey  = "reservation_cancelled_email.subject"
 	maxQueueEntries  = 30
 	maxItemNameRunes = 80
-	// lockNamespace is the first key of the advisory locks that serialize bookings and waiting-list changes of an item.
-	lockNamespace = 7301
+	// ItemLockNamespace is the first key of the advisory locks that serialize bookings and waiting-list changes of an item.
+	ItemLockNamespace = 7301
 )
 
 var (
@@ -49,11 +49,13 @@ var (
 	ErrAlreadyQueued  = errors.New("you are already on the waiting list")
 	ErrNotQueued      = errors.New("you are not on the waiting list")
 	ErrQueueFull      = errors.New("too many waiting list entries")
+	ErrNotBookable    = errors.New("item is under maintenance or disabled")
+	ErrNotAdmin       = errors.New("administrator role required")
 )
 
-// Notifier is the part of the notification service this package needs.
+// Notifier is the part of the notification service this package needs. It delivers through the push pipeline, or
+// straight to Expo when the pipeline is switched off (PUSH_PIPELINE=legacy); this package does not tell them apart.
 type Notifier interface {
-	OutboxEnabled() bool
 	Announce(ctx context.Context, a services.Announcement) (push.EnqueueResult, error)
 	// CanReach reports whether a push to this user would go to at least one device right now.
 	CanReach(ctx context.Context, email string, category models.NotificationCategory) (bool, error)
@@ -69,6 +71,8 @@ type Item struct {
 	ID   int
 	Name string
 	Slot bool
+	// Status is active, maintenance or inactive; only an active item can be booked.
+	Status string
 }
 
 // Service implements the reservation rules on top of the database.
@@ -114,8 +118,8 @@ type queryRower interface {
 func (s *Service) loadItem(ctx context.Context, id int) (Item, error) {
 	it := Item{ID: id}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT COALESCE(name, ''), COALESCE(slot, FALSE) FROM reservation_element WHERE id_reservation_element = $1`, id).
-		Scan(&it.Name, &it.Slot)
+		`SELECT COALESCE(name, ''), COALESCE(slot, FALSE), status FROM reservation_element WHERE id_reservation_element = $1`, id).
+		Scan(&it.Name, &it.Slot, &it.Status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return it, ErrItemNotFound
 	}
@@ -153,7 +157,7 @@ func (s *Service) userLanguage(ctx context.Context, email string) string {
 }
 
 func lockItem(ctx context.Context, tx *sql.Tx, itemID int) error {
-	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1::int, $2::int)`, lockNamespace, itemID)
+	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1::int, $2::int)`, ItemLockNamespace, itemID)
 	return err
 }
 

@@ -229,7 +229,8 @@ func main() {
 	routes.SetupBassineRoutes(app, db)
 	routes.SetupPhotosRoutes(app, db, photosSync, photoReports)
 	routes.SetupProfileRoutes(app, db, r2Service)
-	routes.SetupAdminRoutes(app, db, notificationService)
+	adminGroup := routes.SetupAdminRoutes(app, db, notificationService)
+	routes.SetupAdminReservationRoutes(adminGroup, db, reservationDiscordService, reservationService)
 
 	app.Get(middlewares.HealthPath, func(c *fiber.Ctx) error {
 		return c.SendString("OK")

@@ -155,10 +155,11 @@ func TestAnnouncementsAreWrittenInEveryLanguage(t *testing.T) {
 		t.Fatalf("summary = %+v", sum)
 	}
 
-	// Without a pipeline there is nothing to queue into.
+	// Without a pipeline nothing is queued: the announcement is sent directly, here to nobody.
 	f.ns.SetPipeline(nil)
-	if _, err := f.ns.Announce(context.Background(), Announcement{Kind: "x", Compose: func(string, *i18n.Localizer) (string, string) { return "t", "" }}); err == nil {
-		t.Fatal("Announce without a pipeline must fail")
+	if _, err := f.ns.Announce(context.Background(), Announcement{Kind: "x", Category: models.NotificationRestaurant,
+		Audience: usersOf("nobody@x.test"), Compose: func(string, *i18n.Localizer) (string, string) { return "t", "" }}); err != nil {
+		t.Fatalf("Announce without a pipeline and without recipient: %v", err)
 	}
 }
 

@@ -2372,9 +2372,9 @@ func (h *AdminHandler) DeleteReservationItemAdmin(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid item ID"})
 	}
 
-	// Check if item has active reservations
+	// Check if item has active or upcoming reservations
 	var hasReservations bool
-	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM reservation WHERE id_reservation_element = $1 AND end_date IS NULL)", itemIDInt).Scan(&hasReservations)
+	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM reservation WHERE id_reservation_element = $1 AND (end_date IS NULL OR end_date > now() AT TIME ZONE 'UTC'))", itemIDInt).Scan(&hasReservations)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to check item reservations")
 		utils.LogFooter()
@@ -2428,6 +2428,8 @@ func (h *AdminHandler) UpdateReservationItemAdmin(c *fiber.Ctx) error {
 		Slot                *bool   `json:"slot"`
 		WarningMessage      *string `json:"warning_message"`
 		ConfirmationMessage *string `json:"confirmation_message"`
+		Status              *string `json:"status"`
+		StatusNote          *string `json:"status_note"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -2436,10 +2438,54 @@ func (h *AdminHandler) UpdateReservationItemAdmin(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
 	}
 
+	if req.Name != nil && strings.TrimSpace(*req.Name) == "" {
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Item name is required"})
+	}
+	if req.Status != nil && !models.IsReservationItemStatus(*req.Status) {
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Status must be active, maintenance or inactive"})
+	}
+	if req.StatusNote != nil && len(*req.StatusNote) > 200 {
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "The status note is limited to 200 characters"})
+	}
+
+	// Switching between slots and loans under existing reservations would leave them meaningless.
+	if req.Slot != nil {
+		var busy bool
+		if err := h.DB.QueryRow(`
+			SELECT EXISTS (
+				SELECT 1 FROM reservation r JOIN reservation_element re ON re.id_reservation_element = r.id_reservation_element
+				WHERE r.id_reservation_element = $1 AND COALESCE(re.slot, FALSE) <> $2
+				  AND (r.end_date IS NULL OR r.end_date > now() AT TIME ZONE 'UTC'))`, itemIDInt, *req.Slot).Scan(&busy); err != nil {
+			utils.LogFooter()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to check the item's reservations"})
+		}
+		if busy {
+			utils.LogFooter()
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Cannot change the reservation type while the item has active or upcoming reservations"})
+		}
+	}
+
 	var updateFields []string
 	var updateValues []interface{}
 	paramCount := 1
 
+	if req.Status != nil {
+		updateFields = append(updateFields, fmt.Sprintf("status = $%d", paramCount))
+		updateValues = append(updateValues, *req.Status)
+		paramCount++
+	}
+	if req.StatusNote != nil {
+		if *req.StatusNote == "" {
+			updateFields = append(updateFields, "status_note = NULL")
+		} else {
+			updateFields = append(updateFields, fmt.Sprintf("status_note = $%d", paramCount))
+			updateValues = append(updateValues, *req.StatusNote)
+			paramCount++
+		}
+	}
 	if req.Name != nil {
 		updateFields = append(updateFields, fmt.Sprintf("name = $%d", paramCount))
 		updateValues = append(updateValues, *req.Name)

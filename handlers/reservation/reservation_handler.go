@@ -437,6 +437,12 @@ func (h *ReservationHandler) UpdateReservationItem(c *fiber.Ctx) error {
 			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to create reservation: %v", err))
 			utils.LogFooter()
 
+			if err.Error() == "item is not bookable" {
+				return c.Status(fiber.StatusLocked).JSON(fiber.Map{
+					"error": "This item is under maintenance or disabled",
+				})
+			}
+
 			if err.Error() == "item is not available" {
 				return c.Status(fiber.StatusConflict).JSON(fiber.Map{
 					"error": "Item is not available for the requested time",
@@ -546,8 +552,13 @@ func (h *ReservationHandler) CreateReservationItem(c *fiber.Ctx) error {
 			"error": "Item name is required",
 		})
 	}
+	if itemRequest.Status != nil && !models.IsReservationItemStatus(*itemRequest.Status) {
+		utils.LogFooter()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Status must be active, maintenance or inactive",
+		})
+	}
 	if itemRequest.IDClubParent == nil && itemRequest.IDCategoryParent == nil {
-		utils.LogMessage(utils.LevelError, "Either Club ID or Category Parent is required")
 		utils.LogFooter()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Either Club ID or Category Parent is required",
@@ -647,7 +658,7 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 		})
 	}
 
-	// An administrator ending the loan of an item without a slot sends no body: there is no slot to name.
+	// The body names the slot to cancel; an item without a slot has none, and is returned through its own route.
 	var reservationRequest models.ReservationManagementRequest
 	if len(c.Body()) > 0 {
 		if err := c.BodyParser(&reservationRequest); err != nil {
@@ -689,7 +700,8 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 		start = &parsed
 	}
 
-	// The service decides who may cancel what: a user a slot of their own, an administrator any reservation.
+	// The app's route: whatever the caller's role, it only cancels their own reservation. Cancelling somebody else's
+	// is POST /admin/reservations/cancel, used by the admin site.
 	result, err := h.Reservations.Cancel(c.UserContext(), reservations.CancelRequest{
 		ItemID:     itemID,
 		Start:      start,
