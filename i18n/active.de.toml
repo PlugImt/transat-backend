@@ -13,6 +13,33 @@ new_album_title = "Neues Fotoalbum"
 new_album_message = "{{.AlbumName}}"
 new_album_message_dated = "{{.AlbumName}} · {{.Date}}"
 
+[reservation_notification]
+admin_cancelled_title = "Reservierung storniert"
+admin_cancelled_message = "{{.AdminName}} hat deine Reservierung von {{.ItemName}} storniert."
+admin_cancelled_message_slot = "{{.AdminName}} hat deine Reservierung von {{.ItemName}} am {{.Slot}} storniert."
+slot_reminder_title = "Reservierung in 1 Std."
+slot_reminder_message = "{{.ItemName}} · {{.Time}}"
+loan_reminder_d1_title = "Denk daran, den Gegenstand zurückzugeben"
+loan_reminder_d1_message = "Du hast {{.ItemName}} seit 1 Tag. Wenn du ihn nicht mehr brauchst, gib ihn zurück, damit ihn jemand anderes ausleihen kann."
+loan_reminder_d5_title = "Gegenstand seit 5 Tagen ausgeliehen"
+loan_reminder_d5_message = "{{.ItemName}} ist seit 5 Tagen auf deinen Namen reserviert. Bitte gib ihn zurück oder gib die Reservierung frei."
+loan_reminder_d7_title = "Gegenstand seit 7 Tagen ausgeliehen"
+loan_reminder_d7_message = "{{.ItemName}} ist seit 7 Tagen auf deinen Namen reserviert. Bitte gib ihn zurück, damit er frei wird."
+waitlist_available_title = "{{.ItemName}} ist verfügbar"
+waitlist_available_message = "Du warst auf der Warteliste: Reserviere ihn, bevor es jemand anderes tut."
+waitlist_available_message_slot = "Der Zeitraum {{.Slot}} ist gerade frei geworden. Reserviere ihn, bevor es jemand anderes tut."
+
+[reservation_cancelled_email]
+subject = "[Transat] Reservierung storniert: {{.ItemName}}"
+title = "Reservierung storniert"
+intro = "Ein Administrator hat deine Reservierung storniert."
+item = "Element"
+slot = "Zeitraum"
+cancelled_by = "Storniert von"
+cancelled_at = "Storniert am"
+help = "Wenn du glaubst, dass es sich um einen Irrtum handelt, wende dich an den Administrator. Du kannst auch in der App neu reservieren."
+footer = "Du erhältst diese Nachricht, weil eine Reservierung auf deinen Namen bei Transat storniert wurde."
+
 [photo_report_email]
 subject = "[Transat] Foto gemeldet: {{.SubjectTitle}}"
 title = "Foto gemeldet"

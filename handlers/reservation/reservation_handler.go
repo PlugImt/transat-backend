@@ -2,6 +2,7 @@ package reservation
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -10,18 +11,21 @@ import (
 	"github.com/plugimt/transat-backend/handlers/reservation/repository"
 	"github.com/plugimt/transat-backend/models"
 	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/services/reservations"
 	"github.com/plugimt/transat-backend/utils"
 )
 
 type ReservationHandler struct {
 	ReservationRepository *repository.ReservationRepository
 	DiscordService        *services.DiscordService
+	Reservations          *reservations.Service
 }
 
-func NewReservationHandler(db *sql.DB, discordService *services.DiscordService) *ReservationHandler {
+func NewReservationHandler(db *sql.DB, discordService *services.DiscordService, reservationService *reservations.Service) *ReservationHandler {
 	return &ReservationHandler{
 		ReservationRepository: repository.NewReservationRepository(db),
 		DiscordService:        discordService,
+		Reservations:          reservationService,
 	}
 }
 
@@ -444,6 +448,17 @@ func (h *ReservationHandler) UpdateReservationItem(c *fiber.Ctx) error {
 			})
 		}
 
+		// Booking directly takes the user out of the queue of that item or slot, if they were in it.
+		if res.User != nil && res.User.Email != "" {
+			var slotStart *time.Time
+			if ItemPerSlot {
+				slotStart = &StartDateDate
+			}
+			if err := h.Reservations.ForgetInterest(c.UserContext(), res.User.Email, itemID, slotStart); err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to leave the waiting list: %v", err))
+			}
+		}
+
 		if h.DiscordService != nil && res.User != nil {
 			itemName, err := h.ReservationRepository.GetItemName(itemID)
 			if err != nil {
@@ -476,6 +491,13 @@ func (h *ReservationHandler) UpdateReservationItem(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to end reservation",
 			})
+		}
+
+		// The item is back: the first person waiting for it is told.
+		if res.User != nil && res.User.Email != "" {
+			if _, err := h.Reservations.ReleaseOf(c.UserContext(), itemID, nil); err != nil {
+				utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to notify the waiting list: %v", err))
+			}
 		}
 
 		if h.DiscordService != nil && res.User != nil {
@@ -607,8 +629,6 @@ func (h *ReservationHandler) GetReservationCategories(c *fiber.Ctx) error {
 func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 	utils.LogHeader("📅 Delete Reservation Item")
 
-	var StartDateDate time.Time
-
 	id := c.Params("id")
 	if id == "" {
 		utils.LogMessage(utils.LevelError, "Item ID is required")
@@ -627,13 +647,16 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 		})
 	}
 
+	// An administrator ending the loan of an item without a slot sends no body: there is no slot to name.
 	var reservationRequest models.ReservationManagementRequest
-	if err := c.BodyParser(&reservationRequest); err != nil {
-		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse request body: %v", err))
-		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request format",
-		})
+	if len(c.Body()) > 0 {
+		if err := c.BodyParser(&reservationRequest); err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse request body: %v", err))
+			utils.LogFooter()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid request format",
+			})
+		}
 	}
 
 	itemExists, err := h.ReservationRepository.CheckItemExists(itemID)
@@ -653,88 +676,65 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 		})
 	}
 
-	if reservationRequest.StartDate == nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "StartDate is required to delete a reservation",
-		})
+	var start *time.Time
+	if reservationRequest.StartDate != nil {
+		parsed, err := time.Parse("2006-01-02 15:04:05", *reservationRequest.StartDate)
+		if err != nil {
+			utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse StartDate: %v", err))
+			utils.LogFooter()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid StartDate format",
+			})
+		}
+		start = &parsed
 	}
 
-	StartDateDate, err = time.Parse("2006-01-02 15:04:05", *reservationRequest.StartDate)
-	if err != nil {
-		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to parse StartDate: %v", err))
-		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid StartDate format",
-		})
-	}
-
-	ItemPerSlot, err := h.ReservationRepository.IsItemPerSlot(itemID)
-	if err != nil {
-		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to check if item is per slot: %v", err))
-		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to check if item is per slot",
-		})
-	}
-
-	if !ItemPerSlot {
-		utils.LogMessage(utils.LevelError, "Item is not a per slot item, cannot delete reservation")
-		utils.LogFooter()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Item is not a per slot item, cannot delete reservation",
-		})
-	}
-
-	reservationItemTime := models.ReservationManagementRequestTime{
-		StartDate: &StartDateDate,
-	}
-
-	deleted, err := h.ReservationRepository.DeleteReservation(reservationItemTime, itemID, c.Locals("email").(string))
+	// The service decides who may cancel what: a user a slot of their own, an administrator any reservation.
+	result, err := h.Reservations.Cancel(c.UserContext(), reservations.CancelRequest{
+		ItemID:     itemID,
+		Start:      start,
+		ActorEmail: c.Locals("email").(string),
+	})
 	if err != nil {
 		utils.LogMessage(utils.LevelError, fmt.Sprintf("Failed to delete reservation: %v", err))
 		utils.LogFooter()
+		switch {
+		case errors.Is(err, reservations.ErrStartRequired):
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "StartDate is required to delete a reservation",
+			})
+		case errors.Is(err, reservations.ErrNotSlotItem):
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Item is not a per slot item, cannot delete reservation",
+			})
+		case errors.Is(err, reservations.ErrNotFound):
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "No reservation found to delete or you are not the owner of the reservation",
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to delete reservation",
 		})
 	}
 
-	if !deleted {
-		utils.LogMessage(utils.LevelError, "No reservation found to delete")
-		utils.LogFooter()
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "No reservation found to delete or you are not the owner of the reservation",
-		})
-	}
-
-	if h.DiscordService != nil && deleted {
-		itemName, err := h.ReservationRepository.GetItemName(itemID)
-		if err != nil {
-			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to get item name for Discord notification: %v", err))
-			itemName = "Unknown Item"
-		}
-
-		userEmail := c.Locals("email").(string)
-		userInfo := models.ReservationUser{
-			Email: userEmail,
-		}
-
-		// Try to get user details from database
+	if h.DiscordService != nil {
+		// The owner is the one whose reservation was cancelled, which is not the caller when an admin cancels it.
+		userInfo := models.ReservationUser{Email: result.Owner}
 		query := "SELECT first_name, last_name, COALESCE(profile_picture, '') FROM newf WHERE email = $1"
-		row := h.ReservationRepository.DB.QueryRow(query, userEmail)
+		row := h.ReservationRepository.DB.QueryRow(query, result.Owner)
 		if err := row.Scan(&userInfo.FirstName, &userInfo.LastName, &userInfo.ProfilePicture); err != nil {
 			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to get user details for Discord notification: %v", err))
 			userInfo.FirstName = "Unknown"
 			userInfo.LastName = "User"
 		}
 
-		startDate := reservationItemTime.StartDate.Format("2006-01-02 15:04:05")
+		startDate := result.Start.Format("2006-01-02 15:04:05")
 		var endDate string
-		if ItemPerSlot {
-			var slotDuration time.Duration = time.Hour // default to 1 hour if not set
-			endDate = reservationItemTime.StartDate.Add(slotDuration).Format("2006-01-02 15:04:05")
+		if result.Item.Slot {
+			endDate = result.Start.Add(time.Hour).Format("2006-01-02 15:04:05")
 		}
 
-		if err := h.DiscordService.SendReservationCancelled(itemName, startDate, endDate, ItemPerSlot, userInfo); err != nil {
+		if err := h.DiscordService.SendReservationCancelled(result.Item.Name, startDate, endDate, result.Item.Slot, userInfo); err != nil {
 			utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Failed to send Discord notification for reservation deletion: %v", err))
 		}
 	}
@@ -742,8 +742,10 @@ func (h *ReservationHandler) DeleteReservationItem(c *fiber.Ctx) error {
 	utils.LogMessage(utils.LevelInfo, "Reservation deleted successfully")
 	utils.LogFooter()
 	return c.JSON(fiber.Map{
-		"message":     "Reservation deleted successfully",
-		"reservation": deleted,
+		"message":            "Reservation deleted successfully",
+		"reservation":        true,
+		"cancelled_by_admin": result.ByAdmin,
+		"waitlist_notified":  result.NextNotified,
 	})
 }
 

@@ -37,6 +37,8 @@ type Announcement struct {
 	Navigation *models.NavigationTarget
 	// ImageURL is an optional https image shown with the notification; empty for text only.
 	ImageURL string
+	// ActionCategory is the interactive category (action buttons) the app shows with the notification; empty for none.
+	ActionCategory string
 	// ExpiresAt is the deadline after which the notification is no longer worth sending; zero uses the default.
 	ExpiresAt time.Time
 }
@@ -66,8 +68,23 @@ func (ns *NotificationService) Announce(ctx context.Context, a Announcement) (pu
 	}
 	return ns.pipeline.Enqueue(ctx, push.Message{
 		Kind: a.Kind, Category: a.Category, DedupeKey: a.DedupeKey, Audience: audience,
-		Content: content, Navigation: a.Navigation, ImageURL: a.ImageURL, ExpiresAt: a.ExpiresAt,
+		Content: content, Navigation: a.Navigation, ImageURL: a.ImageURL, ActionCategory: a.ActionCategory, ExpiresAt: a.ExpiresAt,
 	})
+}
+
+// CanReach reports whether a notification of the category sent to this user would go to at least one device now:
+// the user did not switch the category off and has a device with a valid session, a token and a permission.
+func (ns *NotificationService) CanReach(ctx context.Context, email string, category models.NotificationCategory) (bool, error) {
+	if ns.pipeline == nil {
+		return false, nil
+	}
+	res, err := ns.pipeline.Resolve(ctx, push.Audience{
+		NotificationAudience: models.NotificationAudience{Type: models.AudienceUsers, Emails: []string{email}},
+	}, category)
+	if err != nil {
+		return false, err
+	}
+	return len(res.Targets) > 0, nil
 }
 
 func (ns *NotificationService) languageCodes(ctx context.Context) ([]string, error) {

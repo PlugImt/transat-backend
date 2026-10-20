@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"regexp"
 	"strings"
 	"time"
 
@@ -43,6 +44,8 @@ const DefaultLanguage = "fr"
 
 // The providers accept 4096 bytes of payload; this leaves room for what they add.
 const maxPayloadBytes = 3800
+
+var validActionCategory = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
 var (
 	ErrNoContent       = errors.New("the message has no text in the default language")
@@ -72,6 +75,9 @@ type Message struct {
 	// ImageURL is an optional https image shown with the notification. Phones that cannot show it (an app build
 	// without the iOS service extension, a failed download) show the text alone.
 	ImageURL string
+	// ActionCategory names the interactive notification category (the action buttons) the app registered; empty
+	// for a notification without buttons. Apps that did not register it just show the notification.
+	ActionCategory string
 	// NotBefore delays the message; zero means now.
 	NotBefore time.Time
 	// ExpiresAt is the deadline after which the message is no longer worth sending; zero means DefaultTTL from now.
@@ -135,6 +141,9 @@ func (p *Pipeline) Enqueue(ctx context.Context, m Message) (EnqueueResult, error
 			return EnqueueResult{}, err
 		}
 	}
+	if m.ActionCategory != "" && !validActionCategory.MatchString(m.ActionCategory) {
+		return EnqueueResult{}, errors.New("action category must be 1 to 64 letters, digits, dots, dashes or underscores")
+	}
 	content, err := fitContent(m.Content, m.Kind, m.Navigation, m.ImageURL)
 	if err != nil {
 		return EnqueueResult{}, err
@@ -150,6 +159,10 @@ func (p *Pipeline) Enqueue(ctx context.Context, m Message) (EnqueueResult, error
 	var image any
 	if m.ImageURL != "" {
 		image = m.ImageURL
+	}
+	var action any
+	if m.ActionCategory != "" {
+		action = m.ActionCategory
 	}
 	var dedupe, createdBy any
 	if m.DedupeKey != "" {
@@ -168,13 +181,14 @@ func (p *Pipeline) Enqueue(ctx context.Context, m Message) (EnqueueResult, error
 
 	var id int64
 	err = p.db.QueryRowContext(ctx, `
-		INSERT INTO push_messages (kind, category, dedupe_key, audience, content, navigation, image_url, created_by, not_before, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::timestamptz, now()),
+		INSERT INTO push_messages (kind, category, dedupe_key, audience, content, navigation, image_url, action_category,
+		                           created_by, not_before, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $12, $8, COALESCE($9::timestamptz, now()),
 		        COALESCE($10::timestamptz, COALESCE($9::timestamptz, now()) + make_interval(secs => $11)))
 		ON CONFLICT (dedupe_key) DO NOTHING
 		RETURNING id`,
 		m.Kind, string(m.Category), dedupe, string(audience), string(contentJSON), navigation, image, createdBy, notBefore, expiresAt,
-		p.cfg.DefaultTTL.Seconds()).Scan(&id)
+		p.cfg.DefaultTTL.Seconds(), action).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		if err := p.db.QueryRowContext(ctx, `SELECT id FROM push_messages WHERE dedupe_key = $1`, m.DedupeKey).Scan(&id); err != nil {
 			return EnqueueResult{}, err

@@ -131,6 +131,9 @@ func expoMessage(m Outbound) map[string]any {
 			msg["mutableContent"] = true
 		}
 	}
+	if m.ActionCategory != "" {
+		msg["categoryId"] = m.ActionCategory
+	}
 	if ttl := int(m.TTL.Seconds()); ttl > 0 {
 		msg["ttl"] = ttl
 	}

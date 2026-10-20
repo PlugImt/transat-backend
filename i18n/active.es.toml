@@ -50,6 +50,33 @@ new_album_title = "Nuevo álbum de fotos"
 new_album_message = "{{.AlbumName}}"
 new_album_message_dated = "{{.AlbumName}} · {{.Date}}"
 
+[reservation_notification]
+admin_cancelled_title = "Reserva cancelada"
+admin_cancelled_message = "{{.AdminName}} ha cancelado tu reserva de {{.ItemName}}."
+admin_cancelled_message_slot = "{{.AdminName}} ha cancelado tu reserva de {{.ItemName}} del {{.Slot}}."
+slot_reminder_title = "Reserva en 1 h"
+slot_reminder_message = "{{.ItemName}} · {{.Time}}"
+loan_reminder_d1_title = "Recuerda devolver el objeto"
+loan_reminder_d1_message = "Tienes {{.ItemName}} desde hace 1 día. Si ya no lo necesitas, devuélvelo para que otra persona pueda tomarlo."
+loan_reminder_d5_title = "Objeto prestado desde hace 5 días"
+loan_reminder_d5_message = "{{.ItemName}} sigue a tu nombre desde hace 5 días. Devuélvelo o libera la reserva."
+loan_reminder_d7_title = "Objeto prestado desde hace 7 días"
+loan_reminder_d7_message = "{{.ItemName}} sigue a tu nombre desde hace 7 días. Devuélvelo para liberarlo."
+waitlist_available_title = "{{.ItemName}} está disponible"
+waitlist_available_message = "Estabas en la lista de espera: resérvalo antes de que lo haga otra persona."
+waitlist_available_message_slot = "La franja del {{.Slot}} se acaba de liberar. Resérvala antes de que lo haga otra persona."
+
+[reservation_cancelled_email]
+subject = "[Transat] Reserva cancelada: {{.ItemName}}"
+title = "Reserva cancelada"
+intro = "Un administrador ha cancelado tu reserva."
+item = "Elemento"
+slot = "Franja"
+cancelled_by = "Cancelada por"
+cancelled_at = "Cancelada el"
+help = "Si crees que se trata de un error, ponte en contacto con el administrador. También puedes volver a reservar desde la aplicación."
+footer = "Recibes este mensaje porque se ha cancelado una reserva a tu nombre en Transat."
+
 [photo_report_email]
 subject = "[Transat] Foto denunciada: {{.SubjectTitle}}"
 title = "Foto denunciada"

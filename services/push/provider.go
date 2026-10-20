@@ -15,6 +15,8 @@ type Outbound struct {
 	Data     map[string]any
 	// ImageURL is an optional https image; empty for a text notification.
 	ImageURL string
+	// ActionCategory is the interactive notification category (action buttons); empty for none.
+	ActionCategory string
 	// TTL is how long the provider may keep the message while the device is unreachable.
 	TTL time.Duration
 	// DedupeTag makes a duplicated send replace the notification already shown instead of stacking a second one,

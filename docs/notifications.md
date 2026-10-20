@@ -94,6 +94,8 @@ directory). Every one is additive: the previous server version keeps working on 
 | 00038 | `devices_legacy_tokens` | `source` column, `unknown` platform, `invalid_token` reason; imports every well-formed row of `user_notification_tokens` as a `legacy` device (a token shared by two accounts goes to the most recent) |
 | 00039 | `push_pipeline` | `push_messages` and `push_deliveries` |
 | 00040 | `push_message_image` | nullable `push_messages.image_url` |
+| 00041 | `reservation_reminders_waitlist` | `reservation.created_at`, `reservation_reminders` (one row per reminder sent), `reservation_waitlist` (queue of interest) |
+| 00042 | `push_message_action_category` | nullable `push_messages.action_category` (interactive notification buttons) |
 
 `user_notification_tokens` is still written (mirrored from `devices`) and still read by `PUSH_PIPELINE=legacy`.
 `TestNotificationMigrationsUpgradeKeepTheLegacyTokensAndCanBeRolledBack` upgrades a database holding legacy
@@ -145,6 +147,25 @@ Configuration that matters, and where it comes from:
 | Event reminders (`scheduler/event_scheduler.go`) | periodic | queued once per event, expire at the event start |
 | Restaurant menu (`scheduler/restaurant_scheduler.go`) | weekdays 9h to 14h | queued once per day |
 | Photo album announcements | follows the photo sync | queued once per album |
+| Reservation reminders (`scheduler/reservation_scheduler.go`) | every minute | see below |
+
+### Reservation notifications
+
+All of them use the `RESERVATIONS` category (a user who switched it off gets no push; the cancellation email is
+independent) and are addressed to one user. They need the pipeline: with `PUSH_PIPELINE=legacy` the reminders and the
+waiting list notifications are not sent.
+
+| `data.type` | When | Notes |
+| --- | --- | --- |
+| `reservation_cancelled` | an administrator cancels somebody else's reservation (`DELETE /reservation/item/:id`) | names the administrator; an email with the same information goes out |
+| `reservation_reminder` | one hour before a slot; one, five and seven days into a loan of an item without slot | claimed in `reservation_reminders` first, so a milestone is never sent twice; nothing for a cancelled or returned reservation, nor for a slot booked less than an hour before it starts; a milestone is dropped when it is more than 24 hours late |
+| `reservation_waitlist` | a reserved item or slot is released and somebody is waiting for it | only the first reachable person of the queue; carries `categoryId = reservation_waitlist` |
+
+The waiting list notification opens the reservation page (`navigation.params.waitlist = "1"`, plus `start` in the API's
+UTC format for a slot) and expects the app to register an interactive category named `reservation_waitlist` with two
+buttons: "Réserver" calls `POST /reservation/item/:id/waitlist/reserve` and "Annuler" calls
+`POST /reservation/item/:id/waitlist/decline`, both with `{"start_date": "YYYY-MM-DD HH:mm:ss"}` for a slot item. An
+app that did not register the category shows a plain notification that opens the page.
 
 ## 6. Send a controlled test notification
 

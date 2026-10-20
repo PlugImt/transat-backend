@@ -31,6 +31,7 @@ import (
 	"github.com/plugimt/transat-backend/services/photoreport"
 	photosService "github.com/plugimt/transat-backend/services/photos"
 	"github.com/plugimt/transat-backend/services/push"
+	"github.com/plugimt/transat-backend/services/reservations"
 	"github.com/plugimt/transat-backend/utils"
 	"github.com/robfig/cron/v3"
 )
@@ -106,6 +107,8 @@ func main() {
 
 	restHandler := restaurantHandler.NewRestaurantHandler(db, translationService, notificationService)
 
+	reservationService := reservations.New(db, notificationService, emailService)
+
 	weatherService, err := services.NewWeatherService()
 	if err != nil {
 		log.Fatalf("💥 Failed to create Weather Service: %v", err)
@@ -128,7 +131,7 @@ func main() {
 
 	eventHandler := event.NewEventHandler(db, notificationService)
 
-	appScheduler := scheduler.NewScheduler(restHandler, db, notificationService)
+	appScheduler := scheduler.NewScheduler(restHandler, db, notificationService, reservationService)
 	appScheduler.StartAll()
 	defer appScheduler.StopAll()
 
@@ -222,7 +225,7 @@ func main() {
 	routes.SetupWeatherRoutes(app, weatherHandler)
 	routes.SetupBusDepartureRoutes(app, gtfsService)
 	routes.SetupEventRoutes(app, db, eventHandler)
-	routes.SetupReservationRoutes(app, db, reservationDiscordService)
+	routes.SetupReservationRoutes(app, db, reservationDiscordService, reservationService)
 	routes.SetupBassineRoutes(app, db)
 	routes.SetupPhotosRoutes(app, db, photosSync, photoReports)
 	routes.SetupProfileRoutes(app, db, r2Service)

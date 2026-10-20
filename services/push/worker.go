@@ -283,6 +283,7 @@ type recheck struct {
 	navigation []byte
 	kind       string
 	imageURL   string
+	action     string
 	expired    bool
 	remaining  float64
 	prefOn     bool
@@ -299,7 +300,7 @@ func (p *Pipeline) process(ctx context.Context, claims []claim, st *Stats) error
 	rows, err := p.db.QueryContext(ctx, `
 		SELECT del.id, d.user_email, COALESCE(d.push_token, ''), d.push_token IS NOT NULL, d.platform, d.permission_status,
 		       `+devices.StateSQL("$2", "$3")+`,
-		       m.content, m.navigation, m.kind, COALESCE(m.image_url, ''), m.expires_at <= now(),
+		       m.content, m.navigation, m.kind, COALESCE(m.image_url, ''), COALESCE(m.action_category, ''), m.expires_at <= now(),
 		       GREATEST(EXTRACT(EPOCH FROM (m.expires_at - now())), 0)::float8,
 		       (m.category = '' OR EXISTS (
 		           SELECT 1 FROM notifications nt JOIN services s ON s.id_services = nt.id_services
@@ -318,7 +319,7 @@ func (p *Pipeline) process(ctx context.Context, claims []claim, st *Stats) error
 		var id int64
 		var r recheck
 		if err := rows.Scan(&id, &r.owner, &r.token, &r.hasToken, &r.platform, &r.permission, &r.state,
-			&r.content, &r.navigation, &r.kind, &r.imageURL, &r.expired, &r.remaining, &r.prefOn); err != nil {
+			&r.content, &r.navigation, &r.kind, &r.imageURL, &r.action, &r.expired, &r.remaining, &r.prefOn); err != nil {
 			rows.Close()
 			return err
 		}
@@ -373,10 +374,11 @@ func (p *Pipeline) process(ctx context.Context, claims []claim, st *Stats) error
 			fingerprint: devices.TokenFingerprint(r.token),
 			out: Outbound{
 				Token: r.token, Platform: r.platform, Title: text.Title, Body: text.Body,
-				Data:      models.NotificationPayload{Kind: r.kind, Navigation: nav}.ExpoData(),
-				ImageURL:  r.imageURL,
-				TTL:       time.Duration(r.remaining * float64(time.Second)),
-				DedupeTag: fmt.Sprintf("m%d", c.messageID),
+				Data:           models.NotificationPayload{Kind: r.kind, Navigation: nav}.ExpoData(),
+				ImageURL:       r.imageURL,
+				ActionCategory: r.action,
+				TTL:            time.Duration(r.remaining * float64(time.Second)),
+				DedupeTag:      fmt.Sprintf("m%d", c.messageID),
 			},
 		})
 	}

@@ -54,6 +54,33 @@ new_album_title = "New photo album"
 new_album_message = "{{.AlbumName}}"
 new_album_message_dated = "{{.AlbumName}} · {{.Date}}"
 
+[reservation_notification]
+admin_cancelled_title = "Reservation cancelled"
+admin_cancelled_message = "{{.AdminName}} cancelled your reservation of {{.ItemName}}."
+admin_cancelled_message_slot = "{{.AdminName}} cancelled your reservation of {{.ItemName}} on {{.Slot}}."
+slot_reminder_title = "Reservation in 1h"
+slot_reminder_message = "{{.ItemName}} · {{.Time}}"
+loan_reminder_d1_title = "Remember to return the item"
+loan_reminder_d1_message = "You have had {{.ItemName}} for 1 day. If you no longer need it, return it so someone else can borrow it."
+loan_reminder_d5_title = "Item borrowed for 5 days"
+loan_reminder_d5_message = "{{.ItemName}} has been in your name for 5 days. Please return it or free the reservation."
+loan_reminder_d7_title = "Item borrowed for 7 days"
+loan_reminder_d7_message = "{{.ItemName}} has been in your name for 7 days. Please return it to free it up."
+waitlist_available_title = "{{.ItemName}} is available"
+waitlist_available_message = "You were on the waiting list: book it before someone else does."
+waitlist_available_message_slot = "The {{.Slot}} slot just became free. Book it before someone else does."
+
+[reservation_cancelled_email]
+subject = "[Transat] Reservation cancelled: {{.ItemName}}"
+title = "Reservation cancelled"
+intro = "An administrator cancelled your reservation."
+item = "Item"
+slot = "Slot"
+cancelled_by = "Cancelled by"
+cancelled_at = "Cancelled on"
+help = "If you think this is a mistake, contact the administrator. You can also book again from the app."
+footer = "You are receiving this message because a reservation in your name on Transat was cancelled."
+
 [photo_report_email]
 subject = "[Transat] Photo report: {{.SubjectTitle}}"
 title = "Photo report"

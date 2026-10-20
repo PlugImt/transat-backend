@@ -4,23 +4,26 @@ import (
 	"database/sql"
 
 	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/services/reservations"
 	"github.com/robfig/cron/v3"
 )
 
 // Scheduler manages all scheduled tasks in the application
 type Scheduler struct {
-	restaurantScheduler *RestaurantScheduler
-	eventScheduler      *EventScheduler
+	restaurantScheduler  *RestaurantScheduler
+	eventScheduler       *EventScheduler
+	reservationScheduler *ReservationScheduler
 	// Add other schedulers here as needed
 	cron         *cron.Cron
 	cronEntryIDs map[string]cron.EntryID
 }
 
 // NewScheduler creates a new main scheduler
-func NewScheduler(restaurantHandler RestaurantMenuCronHandler, db *sql.DB, notificationService *services.NotificationService) *Scheduler {
+func NewScheduler(restaurantHandler RestaurantMenuCronHandler, db *sql.DB, notificationService *services.NotificationService, reservationService *reservations.Service) *Scheduler {
 	return &Scheduler{
-		restaurantScheduler: NewRestaurantScheduler(restaurantHandler),
-		eventScheduler:      NewEventScheduler(db, notificationService),
+		restaurantScheduler:  NewRestaurantScheduler(restaurantHandler),
+		eventScheduler:       NewEventScheduler(db, notificationService),
+		reservationScheduler: NewReservationScheduler(reservationService),
 		// Initialize other schedulers here
 		cron:         cron.New(),
 		cronEntryIDs: make(map[string]cron.EntryID),
@@ -35,6 +38,9 @@ func (s *Scheduler) StartAll() {
 	// Start event scheduler
 	s.eventScheduler.Start()
 
+	// Start reservation reminders
+	s.reservationScheduler.Start()
+
 	// Start other schedulers as needed
 
 	// Start cron scheduler
@@ -48,6 +54,9 @@ func (s *Scheduler) StopAll() {
 
 	// Stop event scheduler
 	s.eventScheduler.Stop()
+
+	// Stop reservation reminders
+	s.reservationScheduler.Stop()
 
 	// Stop other schedulers as needed
 
