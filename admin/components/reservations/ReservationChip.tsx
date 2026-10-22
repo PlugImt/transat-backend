@@ -6,13 +6,16 @@ import { chipStyle, PHASE_LABELS, phaseOf, solidColor } from "./planningColors";
 import { formatDateTime, formatTime, fullName, ReminderBadges, ReservationStatusBadge } from "./ui";
 
 interface ReservationChipProps {
-  reservation: AdminReservation;
+  /** Consecutive slots of the same person, shown as one event. */
+  run: AdminReservation[];
   hue: number;
-  onSelect: (reservation: AdminReservation) => void;
+  onSelect: (run: AdminReservation[]) => void;
 }
 
 /** A reservation in the calendar: item and person always visible, everything else on hover. */
-export function ReservationChip({ reservation, hue, onSelect }: ReservationChipProps) {
+export function ReservationChip({ run, hue, onSelect }: ReservationChipProps) {
+  const reservation = run.find((r) => phaseOf(r) === "ongoing") ?? run[0];
+  const end = run[run.length - 1].end_date;
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const phase = phaseOf(reservation);
   const person = fullName(reservation.first_name, reservation.last_name) || reservation.email;
@@ -23,7 +26,7 @@ export function ReservationChip({ reservation, hue, onSelect }: ReservationChipP
         type="button"
         aria-disabled={!reservation.cancellable}
         aria-label={`${reservation.item_name}, ${person}, ${PHASE_LABELS[phase]}`}
-        onClick={() => reservation.cancellable && onSelect(reservation)}
+        onClick={() => reservation.cancellable && onSelect(run)}
         onMouseEnter={(event) => setAnchor(event.currentTarget.getBoundingClientRect())}
         onMouseLeave={() => setAnchor(null)}
         onFocus={(event) => setAnchor(event.currentTarget.getBoundingClientRect())}
@@ -33,10 +36,13 @@ export function ReservationChip({ reservation, hue, onSelect }: ReservationChipP
           reservation.cancellable ? "cursor-pointer" : "cursor-default"
         }`}
       >
-        <span className="truncate text-[11px] font-semibold">{reservation.item_name}</span>
-        <span className="truncate text-[10px]">{person}</span>
+        <span className="truncate text-[11px] font-semibold">{person}</span>
+        <span className="truncate text-[10px] opacity-80">
+          {formatTime(run[0].start_date)}
+          {end ? ` – ${formatTime(end)}` : ""}
+        </span>
       </button>
-      {anchor && <HoverCard anchor={anchor} reservation={reservation} hue={hue} />}
+      {anchor && <HoverCard anchor={anchor} reservation={reservation} start={run[0].start_date} end={end} hue={hue} />}
     </>
   );
 }
@@ -46,10 +52,14 @@ const CARD_WIDTH = 288;
 function HoverCard({
   anchor,
   reservation,
+  start,
+  end,
   hue,
 }: {
+  start: string;
   anchor: DOMRect;
   reservation: AdminReservation;
+  end?: string;
   hue: number;
 }) {
   const left = Math.max(8, Math.min(anchor.left, window.innerWidth - CARD_WIDTH - 8));
@@ -87,8 +97,8 @@ function HoverCard({
         </dd>
         <dt className="text-gray-500">Créneau</dt>
         <dd>
-          {formatDateTime(reservation.start_date)}
-          {reservation.end_date ? ` – ${formatTime(reservation.end_date)}` : ""}
+          {formatDateTime(start)}
+          {end ? ` – ${formatTime(end)}` : ""}
         </dd>
         <dt className="text-gray-500">Rappels</dt>
         <dd>

@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarDays, FolderTree, ListChecks, Package } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { CatalogueTab } from "@/components/reservations/CatalogueTab";
 import { CategoryTree } from "@/components/reservations/CategoryTree";
@@ -22,8 +23,13 @@ const TABS: { id: Tab; label: string; icon: typeof Package }[] = [
   { id: "categories", label: "Catégories", icon: FolderTree },
 ];
 
+const tabPath = (id: Tab) => (id === "catalogue" ? "/reservations" : `/reservations/${id}`);
+
 export default function ReservationsPage() {
-  const [tab, setTab] = useState<Tab>("catalogue");
+  const router = useRouter();
+  const segment = useParams<{ tab?: string[] }>().tab?.[0];
+  const tab = TABS.find(({ id }) => id === segment)?.id ?? "catalogue";
+  const setTab = (id: Tab) => router.push(tabPath(id));
   const [filters, setFilters] = useState<ReservationFilters>({});
   const [drawerItemId, setDrawerItemId] = useState<number | null>(null);
   const [form, setForm] = useState<{ open: boolean; item: AdminItem | null }>({

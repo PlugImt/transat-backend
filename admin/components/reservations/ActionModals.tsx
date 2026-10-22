@@ -14,6 +14,8 @@ export interface ReservationTarget {
   /** ISO start of the slot; the loan of an item without slot needs none. */
   startDate?: string;
   endDate?: string;
+  /** Every slot start of a merged event; cancelled one after the other. */
+  startDates?: string[];
   ownerName: string;
   ownerEmail: string;
 }
@@ -31,12 +33,14 @@ export function CancelReservationModal({ target, onClose }: ActionModalProps) {
   const confirm = async () => {
     if (!target) return;
     try {
-      const result = await cancel.mutateAsync({
-        item_id: target.itemId,
-        start_date: target.slot ? target.startDate : undefined,
-      });
+      const starts = target.slot ? (target.startDates ?? [target.startDate]) : [undefined];
+      let waitlistNotified = false;
+      for (const start of starts) {
+        const result = await cancel.mutateAsync({ item_id: target.itemId, start_date: start });
+        waitlistNotified ||= result.waitlist_notified;
+      }
       toast.success(
-        result.waitlist_notified
+        waitlistNotified
           ? `Réservation annulée. ${target.ownerName} a été prévenu(e), la première personne de la file d'attente aussi.`
           : `Réservation annulée. ${target.ownerName} a été prévenu(e).`,
       );

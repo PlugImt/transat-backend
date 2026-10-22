@@ -45,3 +45,44 @@ export const hoursWith = (reservations: AdminReservation[], day?: (value: string
 };
 
 export const hourLabel = (hour: number) => `${String(hour % 24).padStart(2, "0")}:00`;
+
+/** Consecutive hourly slots of one person on one item, shown as a single long event. */
+export interface SlotRun {
+  day: string;
+  hour: number;
+  /** The slots in chronological order. */
+  reservations: AdminReservation[];
+}
+
+export const mergeRuns = (reservations: AdminReservation[]): SlotRun[] => {
+  const sorted = reservations
+    .map((reservation) => ({ reservation, cell: cellOf(reservation.start_date) }))
+    .sort(
+      (a, b) =>
+        a.reservation.item_id - b.reservation.item_id ||
+        a.reservation.email.localeCompare(b.reservation.email) ||
+        a.cell.day.localeCompare(b.cell.day) ||
+        a.cell.hour - b.cell.hour,
+    );
+  const runs: SlotRun[] = [];
+  let last: { run: SlotRun; hour: number } | null = null;
+  for (const { reservation, cell } of sorted) {
+    const previous = last?.run.reservations[0];
+    if (
+      last &&
+      previous &&
+      previous.item_id === reservation.item_id &&
+      previous.email === reservation.email &&
+      last.run.day === cell.day &&
+      last.hour + 1 === cell.hour
+    ) {
+      last.run.reservations.push(reservation);
+      last.hour = cell.hour;
+    } else {
+      const run = { day: cell.day, hour: cell.hour, reservations: [reservation] };
+      runs.push(run);
+      last = { run, hour: cell.hour };
+    }
+  }
+  return runs;
+};

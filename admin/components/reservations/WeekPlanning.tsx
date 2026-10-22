@@ -11,13 +11,15 @@ import {
   cellOf,
   hourLabel,
   hoursWith,
+  mergeRuns,
   mondayOf,
   shiftDay,
+  type SlotRun,
   toUtcDate,
   weekday,
 } from "./planningDates";
 import { ReservationChip } from "./ReservationChip";
-import { targetOf } from "./ReservationsList";
+import { targetOfRun } from "./ReservationsList";
 import { EmptyState, parisDay, parisHour, SkeletonRows } from "./ui";
 
 interface WeekPlanningProps {
@@ -44,24 +46,27 @@ export function WeekPlanning({ slotItems, hues }: WeekPlanningProps) {
   );
 
   const { cells, hours, perDay } = useMemo(() => {
-    const map = new Map<string, AdminReservation[]>();
+    const map = new Map<string, { run: SlotRun; first: boolean }[]>();
     const counts = new Map<string, number>();
     const names = new Map(slotItems.map((item) => [item.id, item.name]));
+    const visible: AdminReservation[] = [];
     for (const reservation of data ?? []) {
       if (reservation.status === "cancelled" || hidden.has(reservation.item_id)) continue;
-      const cell = cellOf(reservation.start_date);
-      if (!days.includes(cell.day)) continue;
-      const key = `${cell.day}|${cell.hour}`;
-      map.set(key, [...(map.get(key) ?? []), reservation]);
-      counts.set(cell.day, (counts.get(cell.day) ?? 0) + 1);
+      if (!days.includes(cellOf(reservation.start_date).day)) continue;
+      visible.push(reservation);
     }
+    for (const run of mergeRuns(visible)) {
+      counts.set(run.day, (counts.get(run.day) ?? 0) + run.reservations.length);
+      // The event sits on its first hour; the following hours only carry a continuation strip.
+      for (let offset = 0; offset < run.reservations.length; offset++) {
+        const key = `${run.day}|${run.hour + offset}`;
+        map.set(key, [...(map.get(key) ?? []), { run, first: offset === 0 }]);
+      }
+    }
+    const nameOf = (run: SlotRun) =>
+      names.get(run.reservations[0].item_id) ?? run.reservations[0].item_name;
     for (const list of map.values()) {
-      list.sort((a, b) =>
-        (names.get(a.item_id) ?? a.item_name).localeCompare(
-          names.get(b.item_id) ?? b.item_name,
-          "fr",
-        ),
-      );
+      list.sort((a, b) => nameOf(a.run).localeCompare(nameOf(b.run), "fr"));
     }
     return {
       cells: map,
@@ -214,14 +219,26 @@ export function WeekPlanning({ slotItems, hues }: WeekPlanningProps) {
                       )}
                     >
                       <div className="flex flex-col gap-0.5">
-                        {(cells.get(`${day}|${hour}`) ?? []).map((reservation) => (
-                          <ReservationChip
-                            key={reservation.key}
-                            reservation={reservation}
-                            hue={hues.get(reservation.item_id) ?? 0}
-                            onSelect={(value) => setTarget(targetOf(value))}
-                          />
-                        ))}
+                        {(cells.get(`${day}|${hour}`) ?? []).map(({ run, first }) => {
+                          const head = run.reservations[0];
+                          const hue = hues.get(head.item_id) ?? 0;
+                          return first ? (
+                            <ReservationChip
+                              key={head.key}
+                              run={run.reservations}
+                              hue={hue}
+                              onSelect={(value) => setTarget(targetOfRun(value))}
+                            />
+                          ) : (
+                            <i
+                              key={head.key}
+                              aria-hidden
+                              title={`${head.item_name} (suite)`}
+                              className="block h-2 rounded"
+                              style={{ backgroundColor: solidColor(hue), opacity: 0.45 }}
+                            />
+                          );
+                        })}
                       </div>
                     </td>
                   ))}

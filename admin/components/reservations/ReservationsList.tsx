@@ -67,6 +67,13 @@ export const targetOf = (r: AdminReservation): ReservationTarget => ({
   ownerEmail: r.email,
 });
 
+/** One cancel target for a run of consecutive slots. */
+export const targetOfRun = (run: AdminReservation[]): ReservationTarget => ({
+  ...targetOf(run[0]),
+  endDate: run[run.length - 1].end_date,
+  startDates: run.map((r) => r.start_date),
+});
+
 interface ReservationsListProps {
   filters: ReservationFilters;
   onFiltersChange: (filters: ReservationFilters) => void;

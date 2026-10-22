@@ -7,9 +7,18 @@ import { useSlotReservations } from "@/lib/reservationHooks";
 import type { AdminItem, AdminReservation } from "@/lib/reservationTypes";
 import { CancelReservationModal, type ReservationTarget } from "./ActionModals";
 import { solidColor } from "./planningColors";
-import { cellOf, hourLabel, hoursWith, longDay, shiftDay, toUtcDate } from "./planningDates";
+import {
+  cellOf,
+  hourLabel,
+  hoursWith,
+  longDay,
+  mergeRuns,
+  shiftDay,
+  type SlotRun,
+  toUtcDate,
+} from "./planningDates";
 import { ReservationChip } from "./ReservationChip";
-import { targetOf } from "./ReservationsList";
+import { targetOfRun } from "./ReservationsList";
 import { Badge, EmptyState, ITEM_STATUS_LABELS, parisDay, parisHour, SkeletonRows } from "./ui";
 
 interface DayPlanningProps {
@@ -28,18 +37,28 @@ export function DayPlanning({ slotItems, hues, onOpenItem }: DayPlanningProps) {
   // Wider than the day: the days are cut in Paris time on this side.
   const { data, isLoading, isError } = useSlotReservations(shiftDay(day, -1), shiftDay(day, 2));
 
-  const { cells, hours, itemsBooked } = useMemo(() => {
-    const map = new Map<string, AdminReservation>();
+  const { cells, covered, slots, hours, itemsBooked } = useMemo(() => {
+    const map = new Map<string, SlotRun>();
+    const skipped = new Set<string>();
     const booked = new Set<number>();
+    const ofDay: AdminReservation[] = [];
     for (const reservation of data ?? []) {
       if (reservation.status === "cancelled") continue;
-      const cell = cellOf(reservation.start_date);
-      if (cell.day !== day) continue;
-      map.set(`${reservation.item_id}|${cell.hour}`, reservation);
+      if (cellOf(reservation.start_date).day !== day) continue;
+      ofDay.push(reservation);
       booked.add(reservation.item_id);
+    }
+    for (const run of mergeRuns(ofDay)) {
+      const itemId = run.reservations[0].item_id;
+      map.set(`${itemId}|${run.hour}`, run);
+      for (let offset = 1; offset < run.reservations.length; offset++) {
+        skipped.add(`${itemId}|${run.hour + offset}`);
+      }
     }
     return {
       cells: map,
+      covered: skipped,
+      slots: ofDay.length,
       hours: hoursWith(data ?? [], (value) => value === day),
       itemsBooked: booked.size,
     };
@@ -89,7 +108,7 @@ export function DayPlanning({ slotItems, hues, onOpenItem }: DayPlanningProps) {
         <span className="ml-auto text-sm text-gray-600">
           {isLoading
             ? "Chargement…"
-            : `${cells.size} créneau${cells.size > 1 ? "x" : ""} réservé${cells.size > 1 ? "s" : ""} sur ${itemsBooked} élément${itemsBooked > 1 ? "s" : ""}`}
+            : `${slots} créneau${slots > 1 ? "x" : ""} réservé${slots > 1 ? "s" : ""} sur ${itemsBooked} élément${itemsBooked > 1 ? "s" : ""}`}
         </span>
       </div>
 
@@ -158,13 +177,16 @@ export function DayPlanning({ slotItems, hues, onOpenItem }: DayPlanningProps) {
                       {hourLabel(hour)}
                     </th>
                     {slotItems.map((item) => {
-                      const reservation = cells.get(`${item.id}|${hour}`);
+                      if (covered.has(`${item.id}|${hour}`)) return null;
+                      const run = cells.get(`${item.id}|${hour}`);
+                      const reservation = run?.reservations[0];
                       const unavailable = item.status !== "active";
                       return (
                         <td
                           key={item.id}
+                          rowSpan={run?.reservations.length}
                           className={clsx(
-                            "h-11 border-b border-l border-gray-100 p-0.5 align-middle",
+                            "relative h-11 border-b border-l border-gray-100 p-0.5 align-middle",
                             unavailable && !reservation && "bg-gray-50",
                           )}
                           title={
@@ -173,12 +195,14 @@ export function DayPlanning({ slotItems, hues, onOpenItem }: DayPlanningProps) {
                               : undefined
                           }
                         >
-                          {reservation ? (
-                            <ReservationChip
-                              reservation={reservation}
-                              hue={hues.get(item.id) ?? 0}
-                              onSelect={(value) => setTarget(targetOf(value))}
-                            />
+                          {run ? (
+                            <div className="absolute inset-0.5">
+                              <ReservationChip
+                                run={run.reservations}
+                                hue={hues.get(item.id) ?? 0}
+                                onSelect={(value) => setTarget(targetOfRun(value))}
+                              />
+                            </div>
                           ) : (
                             !unavailable &&
                             !isPast(hour) && (

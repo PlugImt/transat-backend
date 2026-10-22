@@ -59,9 +59,6 @@ export function PlanningView({ items, onOpenItem }: PlanningViewProps) {
           ))}
         </div>
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-          <span>
-            Une couleur par élément. Heures de Paris. Cliquez sur une réservation pour l'annuler.
-          </span>
           {PHASES.map((phase) => (
             <span key={phase} className="inline-flex items-center gap-1">
               <i
