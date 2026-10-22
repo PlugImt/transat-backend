@@ -167,6 +167,19 @@ func (h *WashingMachineHandler) GetWashingMachinesTest() fiber.Handler {
 	}
 }
 
+// timeLeft reads the remaining time from the field the operator's own page reads for each status: 4 and 6 count down
+// in "temps", 14 in "time_before_off_virtu", the others in "time_before_off".
+func timeLeft(machine models.MachineData) int {
+	switch machine.Status {
+	case 4, 6:
+		return int(machine.Temps)
+	case 14:
+		return int(machine.TimeBeforeOffVirtu)
+	default:
+		return int(machine.TimeBeforeOff)
+	}
+}
+
 // transformMachineData categorizes and transforms the machine data into washing machines and dryers
 func transformMachineData(machineList []models.MachineData) models.FormattedMachineData {
 	var result models.FormattedMachineData
@@ -176,17 +189,14 @@ func transformMachineData(machineList []models.MachineData) models.FormattedMach
 	result.Dryers = []models.FormattedMachine{}
 
 	for _, machine := range machineList {
-		// Convert selecteur_machine to number
-		number, _ := strconv.Atoi(machine.SelecteurMachine)
-
-		// Check if machine is available (status 1 appears to mean available)
+		// Status 1 is "free" on the operator's own page.
 		isAvailable := machine.Status == 1
 
 		// Create formatted machine
 		formattedMachine := models.FormattedMachine{
-			Number:    number,
+			Number:    int(machine.SelecteurMachine),
 			Available: isAvailable,
-			TimeLeft:  machine.TimeBeforeOff,
+			TimeLeft:  timeLeft(machine),
 		}
 
 		// Categorize by machine type
