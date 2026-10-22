@@ -119,3 +119,6 @@ squall = "Chubasco"
 tornado = "Tornado"
 clear = "Despejado"
 clouds = "Nublado"
+
+[washing_machines]
+unavailable = "La información de las lavadoras no está disponible temporalmente: el sitio que la proporciona no responde. Inténtalo de nuevo más tarde."

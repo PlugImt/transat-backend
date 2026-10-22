@@ -131,3 +131,6 @@ squall = "Squall"
 tornado = "Tornado"
 clear = "Clear"
 clouds = "Clouds"
+
+[washing_machines]
+unavailable = "Washing machine info is temporarily unavailable: the website providing it is not responding. Please try again later."

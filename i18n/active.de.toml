@@ -119,3 +119,6 @@ ru_title = "Unentschlossenheit in der <span style=\"color:#ec7f32\">Mensa</span>
 ru_message = "Du weißt nie, in welche Schlange du dich stellen sollst? Erhalte den Tagesmenüplan um 11 Uhr und plane dein Festmahl schon am Morgen. Mit <b>Transat</b> wird dir dein Magen danken!"
 future_title = "<span style=\"color:#ec7f32\">Transat</span>, das ist erst der Anfang!"
 future_message = "Wir verbessern die App basierend auf eurem Feedback, und einige tolle neue Funktionen kommen sehr bald!\n\nViele Grüße,\nDas Transat-Team"
+
+[washing_machines]
+unavailable = "Die Informationen zu den Waschmaschinen sind vorübergehend nicht verfügbar: Die Website, die sie liefert, antwortet nicht. Bitte versuche es später erneut."

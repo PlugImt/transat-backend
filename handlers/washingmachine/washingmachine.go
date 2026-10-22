@@ -1,84 +1,140 @@
 package washingmachine
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/utils"
 )
 
-type WashingMachineHandler struct{}
+const (
+	upstreamURL     = "https://status.wi-line.fr/update_machine_ext.php"
+	upstreamTimeout = 8 * time.Second
+	// freshFor: a successful answer is reused, so a burst of users makes one upstream call.
+	freshFor = 15 * time.Second
+	// retryAfter: after a failure the upstream is left alone, so users get the message at once instead of waiting for the timeout.
+	retryAfter = 20 * time.Second
+	// maxBody caps what is read from the upstream, which is not under our control.
+	maxBody = 1 << 20
+)
+
+type WashingMachineHandler struct {
+	client *http.Client
+	url    string
+
+	mu       sync.Mutex
+	cached   models.FormattedMachineData
+	cachedAt time.Time
+	failedAt time.Time
+}
 
 // NewWashingMachineHandler creates a new instance of WashingMachineHandler
 func NewWashingMachineHandler() *WashingMachineHandler {
-	return &WashingMachineHandler{}
+	return &WashingMachineHandler{
+		client: &http.Client{Timeout: upstreamTimeout},
+		url:    upstreamURL,
+	}
 }
+
+// fetchUpstream returns an error for everything that is not a usable machine list: a paused or broken site answers
+// with an error status, an HTML page, or nothing at all.
+func (h *WashingMachineHandler) fetchUpstream(ctx context.Context) (models.FormattedMachineData, error) {
+	requestData := strings.NewReader("action=READ_LIST_STATUS&serial_centrale=65e4444c3471550a789e2138a9e28eff")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.url, requestData)
+	if err != nil {
+		return models.FormattedMachineData{}, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return models.FormattedMachineData{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return models.FormattedMachineData{}, fmt.Errorf("upstream answered HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+	if err != nil {
+		return models.FormattedMachineData{}, err
+	}
+
+	var externalResponse struct {
+		MachineInfoStatus struct {
+			MachineList []models.MachineData `json:"machine_list"`
+		} `json:"machine_info_status"`
+	}
+	if err := json.Unmarshal(body, &externalResponse); err != nil {
+		return models.FormattedMachineData{}, fmt.Errorf("upstream answered something that is not the machine list: %w", err)
+	}
+	if len(externalResponse.MachineInfoStatus.MachineList) == 0 {
+		return models.FormattedMachineData{}, errors.New("upstream returned no machine")
+	}
+
+	return transformMachineData(externalResponse.MachineInfoStatus.MachineList), nil
+}
+
+// machines serves the recent answer when there is one, otherwise asks the upstream. Concurrent requests wait on the
+// lock and then read what the first one found.
+func (h *WashingMachineHandler) machines(ctx context.Context) (models.FormattedMachineData, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	now := time.Now()
+	if !h.cachedAt.IsZero() && now.Sub(h.cachedAt) < freshFor {
+		return h.cached, nil
+	}
+	if !h.failedAt.IsZero() && now.Sub(h.failedAt) < retryAfter {
+		return models.FormattedMachineData{}, errUpstreamUnavailable
+	}
+
+	data, err := h.fetchUpstream(ctx)
+	if err != nil {
+		h.failedAt = now
+		utils.LogMessage(utils.LevelWarn, fmt.Sprintf("Washing machines upstream unavailable: %v", err))
+		return models.FormattedMachineData{}, errUpstreamUnavailable
+	}
+
+	h.cached, h.cachedAt, h.failedAt = data, now, time.Time{}
+	return data, nil
+}
+
+var errUpstreamUnavailable = errors.New("washing machines upstream unavailable")
 
 // GetWashingMachines returns the status of all washing machines
 func (h *WashingMachineHandler) GetWashingMachines() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Prepare the request to the external API
-		requestData := strings.NewReader("action=READ_LIST_STATUS&serial_centrale=65e4444c3471550a789e2138a9e28eff")
-		req, err := http.NewRequest("POST", "https://status.wi-line.fr/update_machine_ext.php", requestData)
+		// Detached from the request: a user leaving must not be recorded as the upstream failing.
+		data, err := h.machines(context.Background())
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(models.WashingMachineResponse{
-				Success: false,
-				Message: "Failed to create request to external API",
+			// The app shows the "error" of a failed response as is, so it carries the message meant for the user.
+			message := i18n.Localize(i18n.GetLocalizer(c.Get("Accept-Language")), "washing_machines.unavailable",
+				"Washing machine info is temporarily unavailable: the website providing it is not responding. Please try again later.", nil)
+			c.Set(fiber.HeaderRetryAfter, strconv.Itoa(int(retryAfter.Seconds())))
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"success": false,
+				"code":    "washing_machines_unavailable",
+				"error":   message,
+				"message": message,
 			})
 		}
 
-		// Set headers
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-
-		// Send the request
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(models.WashingMachineResponse{
-				Success: false,
-				Message: "Failed to fetch data from external API",
-			})
-		}
-		defer resp.Body.Close()
-
-		// Read the response body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(models.WashingMachineResponse{
-				Success: false,
-				Message: "Failed to read response from external API",
-			})
-		}
-
-		// Parse the response
-		var externalResponse struct {
-			MachineInfoStatus struct {
-				MachineList []models.MachineData `json:"machine_list"`
-			} `json:"machine_info_status"`
-		}
-
-		if err := json.Unmarshal(body, &externalResponse); err != nil {
-			// Try to read the raw response for debugging
-			return c.Status(fiber.StatusInternalServerError).JSON(models.WashingMachineResponse{
-				Success: false,
-				Message: fmt.Sprintf("Failed to parse response from external API: %v", err),
-			})
-		}
-
-		// Transform the data into the desired format
-		formattedData := transformMachineData(externalResponse.MachineInfoStatus.MachineList)
-
-		fmt.Println(formattedData)
-
-		// Return the formatted data
 		return c.JSON(models.WashingMachineResponse{
 			Success: true,
-			Data:    formattedData,
+			Data:    data,
 		})
 	}
 }
