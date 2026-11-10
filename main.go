@@ -168,6 +168,9 @@ func main() {
 		photobooth = photoboothHandler.NewHandler(svc, verifier)
 		// Retakes and cancelled sessions are trashed right away; this retries what Drive refused then.
 		if _, err := c.AddFunc("@every 15m", func() {
+			if _, err := svc.PurgeFrameSessions(context.Background()); err != nil {
+				log.Printf("Photobooth frame links cleanup failed: %v", err)
+			}
 			if _, err := svc.RunTrash(context.Background()); err != nil {
 				log.Printf("Photobooth trash job failed: %v", err)
 			}

@@ -29,6 +29,11 @@ func SetupPhotoboothRoutes(router fiber.Router, h *photoboothHandler.Handler) {
 	booth.Delete("/sessions/:session/slots/:kind/:number", h.DiscardSlot)
 	booth.Post("/sessions/:session/finalize", h.Finalize)
 	booth.Delete("/sessions/:session", h.Cancel)
+	// Frames sent from a phone through a temporary link shown as a QR code in the booth's admin panel.
+	booth.Post("/frame-sessions", h.CreateFrameSession)
+	booth.Get("/frame-sessions/:id", h.FrameSessionStatus)
+	booth.Get("/frame-sessions/:id/frames/:type", h.FrameImage)
+	booth.Delete("/frame-sessions/:id", h.CloseFrameSession)
 
 	// Every visitor may come through the same proxy address: limit per link, not per address.
 	perShare := limiter.New(limiter.Config{
@@ -40,5 +45,7 @@ func SetupPhotoboothRoutes(router fiber.Router, h *photoboothHandler.Handler) {
 		},
 	})
 	router.Get("/photobooth/shares/:token", perShare, h.GetShare)
+	router.Get("/photobooth/frames/:token", perShare, h.GetFrameSession)
+	router.Post("/photobooth/frames/:token/:type", perShare, h.UploadFrame)
 	router.Get("/photobooth/shares/:token/files/:id", perShare, h.GetSharedFile)
 }
