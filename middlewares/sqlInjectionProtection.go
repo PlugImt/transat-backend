@@ -25,6 +25,10 @@ func SQLInjectionProtectionMiddleware() fiber.Handler {
 		if strings.HasPrefix(path, "/devices/") {
 			return c.Next()
 		}
+		// Photobooth requests are signed byte for byte and every field is checked against a strict format.
+		if strings.HasPrefix(path, "/photobooth/") {
+			return c.Next()
+		}
 
 		// If body is empty, skip validation
 		if len(c.Body()) == 0 {

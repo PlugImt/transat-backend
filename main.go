@@ -18,6 +18,7 @@ import (
 	"github.com/plugimt/transat-backend/handlers"
 	"github.com/plugimt/transat-backend/handlers/club"
 	devicesHandler "github.com/plugimt/transat-backend/handlers/devices"
+	photoboothHandler "github.com/plugimt/transat-backend/handlers/photobooth"
 	reportHandler "github.com/plugimt/transat-backend/handlers/photoreport"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
 	"github.com/plugimt/transat-backend/i18n"
@@ -28,6 +29,7 @@ import (
 	"github.com/plugimt/transat-backend/scheduler"
 	"github.com/plugimt/transat-backend/services"
 	devicesService "github.com/plugimt/transat-backend/services/devices"
+	photoboothService "github.com/plugimt/transat-backend/services/photobooth"
 	"github.com/plugimt/transat-backend/services/photoreport"
 	photosService "github.com/plugimt/transat-backend/services/photos"
 	"github.com/plugimt/transat-backend/services/push"
@@ -154,6 +156,24 @@ func main() {
 		photosSync.Schedule(c)
 	}
 
+	// Photobooth: booth uploads into the Photos drive and permanent share links.
+	var photobooth *photoboothHandler.Handler
+	if svc, verifier, err := photoboothService.FromEnv(context.Background(), db); err != nil {
+		log.Printf("Warning: Photobooth disabled: %v", err)
+	} else if svc == nil {
+		log.Println("Info: ℹ️ Photobooth disabled: PHOTOBOOTH_DEVICE_KEYS is not set")
+	} else {
+		photobooth = photoboothHandler.NewHandler(svc, verifier)
+		// Retakes and cancelled sessions are trashed right away; this retries what Drive refused then.
+		if _, err := c.AddFunc("@every 15m", func() {
+			if _, err := svc.RunTrash(context.Background()); err != nil {
+				log.Printf("Photobooth trash job failed: %v", err)
+			}
+		}); err != nil {
+			log.Printf("Photobooth trash scheduling failed: %v", err)
+		}
+	}
+
 	// Reports are stored before any email is sent; this job retries the ones the email service refused.
 	photoReportService := photoreport.NewService(db, emailService, os.Getenv("ADMIN_PANEL_URL"))
 	photoReports := reportHandler.NewHandler(photoReportService)
@@ -228,6 +248,7 @@ func main() {
 	routes.SetupReservationRoutes(app, db, reservationDiscordService, reservationService)
 	routes.SetupBassineRoutes(app, db)
 	routes.SetupPhotosRoutes(app, db, photosSync, photoReports)
+	routes.SetupPhotoboothRoutes(app, photobooth)
 	routes.SetupProfileRoutes(app, db, r2Service)
 	adminGroup := routes.SetupAdminRoutes(app, db, notificationService)
 	routes.SetupAdminReservationRoutes(adminGroup, db, reservationDiscordService, reservationService)

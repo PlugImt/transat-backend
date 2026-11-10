@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/services"
@@ -23,8 +24,8 @@ func StatisticsMiddleware(statisticsService *services.StatisticsService) fiber.H
 		// Record request time
 		requestReceived := utils.Now()
 
-		// Store original URL path
-		endpoint := c.Path()
+		// Store original URL path, without secrets it may hold (statistics are public)
+		endpoint := redactSecrets(c.Path())
 		method := c.Method()
 
 		// Process request and capture any error
@@ -82,4 +83,17 @@ func StatisticsMiddleware(statisticsService *services.StatisticsService) fiber.H
 
 		return err
 	}
+}
+
+// redactSecrets hides capability tokens carried in paths, such as photobooth share links.
+func redactSecrets(path string) string {
+	const shares = "/photobooth/shares/"
+	if !strings.HasPrefix(path, shares) {
+		return path
+	}
+	rest := path[len(shares):]
+	if i := strings.IndexByte(rest, '/'); i >= 0 {
+		return shares + ":token" + rest[i:]
+	}
+	return shares + ":token"
 }
