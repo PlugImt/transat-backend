@@ -60,12 +60,12 @@ func (s *Service) PurgeInactive(ctx context.Context, mailer Mailer) (PurgeReport
 		for rows.Next() {
 			var t target
 			if err := rows.Scan(&t.email, &t.first, &t.lang, &t.last); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return rep, err
 			}
 			targets = append(targets, t)
 		}
-		rows.Close()
+		_ = rows.Close()
 		for _, t := range targets {
 			// The account gets the full notice from now, even if its five years end sooner.
 			deletion := maxTime(t.last.Add(InactivityLimit), now.Add(WarningNotice))

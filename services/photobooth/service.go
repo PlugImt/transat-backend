@@ -436,12 +436,12 @@ func (s *Service) Finalize(ctx context.Context, device, sessionID string, photoC
 			var kind, st string
 			var n int
 			if err := rows.Scan(&kind, &n, &st); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return err
 			}
 			uploaded[fmt.Sprintf("%s-%d", kind, n)] = st == "uploaded"
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return err
 		}
@@ -689,12 +689,12 @@ func (s *Service) RunTrash(ctx context.Context) (int, error) {
 	for rows.Next() {
 		var it item
 		if err := rows.Scan(&it.id, &it.driveID, &it.name, &it.folder, &it.createdAt); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return 0, err
 		}
 		items = append(items, it)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if err := rows.Err(); err != nil {
 		return 0, err
 	}

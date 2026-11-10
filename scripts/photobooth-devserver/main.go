@@ -10,7 +10,7 @@ package main
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 -- Google Drive identifies files by their MD5 checksum
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -99,7 +99,7 @@ func (d *memDrive) receive(sid string, data []byte) (string, error) {
 		return "", fmt.Errorf("size %d, announced %d", len(data), s.Size)
 	}
 	delete(d.sessions, sid)
-	sum := md5.Sum(data)
+	sum := md5.Sum(data) // #nosec G401 -- same checksum as Google Drive, not a security use
 	f := &file{FileInfo: s, data: data}
 	f.ID, f.MD5 = d.id("file"), hex.EncodeToString(sum[:])
 	d.files[f.ID] = f
@@ -225,6 +225,7 @@ func main() {
 	})
 	routes.SetupPhotoboothRoutes(app, photoboothHandler.NewHandler(svc, pb.NewVerifier(keys)))
 
+	// #nosec G706 -- local development tool: printing the generated key is its purpose
 	log.Printf("Booth key for the admin panel: booth-dev.%s", secret)
 	log.Fatal(app.Listen(":" + port))
 }

@@ -243,7 +243,7 @@ func (c *DriveClient) Thumbnail(ctx context.Context, info FileInfo, size int) (i
 		return nil, "", err
 	}
 	if res.StatusCode != http.StatusOK {
-		res.Body.Close()
+		_ = res.Body.Close()
 		return nil, "", ErrNotFound
 	}
 	return res.Body, res.Header.Get("Content-Type"), nil
