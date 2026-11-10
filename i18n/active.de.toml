@@ -45,8 +45,9 @@ subject = "[Transat] Foto gemeldet: {{.SubjectTitle}}"
 title = "Foto gemeldet"
 intro_owner = "Ein Nutzer hat ein Foto Ihres Clubs gemeldet. Bitte prüfen Sie es."
 intro_admin = "Ein Nutzer hat ein Foto gemeldet. Bitte prüfen Sie es."
+intro_photo_club = "Ein Nutzer hat ein Foto gemeldet. Bitte prüfen Sie es als Verantwortliche(r) des Fotoclubs."
 no_club_note = "Dieses Foto ist keinem Club zugeordnet, die Meldung geht daher nur an die Administratoren."
-no_automatic_action = "Die Meldung löscht oder verbirgt das Foto nicht: Sie ist eine Bitte um Prüfung."
+no_automatic_action = "Die Meldung löscht oder verbirgt das Foto nicht von selbst: Genehmigen oder lehnen Sie sie im Admin-Bereich ab."
 reason = "Grund"
 comment = "Kommentar"
 no_comment = "Kein Kommentar"
@@ -122,3 +123,13 @@ future_message = "Wir verbessern die App basierend auf eurem Feedback, und einig
 
 [washing_machines]
 unavailable = "Die Informationen zu den Waschmaschinen sind vorübergehend nicht verfügbar: Die Website, die sie liefert, antwortet nicht. Bitte versuche es später erneut."
+
+[account_inactivity_email]
+subject = "[Transat] Ihr Konto wird wegen Inaktivität gelöscht"
+title = "Ihr Konto wird bald gelöscht"
+greeting = "Hallo"
+intro = "Sie haben Transat seit fast 5 Jahren nicht genutzt. Zum Schutz Ihrer Daten werden Konten nach 5 Jahren Inaktivität gelöscht."
+date = "Löschdatum:"
+keep = "Um Ihr Konto zu behalten, öffnen Sie einfach die Transat-App und melden Sie sich vor diesem Datum an."
+leave = "Wenn Sie nichts tun, werden Ihr Konto und Ihre persönlichen Daten endgültig gelöscht."
+footer = "Sie erhalten diese Nachricht, weil ein Transat-Konto diese Adresse verwendet."

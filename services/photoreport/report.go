@@ -65,6 +65,9 @@ type Mailer interface {
 // defaultClubName is the club every photo belongs to unless its album says otherwise.
 const defaultClubName = "Club Photo"
 
+// PhotoClubRole marks the Club Photo's owners: they receive every report and review them in the admin panel.
+var PhotoClubRole = clubRoleName(defaultClubName)
+
 // Service stores reports and delivers them. A nil mailer keeps every report pending until one is configured.
 type Service struct {
 	db       *sql.DB
@@ -72,6 +75,7 @@ type Service struct {
 	adminURL string // optional base URL of the admin panel, used for the link in emails
 	template string
 	lease    time.Duration
+	remover  PhotoRemover // nil: reports can be rejected but not approved
 }
 
 func NewService(db *sql.DB, mailer Mailer, adminURL string) *Service {
@@ -297,8 +301,9 @@ func clubRoleName(clubName string) string {
 	return strings.ToLower(strings.ReplaceAll(clubName, " ", "")) + "_respo"
 }
 
-// resolveRecipients returns the club's owners (when the photo has a club) and every administrator, once each.
-// A photo without club, or a club without owner, simply reaches the administrators only.
+// resolveRecipients returns the club's owners (when the photo has a club), the Club Photo's owners (always: they
+// look after every photo) and every administrator, once each. Someone holding several roles gets one email, under
+// the most specific role.
 func resolveRecipients(ctx context.Context, tx *sql.Tx, clubID sql.NullInt64, clubName string) ([]recipient, error) {
 	ownerRole := ""
 	if clubID.Valid {
@@ -311,13 +316,17 @@ func resolveRecipients(ctx context.Context, tx *sql.Tx, clubID sql.NullInt64, cl
 			FROM newf_roles nr JOIN roles r ON r.id_roles = nr.id_roles
 			WHERE $1 <> '' AND r.name = $1
 			UNION ALL
-			SELECT nr.email, 'admin', 1
+			SELECT nr.email, 'photo_club', 1
+			FROM newf_roles nr JOIN roles r ON r.id_roles = nr.id_roles
+			WHERE r.name = $2
+			UNION ALL
+			SELECT nr.email, 'admin', 2
 			FROM newf_roles nr JOIN roles r ON r.id_roles = nr.id_roles
 			WHERE r.name = 'ADMIN'
 		) x
 		JOIN newf n ON n.email = x.email
 		LEFT JOIN languages l ON l.id_languages = n.language
-		ORDER BY n.email, x.prio`, ownerRole)
+		ORDER BY n.email, x.prio`, ownerRole, PhotoClubRole)
 	if err != nil {
 		return nil, err
 	}

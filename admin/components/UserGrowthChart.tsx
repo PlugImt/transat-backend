@@ -48,21 +48,21 @@ export default function UserGrowthChart({ data }: UserGrowthChartProps) {
             <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
         <XAxis
           dataKey="date"
           tickFormatter={formatDate}
-          stroke="#6b7280"
+          stroke="var(--chart-axis)"
           fontSize={12}
           minTickGap={24}
         />
-        <YAxis yAxisId="total" stroke="#6b7280" fontSize={12} width={40} />
-        <YAxis yAxisId="daily" orientation="right" stroke="#6b7280" fontSize={12} width={30} />
+        <YAxis yAxisId="total" stroke="var(--chart-axis)" fontSize={12} width={40} />
+        <YAxis yAxisId="daily" orientation="right" stroke="var(--chart-axis)" fontSize={12} width={30} />
         <Tooltip
           labelFormatter={(label) => formatTooltipDate(String(label ?? ""))}
           formatter={(value, name) => [value, SERIES_LABELS[String(name)] ?? name]}
           contentStyle={{
-            backgroundColor: "#fff",
+            backgroundColor: "var(--surface)", color: "var(--ink)",
             border: "1px solid #e5e7eb",
             borderRadius: "6px",
             fontSize: "12px",
@@ -74,7 +74,7 @@ export default function UserGrowthChart({ data }: UserGrowthChartProps) {
           yAxisId="total"
           type="monotone"
           dataKey="cumulativeCount"
-          stroke="#2563eb"
+          stroke="#ec7f32"
           strokeWidth={2}
           fill={`url(#${gradientId})`}
           dot={false}

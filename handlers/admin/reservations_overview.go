@@ -228,6 +228,15 @@ func (h *ReservationsAdminHandler) GetWaitlist(c *fiber.Ctx) error {
 	return c.JSON(list)
 }
 
+// GetAllWaitlists handles GET /admin/reservations/waitlists: everyone waiting, all items together.
+func (h *ReservationsAdminHandler) GetAllWaitlists(c *fiber.Ctx) error {
+	entries, err := h.service.AdminAllWaitlists(c.UserContext())
+	if err != nil {
+		return reservationError(c, err)
+	}
+	return c.JSON(fiber.Map{"entries": entries})
+}
+
 // RemoveWaitlistEntry handles DELETE /admin/reservations/waitlist/:id.
 func (h *ReservationsAdminHandler) RemoveWaitlistEntry(c *fiber.Ctx) error {
 	id, err := strconv.ParseInt(c.Params("id"), 10, 64)

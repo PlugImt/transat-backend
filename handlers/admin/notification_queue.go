@@ -30,8 +30,10 @@ func (h *AdminHandler) queueNotification(c *fiber.Ctx, req sendNotificationReque
 		"users":         recipients.Users,
 		"devices":       len(recipients.Targets),
 		"withoutDevice": withoutDevice,
-		"filtered":      recipients.Filtered,
-		"sent":          false,
+		// The same people, by name, for the panel.
+		"withoutDeviceNames": h.unreachablePeople(c.UserContext(), withoutDevice),
+		"filtered":           recipients.Filtered,
+		"sent":               false,
 	}
 	if req.DryRun {
 		return c.JSON(result)

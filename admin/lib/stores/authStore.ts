@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import type { PanelAccess } from "../access";
 
 export interface AuthUser {
   email: string;
@@ -13,8 +14,10 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  access: PanelAccess | null;
 
   // Actions
+  setAccess: (access: PanelAccess | null) => void;
   setAuth: (user: AuthUser, token: string) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
@@ -28,6 +31,9 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: true,
+      access: null,
+
+      setAccess: (access) => set({ access }),
 
       setAuth: (user, token) =>
         set({
@@ -43,6 +49,7 @@ export const useAuthStore = create<AuthState>()(
           token: null,
           isAuthenticated: false,
           isLoading: false,
+          access: null,
         });
         // Clear localStorage
         if (typeof window !== "undefined") {

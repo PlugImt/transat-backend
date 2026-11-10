@@ -35,6 +35,8 @@
                                 <td style="padding:8px 25px 20px 25px;font-size:16px;line-height:24px;color:#ffe6cc;">
                                     {{if .Data.IsClubOwner}}
                                     <p style="margin:0 0 12px 0;">{{call .T "photo_report_email.intro_owner"}}</p>
+                                    {{else if .Data.IsPhotoClub}}
+                                    <p style="margin:0 0 12px 0;">{{call .T "photo_report_email.intro_photo_club"}}</p>
                                     {{else}}
                                     <p style="margin:0 0 12px 0;">{{call .T "photo_report_email.intro_admin"}}</p>
                                     {{if not .Data.HasClub}}<p style="margin:0 0 12px 0;color:#b9a99c;">{{call .T "photo_report_email.no_club_note"}}</p>{{end}}

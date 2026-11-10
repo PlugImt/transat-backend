@@ -52,7 +52,7 @@ func (ns *NotificationService) resolveTargets(audience models.NotificationAudien
 		FROM newf n
 		LEFT JOIN languages l ON l.id_languages = n.language
 		LEFT JOIN user_notification_tokens unt ON unt.email = n.email
-		WHERE TRUE`
+		WHERE n.email <> 'deleted-account@transat.invalid'`
 	var args []interface{}
 	arg := func(v interface{}) string {
 		args = append(args, v)
@@ -60,6 +60,9 @@ func (ns *NotificationService) resolveTargets(audience models.NotificationAudien
 	}
 
 	switch audience.Type {
+	case models.AudienceAppVersion:
+		// Legacy tokens carry no version: only the delivery pipeline can target an app version.
+		return nil, fmt.Errorf("the app version audience needs the delivery pipeline")
 	case models.AudienceClub:
 		query += " AND n.email IN (SELECT email FROM clubs_members WHERE id_clubs = " + arg(audience.ClubID) + ")"
 	case models.AudienceCampus:

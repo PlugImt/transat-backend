@@ -480,6 +480,58 @@ func (s *Service) AdminWaitlist(ctx context.Context, itemID int, start *time.Tim
 	return out, rows.Err()
 }
 
+// AdminQueuedEntry is one person waiting, with what they wait for.
+type AdminQueuedEntry struct {
+	AdminWaitlistEntry
+	ItemID   int    `json:"item_id"`
+	ItemName string `json:"item_name"`
+	ClubName string `json:"club_name"`
+	Slot     bool   `json:"slot"`
+}
+
+// AdminAllWaitlists lists everyone currently waiting, every item and upcoming slot together: the people being
+// waited for (notified, turn running) first, then by item and place in the queue.
+func (s *Service) AdminAllWaitlists(ctx context.Context) ([]AdminQueuedEntry, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT w.id, row_number() OVER (PARTITION BY w.id_reservation_element, w.slot_start ORDER BY w.id),
+		       w.email, COALESCE(n.first_name, ''), COALESCE(n.last_name, ''),
+		       w.slot_start, w.created_at, w.notified_at, w.turn_expires_at,
+		       re.id_reservation_element, COALESCE(re.name, ''), COALESCE(cl.name, ''), COALESCE(re.slot, FALSE)
+		FROM reservation_waitlist w
+		JOIN reservation_element re ON re.id_reservation_element = w.id_reservation_element
+		LEFT JOIN clubs cl ON cl.id_clubs = re.id_clubs
+		LEFT JOIN newf n ON n.email = w.email
+		WHERE w.slot_start IS NULL OR w.slot_start > $1::timestamp
+		ORDER BY (w.notified_at IS NULL), re.name, w.slot_start NULLS FIRST, w.id`, s.now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []AdminQueuedEntry{}
+	for rows.Next() {
+		var e AdminQueuedEntry
+		var slotStart, notified, expires sql.NullTime
+		if err := rows.Scan(&e.ID, &e.Position, &e.Email, &e.FirstName, &e.LastName, &slotStart, &e.JoinedAt, &notified, &expires,
+			&e.ItemID, &e.ItemName, &e.ClubName, &e.Slot); err != nil {
+			return nil, err
+		}
+		if slotStart.Valid {
+			t := slotStart.Time.UTC()
+			e.SlotStart = &t
+		}
+		if notified.Valid {
+			t := notified.Time
+			e.NotifiedAt = &t
+		}
+		if expires.Valid {
+			t := expires.Time
+			e.TurnExpiresAt = &t
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
 // AdminRemoveWaitlistEntry takes somebody out of a queue. When they were the one being waited for, the next person is told.
 func (s *Service) AdminRemoveWaitlistEntry(ctx context.Context, entryID int64) (bool, error) {
 	var itemID int

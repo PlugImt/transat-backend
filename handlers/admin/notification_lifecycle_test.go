@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/plugimt/transat-backend/services/accounts"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -75,7 +76,7 @@ func newLifecycle(t *testing.T) *lifecycle {
 	ns := services.NewNotificationService(db)
 	ns.SetPipeline(l.pipeline)
 	l.app = fiber.New()
-	routes.SetupAdminRoutes(l.app, db, ns)
+	routes.SetupAdminRoutes(l.app, db, ns, accounts.NewService(db, nil))
 	routes.SetupDeviceRoutes(l.app, devicesHandler.NewHandler(devices.NewService(db, devices.DefaultConfig())))
 
 	l.exec(`INSERT INTO roles (name) VALUES ('ADMIN') ON CONFLICT (name) DO NOTHING`)

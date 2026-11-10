@@ -94,11 +94,11 @@ func albumKeyOf(c *PhotoCursor) int64 {
 	return c.AlbumKey
 }
 
-// Gallery lists every visible photo and video, newest first, events kept together within one timestamp. Exact
+// Gallery lists every visible photo and video (album cover files excepted), newest first, events kept together within one timestamp. Exact
 // duplicates appear once. Uses idx_photos_gallery_event.
 func (r *PhotosRepository) Gallery(ctx context.Context, after *PhotoCursor, limit int) ([]PhotoRow, error) {
 	return r.photos(ctx, `SELECT `+photoColumns+`
-		WHERE p.deleted_at IS NULL AND p.duplicate_of IS NULL AND p.media_type <> 'other'
+		WHERE p.deleted_at IS NULL AND p.duplicate_of IS NULL AND p.media_type <> 'other' AND NOT p.is_cover
 		  AND ($1::timestamptz IS NULL OR (p.sort_at, COALESCE(p.album_id, 0), p.drive_file_id) < ($1, $4::bigint, $2))
 		ORDER BY p.sort_at DESC, COALESCE(p.album_id, 0) DESC, p.drive_file_id DESC LIMIT $3`,
 		after, limit, albumKeyOf(after))
@@ -108,7 +108,7 @@ func (r *PhotosRepository) Gallery(ctx context.Context, after *PhotoCursor, limi
 // Uses idx_photos_album backwards.
 func (r *PhotosRepository) AlbumPhotos(ctx context.Context, albumID int64, after *PhotoCursor, limit int) ([]PhotoRow, error) {
 	return r.photos(ctx, `SELECT `+photoColumns+`
-		WHERE p.album_id = $4 AND p.deleted_at IS NULL AND p.media_type <> 'other'
+		WHERE p.album_id = $4 AND p.deleted_at IS NULL AND p.media_type <> 'other' AND NOT p.is_cover
 		  AND (p.duplicate_of IS NULL OR NOT p.album_duplicate)
 		  AND ($1::timestamptz IS NULL OR (p.sort_at, p.drive_file_id) < ($1, $2))
 		ORDER BY p.sort_at DESC, p.drive_file_id DESC LIMIT $3`, after, limit, albumID)

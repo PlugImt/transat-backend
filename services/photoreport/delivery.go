@@ -165,6 +165,7 @@ type EmailData struct {
 	SubmittedAt  string
 	AdminURL     string
 	IsClubOwner  bool
+	IsPhotoClub  bool
 	HasClub      bool
 }
 
@@ -187,6 +188,7 @@ func (s *Service) emailData(ctx context.Context, c claim) (EmailData, error) {
 	d.ReporterYear = int(year.Int64)
 	d.HasClub = clubID.Valid
 	d.IsClubOwner = c.role == "club_owner"
+	d.IsPhotoClub = c.role == "photo_club"
 	d.SubmittedAt = created.UTC().Format("2006-01-02 15:04 UTC")
 	if s.adminURL != "" {
 		d.AdminURL = fmt.Sprintf("%s/photo-reports?report=%d", s.adminURL, c.reportID)

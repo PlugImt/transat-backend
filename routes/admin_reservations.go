@@ -23,6 +23,7 @@ func SetupAdminReservationRoutes(adminGroup fiber.Router, db *sql.DB, discord *s
 	adminGroup.Post("/reservations/items/:id/return", handler.MarkReturned)
 
 	adminGroup.Get("/reservations/waitlist", handler.GetWaitlist)
+	adminGroup.Get("/reservations/waitlists", handler.GetAllWaitlists)
 	adminGroup.Post("/reservations/waitlist/advance", handler.AdvanceWaitlist)
 	adminGroup.Delete("/reservations/waitlist/:id", handler.RemoveWaitlistEntry)
 

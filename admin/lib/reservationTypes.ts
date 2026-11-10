@@ -115,6 +115,14 @@ export interface AdminWaitlistEntry {
   turn_expires_at?: string;
 }
 
+/** Someone waiting, with the item (and slot) they wait for: the all-items view. */
+export interface AdminQueuedEntry extends AdminWaitlistEntry {
+  item_id: number;
+  item_name: string;
+  club_name: string;
+  slot: boolean;
+}
+
 export interface AdminWaitlist {
   entries: AdminWaitlistEntry[];
   free: boolean;

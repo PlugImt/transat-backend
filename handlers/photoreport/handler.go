@@ -87,6 +87,7 @@ func (h *Handler) deliverInBackground() {
 // List handles GET /admin/photos/reports.
 func (h *Handler) List(c *fiber.Ctx) error {
 	filter := service.ListFilter{
+		Status:   c.Query("status"),
 		Reason:   c.Query("reason"),
 		Delivery: c.Query("delivery"),
 		Limit:    c.QueryInt("limit", 25),
@@ -97,6 +98,11 @@ func (h *Handler) List(c *fiber.Ctx) error {
 			return fail(c, fiber.StatusBadRequest, "Invalid report reason", nil)
 		}
 	}
+	switch filter.Status {
+	case "", "pending", "approved", "rejected":
+	default:
+		return fail(c, fiber.StatusBadRequest, "Invalid report status", nil)
+	}
 	switch filter.Delivery {
 	case "", "sent", "pending", "failed", "no_recipients":
 	default:
@@ -106,7 +112,11 @@ func (h *Handler) List(c *fiber.Ctx) error {
 	if err != nil {
 		return fail(c, fiber.StatusInternalServerError, "Could not load reports", err)
 	}
-	return c.JSON(fiber.Map{"reports": reports, "total": total})
+	counts, err := h.svc.Counts(c.Context())
+	if err != nil {
+		return fail(c, fiber.StatusInternalServerError, "Could not load reports", err)
+	}
+	return c.JSON(fiber.Map{"reports": reports, "total": total, "counts": counts, "can_remove": h.svc.CanRemove()})
 }
 
 // Get handles GET /admin/photos/reports/:id.
@@ -139,6 +149,40 @@ func (h *Handler) Retry(c *fiber.Ctx) error {
 		return fail(c, fiber.StatusInternalServerError, "Could not retry the report", err)
 	}
 	return c.JSON(fiber.Map{"retried": n})
+}
+
+type decisionRequest struct {
+	Decision string `json:"decision"` // approve | reject
+	Note     string `json:"note"`
+}
+
+// Decide handles POST /admin/photos/reports/:id/decision. Approving deletes the photo from the Drive.
+func (h *Handler) Decide(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id < 1 {
+		return fail(c, fiber.StatusBadRequest, "Invalid report id", nil)
+	}
+	email, _ := c.Locals("email").(string)
+	var body decisionRequest
+	if err := c.BodyParser(&body); err != nil {
+		return fail(c, fiber.StatusBadRequest, "Invalid request body", nil)
+	}
+	report, err := h.svc.Decide(c.Context(), int64(id), service.Decision(body.Decision), body.Note, email)
+	switch {
+	case errors.Is(err, service.ErrInvalidDecision):
+		return fail(c, fiber.StatusBadRequest, "Decision must be approve or reject", nil)
+	case errors.Is(err, service.ErrCommentTooLong):
+		return fail(c, fiber.StatusBadRequest, "Note too long", nil)
+	case errors.Is(err, service.ErrReportNotFound):
+		return fail(c, fiber.StatusNotFound, "Report not found", nil)
+	case errors.Is(err, service.ErrAlreadyDecided):
+		return fail(c, fiber.StatusConflict, "This report was already decided", nil)
+	case errors.Is(err, service.ErrRemovalUnavailable):
+		return fail(c, fiber.StatusServiceUnavailable, "Photo deletion is not configured on the server", nil)
+	case err != nil:
+		return fail(c, fiber.StatusBadGateway, "Could not delete the photo from Google Drive", err)
+	}
+	return c.JSON(report)
 }
 
 type albumClubRequest struct {

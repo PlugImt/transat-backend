@@ -2,6 +2,7 @@ package routes
 
 import (
 	"database/sql"
+	"github.com/plugimt/transat-backend/services/photoreport"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/handlers/statistics"
@@ -15,7 +16,8 @@ func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *s
 	statsHandler := statistics.NewStatisticsHandler(db, statisticsService)
 
 	// Toutes les routes de statistiques nécessitent un JWT admin
-	statsGroup := router.Group("/statistics", middlewares.JWTMiddleware, middlewares.AdminAuthMiddleware(db))
+	// The dashboard is also open to the Club Photo's owners, who review photo reports.
+	statsGroup := router.Group("/statistics", middlewares.JWTMiddleware, middlewares.AdminOrRolesMiddleware(db, photoreport.PhotoClubRole))
 
 	statsGroup.Get("/endpoints", statsHandler.GetEndpointStatistics)
 	statsGroup.Get("/global", statsHandler.GetGlobalStatistics)

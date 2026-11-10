@@ -546,10 +546,30 @@ export const useNotificationRecipients = (
 };
 
 export const useSendNotification = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: SendNotificationRequest) => notificationsApi.send(request),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["push-messages"] }),
   });
 };
+
+/** Versions of the app in use, newest first. */
+export const useAppVersions = (enabled: boolean) =>
+  useQuery({
+    queryKey: ["app-versions"],
+    queryFn: notificationsApi.appVersions,
+    enabled,
+    staleTime: 60_000,
+  });
+
+/** Latest pushes with their delivery counts (no text: the server keeps none of it in the summaries). */
+export const useRecentPushMessages = () =>
+  useQuery({
+    queryKey: ["push-messages"],
+    queryFn: () => notificationsApi.recent(8),
+    refetchInterval: 15_000,
+    retry: false,
+  });
 
 // Photo reports hooks
 export const usePhotoReports = (filter: PhotoReportsFilter) => {
@@ -574,6 +594,27 @@ export const useRetryPhotoReport = () => {
   return useMutation({
     mutationFn: photoReportsApi.retry,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["photo-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["photo-report"] });
+    },
+  });
+};
+
+export const useDecidePhotoReport = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      decision,
+      note,
+    }: {
+      id: number;
+      decision: "approve" | "reject";
+      note: string;
+    }) => photoReportsApi.decide(id, decision, note),
+    onSuccess: (report) => {
+      queryClient.setQueryData(["photo-report", report.id], report);
       queryClient.invalidateQueries({ queryKey: ["photo-reports"] });
       queryClient.invalidateQueries({ queryKey: ["photo-report"] });
     },

@@ -33,7 +33,12 @@ function UsersPageContent() {
 
   const handleDeleteUser = useCallback(
     async (email: string) => {
-      if (!confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?")) return;
+      if (
+        !confirm(
+          `Supprimer définitivement le compte ${email} ?\n\nSes données personnelles seront effacées (profil, rôles, appareils, clubs, avis, réservations à venir…). Les événements qu'il a créés et son historique de réservations sont conservés, anonymisés.`,
+        )
+      )
+        return;
 
       toast.promise(deleteUserMutation.mutateAsync(email), {
         loading: "Suppression en cours...",

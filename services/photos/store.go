@@ -305,10 +305,12 @@ func refreshDerived(ctx context.Context, tx *sql.Tx) error {
 		  sort_date = COALESCE(a.event_date, (s.first AT TIME ZONE 'Europe/Paris')::date, DATE '1970-01-01')
 		FROM photo_albums b
 		LEFT JOIN (
-		  SELECT album_id, COUNT(*) AS n,
-		         MIN(taken_at) FILTER (WHERE NOT taken_at_suspect) AS first,
-		         MAX(taken_at) FILTER (WHERE NOT taken_at_suspect) AS last,
-		         (ARRAY_AGG(drive_file_id ORDER BY (media_type = 'image' AND has_thumbnail) DESC, sort_at, drive_file_id))[1] AS cover
+		  -- A file named "cover" is the album's cover and not one of its photos; without one, the first photo.
+		  SELECT album_id, COUNT(*) FILTER (WHERE NOT is_cover) AS n,
+		         MIN(taken_at) FILTER (WHERE NOT taken_at_suspect AND NOT is_cover) AS first,
+		         MAX(taken_at) FILTER (WHERE NOT taken_at_suspect AND NOT is_cover) AS last,
+		         (ARRAY_AGG(drive_file_id ORDER BY (is_cover AND media_type = 'image') DESC,
+		                    (media_type = 'image' AND has_thumbnail) DESC, sort_at, drive_file_id))[1] AS cover
 		  FROM photos
 		  WHERE deleted_at IS NULL AND media_type <> 'other' AND album_id IS NOT NULL
 		    AND (duplicate_of IS NULL OR NOT album_duplicate)

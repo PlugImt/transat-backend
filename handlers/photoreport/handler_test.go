@@ -264,13 +264,13 @@ func TestDuplicateRateLimitAndEmailFailure(t *testing.T) {
 	}
 }
 
-func TestAdminReportsAreAdministratorOnly(t *testing.T) {
+func TestReportsAreForAdministratorsAndThePhotoClubOnly(t *testing.T) {
 	a := newAPI(t)
 	a.report("student@x.test", "appears_in_photo", "c")
 	a.waitMails(2)
 
 	for _, path := range []string{"/admin/photos/reports", "/admin/photos/reports/1"} {
-		for _, who := range []string{"", "student@x.test", "owner@x.test", "teacher@x.test"} {
+		for _, who := range []string{"", "student@x.test", "teacher@x.test"} {
 			if got := a.call(http.MethodGet, path, who, nil); got.status != 401 && got.status != 403 {
 				t.Fatalf("%s as %q: status %d", path, who, got.status)
 			}
@@ -278,6 +278,10 @@ func TestAdminReportsAreAdministratorOnly(t *testing.T) {
 	}
 	if got := a.call(http.MethodPost, "/admin/photos/reports/1/retry", "student@x.test", nil); got.status != 403 {
 		t.Fatalf("retry as student: %d", got.status)
+	}
+	// The Club Photo's owners review reports, but nothing else of the admin panel.
+	if got := a.call(http.MethodGet, "/admin/photos/reports", "owner@x.test", nil); got.status != 200 {
+		t.Fatalf("reports as the photo club's owner: %d", got.status)
 	}
 	if got := a.call(http.MethodPut, "/admin/photos/albums/1/club", "owner@x.test", map[string]any{"club_id": nil}); got.status != 403 {
 		t.Fatalf("club link as club owner: %d", got.status)

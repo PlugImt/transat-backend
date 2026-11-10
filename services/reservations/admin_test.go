@@ -330,6 +330,23 @@ func TestTheWaitingListIsVisibleInOrderAndAdministrable(t *testing.T) {
 		t.Fatalf("loan = %+v", loan)
 	}
 
+	// Everyone waiting, all items together, each queue numbered on its own.
+	all, err := f.svc.AdminAllWaitlists(ctx)
+	if err != nil || len(all) != 5 {
+		t.Fatalf("all = %+v, %v", all, err)
+	}
+	if all[0].ItemName != "Câble" || all[0].Email != "q2@x.test" || all[0].Position != 1 || all[0].Slot {
+		t.Fatalf("first = %+v", all[0])
+	}
+	for _, e := range all[1:] {
+		if e.ItemName != "Salle" || !e.Slot || e.ItemID != room.ID {
+			t.Fatalf("room entry = %+v", e)
+		}
+	}
+	if all[4].Email != "q3@x.test" || all[4].Position != 1 || !all[4].SlotStart.Equal(slotB) {
+		t.Fatalf("slot B entry = %+v", all[4])
+	}
+
 	// The slot is not free: the turn cannot be passed.
 	if _, err := f.svc.AdminAdvanceWaitlist(ctx, room.ID, &slotA); !errors.Is(err, ErrNotFree) {
 		t.Fatalf("advance while occupied: %v", err)
@@ -431,5 +448,48 @@ func TestTheSummary(t *testing.T) {
 		WaitlistEntries: 1, AwaitingResponse: 1, Cancelled30Days: 1, Items: 4, UnavailableItems: 1}
 	if st != want {
 		t.Fatalf("stats = %+v\nwant   %+v", st, want)
+	}
+}
+
+func TestAHiddenCategoryTakesEverythingInsideOutOfReach(t *testing.T) {
+	f := newFx(t)
+	f.user("owner@x.test", "O", "X", 1)
+	f.user("q1@x.test", "Q", "X", 1)
+	ctx := context.Background()
+	var parent, child int
+	if err := f.db.QueryRow(`INSERT INTO reservation_category (name, id_clubs) VALUES ('Matériel', $1) RETURNING id_reservation_category`, f.club).Scan(&parent); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.QueryRow(`INSERT INTO reservation_category (name, id_clubs, id_parent_category) VALUES ('Son', $1, $2) RETURNING id_reservation_category`, f.club, parent).Scan(&child); err != nil {
+		t.Fatal(err)
+	}
+	cable := f.item("Câble", false)
+	if _, err := f.db.Exec(`UPDATE reservation_element SET id_reservation_category = $1 WHERE id_reservation_element = $2`, child, cable.ID); err != nil {
+		t.Fatal(err)
+	}
+	f.lend("owner@x.test", cable, t0.Add(-time.Hour))
+
+	if _, err := f.db.Exec(`UPDATE reservation_category SET hidden = TRUE WHERE id_reservation_category = $1`, parent); err != nil {
+		t.Fatal(err)
+	}
+	var hidden int
+	_ = f.db.QueryRow(`SELECT count(*) FROM reservation_hidden_categories`).Scan(&hidden)
+	if hidden != 2 {
+		t.Fatalf("%d hidden categories, want the category and its sub-category", hidden)
+	}
+	if _, err := f.svc.Join(ctx, "q1@x.test", cable.ID, nil); !errors.Is(err, ErrNotBookable) {
+		t.Fatalf("queueing for an item of a hidden category: %v", err)
+	}
+	var status string
+	_ = f.db.QueryRow(`SELECT status FROM reservation_element WHERE id_reservation_element = $1`, cable.ID).Scan(&status)
+	if status != "active" {
+		t.Fatalf("hiding the category changed the item's own status to %s", status)
+	}
+
+	if _, err := f.db.Exec(`UPDATE reservation_category SET hidden = FALSE WHERE id_reservation_category = $1`, parent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Join(ctx, "q1@x.test", cable.ID, nil); err != nil {
+		t.Fatalf("queueing once the category is shown again: %v", err)
 	}
 }

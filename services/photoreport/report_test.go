@@ -223,7 +223,7 @@ func TestPhotosWithoutAClubBelongToTheDefaultClub(t *testing.T) {
 	}
 }
 
-func TestAnAlbumsOwnClubBeatsTheDefault(t *testing.T) {
+func TestAnAlbumsOwnClubIsToldAlongWithThePhotoClub(t *testing.T) {
 	f, _ := standard(t)
 	f.user("sport@x.test", "Sam", "sport_respo")
 	sport := f.club("Sport")
@@ -234,12 +234,17 @@ func TestAnAlbumsOwnClubBeatsTheDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.deliver()
-	if got := fmt.Sprint(f.m.recipients()); got != "[admin1@x.test admin2@x.test sport@x.test]" {
-		t.Fatalf("recipients %s: the default club's owner must not be told", got)
+	if got := fmt.Sprint(f.m.recipients()); got != "[admin1@x.test admin2@x.test owner@x.test sport@x.test]" {
+		t.Fatalf("recipients %s: the album's club, the photo club and the administrators must be told", got)
+	}
+	for _, s := range f.m.sent {
+		if s.to == "owner@x.test" && (!s.data.IsPhotoClub || s.data.IsClubOwner) {
+			t.Fatalf("the photo club's owner must get the photo club wording: %+v", s.data)
+		}
 	}
 }
 
-func TestWithoutADefaultClubPhotosGoToAdministratorsOnly(t *testing.T) {
+func TestWithoutADefaultClubThePhotoClubOwnersAreStillTold(t *testing.T) {
 	f, _ := standard(t)
 	f.exec(`UPDATE clubs SET name = 'Autre club'`) // the photo club does not exist
 	f.photo("PHOTO-0000000003", nil)
@@ -247,8 +252,8 @@ func TestWithoutADefaultClubPhotosGoToAdministratorsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.deliver()
-	if got := fmt.Sprint(f.m.recipients()); got != "[admin1@x.test admin2@x.test]" {
-		t.Fatalf("recipients %s, want administrators only", got)
+	if got := fmt.Sprint(f.m.recipients()); got != "[admin1@x.test admin2@x.test owner@x.test]" {
+		t.Fatalf("recipients %s, want the photo club's owners and the administrators", got)
 	}
 	for _, s := range f.m.sent {
 		if s.data.HasClub || s.data.IsClubOwner {
@@ -262,8 +267,9 @@ func TestWithoutADefaultClubPhotosGoToAdministratorsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.deliver()
-	if f.m.calls["owner@x.test"] != 1 {
-		t.Fatalf("owner mailed %d times, want 1", f.m.calls["owner@x.test"])
+	// Once per report: the first one above, and this one where the club also matches.
+	if f.m.calls["owner@x.test"] != 2 {
+		t.Fatalf("owner mailed %d times, want once per report", f.m.calls["owner@x.test"])
 	}
 }
 

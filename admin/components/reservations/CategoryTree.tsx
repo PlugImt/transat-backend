@@ -1,12 +1,17 @@
 "use client";
 
-import { Folder, FolderOpen, FolderPlus, Pencil, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Folder, FolderOpen, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { type ReactElement, useState } from "react";
 import toast from "react-hot-toast";
 import { CategoryModal } from "@/components/CategoryModal";
 import Modal from "@/components/Modal";
 import type { ReservationTreeItem } from "@/lib/api";
-import { useClubs, useDeleteReservationCategory, useReservationTree } from "@/lib/hooks";
+import {
+  useClubs,
+  useDeleteReservationCategory,
+  useReservationTree,
+  useUpdateReservationCategory,
+} from "@/lib/hooks";
 import { apiErrorMessage, EmptyState, LoadingButton, SkeletonRows } from "./ui";
 
 interface CategoryTreeProps {
@@ -18,6 +23,22 @@ export function CategoryTree({ onOpenItem }: CategoryTreeProps) {
   const { data: tree, isLoading } = useReservationTree();
   const { data: clubs } = useClubs();
   const deleteCategory = useDeleteReservationCategory();
+  const updateCategory = useUpdateReservationCategory();
+
+  const toggleHidden = async (node: ReservationTreeItem) => {
+    if (!node.id) return;
+    const hidden = !node.hidden;
+    try {
+      await updateCategory.mutateAsync({ id: node.id, data: { hidden } });
+      toast.success(
+        hidden
+          ? `« ${node.name} » et tout son contenu sont masqués dans l'application`
+          : `« ${node.name} » est de nouveau visible`,
+      );
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Impossible de modifier la visibilité"));
+    }
+  };
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<ReservationTreeItem | null>(null);
@@ -76,7 +97,9 @@ export function CategoryTree({ onOpenItem }: CategoryTreeProps) {
       return (
         <div key={nodeId}>
           <div
-            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50"
+            className={`flex items-center gap-2 px-4 py-2 transition-opacity hover:bg-gray-50 ${
+              node.hidden || node.hidden_by_parent ? "opacity-60" : ""
+            }`}
             style={{ paddingLeft: `${level * 24 + 16}px` }}
           >
             <button
@@ -98,8 +121,35 @@ export function CategoryTree({ onOpenItem }: CategoryTreeProps) {
             </button>
             {node.type === "category" ? (
               <>
-                <span className="flex-1 font-medium text-gray-900">{node.name}</span>
+                <span className="flex flex-1 items-center gap-2 font-medium text-gray-900">
+                  {node.name}
+                  {node.hidden && (
+                    <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700">
+                      Masquée
+                    </span>
+                  )}
+                  {!node.hidden && node.hidden_by_parent && (
+                    <span className="text-xs font-normal text-gray-500">
+                      masquée par une catégorie parente
+                    </span>
+                  )}
+                </span>
                 <span className="text-sm text-gray-500">{node.club_name}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleHidden(node)}
+                  disabled={updateCategory.isPending}
+                  className={`rounded p-1 hover:bg-gray-100 ${node.hidden ? "text-gray-700" : "text-gray-500"}`}
+                  title={
+                    node.hidden
+                      ? "Rendre visible dans l'application"
+                      : "Masquer dans l'application (avec tout son contenu)"
+                  }
+                  aria-label={node.hidden ? "Rendre visible" : "Masquer"}
+                  aria-pressed={node.hidden}
+                >
+                  {node.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
                 <button
                   type="button"
                   onClick={() => openCreate(node.id, node.club_id)}

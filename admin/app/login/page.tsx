@@ -3,6 +3,7 @@
 import { CircleCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useState } from "react";
+import { safeNext } from "@/lib/access";
 import { authApi } from "@/lib/api";
 import type { ApiError } from "@/lib/types";
 
@@ -34,7 +35,7 @@ export default function LoginPage() {
 
       if (response.token) {
         localStorage.setItem("adminToken", response.token);
-        router.push("/dashboard");
+        router.push(safeNext(searchParams.get("next")) ?? "/dashboard");
       } else {
         setError("Échec de la connexion - aucun token reçu");
       }

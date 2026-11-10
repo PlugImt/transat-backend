@@ -118,7 +118,8 @@ type queryRower interface {
 func (s *Service) loadItem(ctx context.Context, id int) (Item, error) {
 	it := Item{ID: id}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT COALESCE(name, ''), COALESCE(slot, FALSE), status FROM reservation_element WHERE id_reservation_element = $1`, id).
+		`SELECT COALESCE(name, ''), COALESCE(slot, FALSE), reservation_item_status(id_reservation_element)
+		 FROM reservation_element WHERE id_reservation_element = $1`, id).
 		Scan(&it.Name, &it.Slot, &it.Status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return it, ErrItemNotFound

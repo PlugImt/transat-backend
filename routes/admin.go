@@ -2,6 +2,7 @@ package routes
 
 import (
 	"database/sql"
+	"github.com/plugimt/transat-backend/services/accounts"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/plugimt/transat-backend/handlers/admin"
@@ -10,8 +11,9 @@ import (
 	"github.com/plugimt/transat-backend/utils"
 )
 
-func SetupAdminRoutes(router fiber.Router, db *sql.DB, notifications *services.NotificationService) fiber.Router {
+func SetupAdminRoutes(router fiber.Router, db *sql.DB, notifications *services.NotificationService, accountsService *accounts.Service) fiber.Router {
 	adminHandler := admin.NewAdminHandler(db, notifications)
+	adminHandler.Accounts = accountsService
 
 	adminGroup := router.Group("/admin",
 		middlewares.JWTMiddleware,
@@ -30,6 +32,7 @@ func SetupAdminRoutes(router fiber.Router, db *sql.DB, notifications *services.N
 	adminGroup.Post("/notifications/send", adminHandler.SendNotification)
 	// Delivery diagnostics of the queued push notifications
 	adminGroup.Get("/notifications/messages", adminHandler.GetPushMessages)
+	adminGroup.Get("/notifications/app-versions", adminHandler.GetAppVersions)
 	adminGroup.Get("/notifications/messages/:id", adminHandler.GetPushMessage)
 
 	adminGroup.Get("/events", adminHandler.GetAllEvents)

@@ -1,8 +1,11 @@
 package admin
 
 import (
+	"errors"
+
 	"database/sql"
 	"fmt"
+	"github.com/plugimt/transat-backend/services/accounts"
 	"net/url"
 	"strconv"
 	"strings"
@@ -18,6 +21,7 @@ import (
 type AdminHandler struct {
 	DB            *sql.DB
 	Notifications *services.NotificationService
+	Accounts      *accounts.Service
 }
 
 func NewAdminHandler(db *sql.DB, notifications *services.NotificationService) *AdminHandler {
@@ -44,6 +48,7 @@ func (h *AdminHandler) GetAllUsers(c *fiber.Ctx) error {
 			n.verification_code_expiration
 		FROM newf n
 		LEFT JOIN languages l ON n.language = l.id_languages
+		WHERE n.email <> 'deleted-account@transat.invalid'
 		ORDER BY n.creation_date DESC;
 	`
 
@@ -137,76 +142,28 @@ func (h *AdminHandler) GetAllUsers(c *fiber.Ctx) error {
 	return c.JSON(users)
 }
 
+// DeleteUser handles DELETE /admin/users/:email: the account and its personal data go, what must stay is anonymised.
 func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
-	email := c.Params("email")
-	email, err := url.QueryUnescape(email)
+	email, err := url.QueryUnescape(c.Params("email"))
 	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to unescape email")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid email"})
 	}
-	utils.LogHeader("🗑️ Delete User (Admin)")
-	utils.LogLineKeyValue(utils.LevelInfo, "Target Email", email)
-
-	// Begin transaction
-	tx, err := h.DB.Begin()
-	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to begin transaction")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to begin transaction"})
+	if self, _ := c.Locals("email").(string); strings.EqualFold(self, email) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Use the app to delete your own account"})
 	}
-
-	// Ensure transaction is closed properly
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			utils.LogMessage(utils.LevelError, "Transaction rolled back due to panic")
-			utils.LogLineKeyValue(utils.LevelError, "Panic", r)
-		}
-	}()
-
-	// Delete user (CASCADE will handle dependent rows automatically)
-	query := `DELETE FROM newf WHERE email = $1`
-	result, err := tx.Exec(query, email)
-	if err != nil {
-		tx.Rollback()
-		utils.LogMessage(utils.LevelError, "Failed to delete user - transaction rolled back")
+	if h.Accounts == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Account deletion unavailable"})
+	}
+	switch err := h.Accounts.Delete(c.UserContext(), email); {
+	case errors.Is(err, accounts.ErrNotFound):
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	case errors.Is(err, accounts.ErrProtected):
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "This account cannot be deleted"})
+	case err != nil:
+		utils.LogMessage(utils.LevelError, "Failed to delete user (admin)")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete user"})
 	}
-
-	// Check if user was found and deleted
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		tx.Rollback()
-		utils.LogMessage(utils.LevelError, "Failed to get rows affected - transaction rolled back")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to verify deletion"})
-	}
-
-	if rowsAffected == 0 {
-		tx.Rollback()
-		utils.LogMessage(utils.LevelWarn, "User not found for deletion - transaction rolled back")
-		utils.LogFooter()
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
-	}
-
-	// Commit transaction
-	err = tx.Commit()
-	if err != nil {
-		utils.LogMessage(utils.LevelError, "Failed to commit transaction")
-		utils.LogLineKeyValue(utils.LevelError, "Error", err)
-		utils.LogFooter()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to commit deletion"})
-	}
-
-	utils.LogMessage(utils.LevelInfo, "User deleted successfully within transaction")
-	utils.LogLineKeyValue(utils.LevelInfo, "Rows Affected", rowsAffected)
-	utils.LogFooter()
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -1965,13 +1922,16 @@ func (h *AdminHandler) UpdateReservationItemMessages(c *fiber.Ctx) error {
 }
 
 type categoryNode struct {
-	ID       int                      `json:"id"`
-	Name     string                   `json:"name"`
-	ParentID *int                     `json:"parent_id"`
-	ClubID   int                      `json:"club_id"`
-	ClubName string                   `json:"club_name"`
-	Children []*categoryNode          `json:"children"`
-	Items    []map[string]interface{} `json:"items"`
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	ParentID *int   `json:"parent_id"`
+	ClubID   int    `json:"club_id"`
+	ClubName string `json:"club_name"`
+	// Hidden: set on this category; HiddenByParent: an enclosing category is hidden.
+	Hidden         bool                     `json:"hidden"`
+	HiddenByParent bool                     `json:"hidden_by_parent"`
+	Children       []*categoryNode          `json:"children"`
+	Items          []map[string]interface{} `json:"items"`
 }
 
 // GetReservationTree gets the full reservation tree structure (categories and items)
@@ -1993,7 +1953,9 @@ func (h *AdminHandler) GetReservationTree(c *fiber.Ctx) error {
 			rc.name,
 			rc.id_parent_category,
 			rc.id_clubs,
-			c.name as club_name
+			c.name as club_name,
+			rc.hidden,
+			rc.id_reservation_category IN (SELECT id FROM reservation_hidden_categories) AND NOT rc.hidden
 		FROM reservation_category rc
 		LEFT JOIN clubs c ON rc.id_clubs = c.id_clubs
 		ORDER BY rc.id_clubs, rc.id_parent_category NULLS FIRST, rc.name
@@ -2018,7 +1980,7 @@ func (h *AdminHandler) GetReservationTree(c *fiber.Ctx) error {
 		var parentID sql.NullInt64
 		var clubName sql.NullString
 
-		err := rows.Scan(&cat.ID, &cat.Name, &parentID, &cat.ClubID, &clubName)
+		err := rows.Scan(&cat.ID, &cat.Name, &parentID, &cat.ClubID, &clubName, &cat.Hidden, &cat.HiddenByParent)
 		if err != nil {
 			utils.LogMessage(utils.LevelError, "Failed to scan category")
 			continue
@@ -2233,6 +2195,9 @@ func (h *AdminHandler) categoryToMap(cat *categoryNode) map[string]interface{} {
 		"club_id":   cat.ClubID,
 		"club_name": cat.ClubName,
 		"items":     cat.Items,
+		// Hidden categories and everything inside them are left out of the app.
+		"hidden":           cat.Hidden,
+		"hidden_by_parent": cat.HiddenByParent,
 	}
 
 	if cat.ParentID != nil {
@@ -2324,8 +2289,10 @@ func (h *AdminHandler) UpdateReservationCategory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid category ID"})
 	}
 
+	// Either field may be sent alone: renaming, or hiding/showing the whole category.
 	var req struct {
-		Name string `json:"name"`
+		Name   *string `json:"name"`
+		Hidden *bool   `json:"hidden"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -2334,13 +2301,18 @@ func (h *AdminHandler) UpdateReservationCategory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
 	}
 
-	if req.Name == "" {
+	if req.Name == nil && req.Hidden == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Nothing to update"})
+	}
+	if req.Name != nil && strings.TrimSpace(*req.Name) == "" {
 		utils.LogMessage(utils.LevelError, "Category name is required")
 		utils.LogFooter()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Category name is required"})
 	}
 
-	result, err := h.DB.Exec("UPDATE reservation_category SET name = $1 WHERE id_reservation_category = $2", req.Name, categoryIDInt)
+	result, err := h.DB.Exec(`UPDATE reservation_category
+		SET name = COALESCE($1, name), hidden = COALESCE($2, hidden)
+		WHERE id_reservation_category = $3`, req.Name, req.Hidden, categoryIDInt)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to update category")
 		utils.LogFooter()

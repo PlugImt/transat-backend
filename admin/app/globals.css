@@ -1,22 +1,271 @@
 @import "tailwindcss";
 
+/* Dark mode follows the "dark" class on <html>, set before the first paint (see app/layout.tsx). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Transat look, matching the app and the emails: warm neutrals instead of cold grays, the Transat orange as the
+ * primary colour (every "blue" of the panel), and a dark mode in the colours of the email templates. The palette
+ * itself is remapped, so every page follows without per-page dark: classes.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --page: #faf7f4;
+  --sidebar: #120a08;
+  --sidebar-hover: #241815;
+  --sidebar-border: #2c201d;
+  --sidebar-text: #c5b4a8;
+  --brand: #ec7f32;
+  --brand-strong: #d96a1f;
+  --brand-soft: #fff1e6;
+  --ink: #241a17;
+  --toast-bg: #241a17;
+  --toast-text: #ffe6cc;
+  --chart-grid: #ece4dc;
+  --chart-axis: #8f7f73;
+  --heat-empty: #f3eee9;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Warm neutrals (light mode); inverted under .dark below. */
+  --color-gray-50: #faf7f4;
+  --color-gray-100: #f3eee9;
+  --color-gray-200: #e7dfd8;
+  --color-gray-300: #d5c9bf;
+  --color-gray-400: #b9a99c;
+  --color-gray-500: #8f7f73;
+  --color-gray-600: #6e6058;
+  --color-gray-700: #524640;
+  --color-gray-800: #3b2c28;
+  --color-gray-900: #241a17;
+  --color-gray-950: #160e0c;
+
+  /* Primary: Transat orange. */
+  --color-blue-50: #fff4ec;
+  --color-blue-100: #ffe4cf;
+  --color-blue-200: #fdc79f;
+  --color-blue-300: #f9a86c;
+  --color-blue-400: #f28f45;
+  --color-blue-500: #ec7f32;
+  --color-blue-600: #d96a1f;
+  --color-blue-700: #b45417;
+  --color-blue-800: #8c4214;
+  --color-blue-900: #6b3412;
+  --color-blue-950: #3d1d0a;
+
+  /* Secondary: Transat blue. */
+  --color-brand-blue: #0049a8;
+
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-fade-out: fade-out 0.2s ease-out;
+  --animate-slide-up: slide-up 0.3s ease-out;
+  --animate-slide-down: slide-down 0.2s ease-out;
+  --animate-rise: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.dark {
+  color-scheme: dark;
+  --surface: #181010;
+  --surface-raised: #1e1515;
+  --page: #0d0505;
+  --sidebar: #0a0403;
+  --sidebar-hover: #1e1515;
+  --sidebar-border: #241815;
+  --brand-soft: #2a1a10;
+  --ink: #ffe6cc;
+  --toast-bg: #2c201d;
+  --toast-text: #ffe6cc;
+  --chart-grid: #2c201d;
+  --chart-axis: #a8978b;
+  --heat-empty: #1e1515;
+
+  --color-gray-50: #0d0505;
+  --color-gray-100: #1e1515;
+  --color-gray-200: #2c201d;
+  --color-gray-300: #3b2c28;
+  --color-gray-400: #7d6b60;
+  --color-gray-500: #a8978b;
+  --color-gray-600: #c5b4a8;
+  --color-gray-700: #dccbbd;
+  --color-gray-800: #efdcca;
+  --color-gray-900: #ffe6cc;
+  --color-gray-950: #fff3e6;
+
+  --color-blue-50: #2a1a10;
+  --color-blue-100: #3a2414;
+  --color-blue-200: #5a3418;
+  --color-blue-700: #f9a86c;
+  --color-blue-800: #fdc79f;
+  --color-blue-900: #ffe4cf;
+
+  --color-green-50: color-mix(in oklab, #22c55e 10%, #181010);
+  --color-green-100: color-mix(in oklab, #22c55e 18%, #181010);
+  --color-green-200: color-mix(in oklab, #22c55e 30%, #181010);
+  --color-green-600: #4ade80;
+  --color-green-700: #86efac;
+  --color-green-800: #86efac;
+  --color-green-900: color-mix(in oklab, #86efac 70%, #ffffff);
+  --color-red-50: color-mix(in oklab, #ef4444 10%, #181010);
+  --color-red-100: color-mix(in oklab, #ef4444 18%, #181010);
+  --color-red-200: color-mix(in oklab, #ef4444 30%, #181010);
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fca5a5;
+  --color-red-900: color-mix(in oklab, #fca5a5 70%, #ffffff);
+  --color-yellow-50: color-mix(in oklab, #eab308 10%, #181010);
+  --color-yellow-100: color-mix(in oklab, #eab308 18%, #181010);
+  --color-yellow-200: color-mix(in oklab, #eab308 30%, #181010);
+  --color-yellow-600: #facc15;
+  --color-yellow-700: #fde047;
+  --color-yellow-800: #fde047;
+  --color-yellow-900: color-mix(in oklab, #fde047 70%, #ffffff);
+  --color-amber-50: color-mix(in oklab, #f59e0b 10%, #181010);
+  --color-amber-100: color-mix(in oklab, #f59e0b 18%, #181010);
+  --color-amber-200: color-mix(in oklab, #f59e0b 30%, #181010);
+  --color-amber-600: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: color-mix(in oklab, #fcd34d 70%, #ffffff);
+  --color-orange-50: color-mix(in oklab, #f97316 10%, #181010);
+  --color-orange-100: color-mix(in oklab, #f97316 18%, #181010);
+  --color-orange-200: color-mix(in oklab, #f97316 30%, #181010);
+  --color-orange-600: #fb923c;
+  --color-orange-700: #fdba74;
+  --color-orange-800: #fdba74;
+  --color-orange-900: color-mix(in oklab, #fdba74 70%, #ffffff);
+  --color-purple-50: color-mix(in oklab, #a855f7 10%, #181010);
+  --color-purple-100: color-mix(in oklab, #a855f7 18%, #181010);
+  --color-purple-200: color-mix(in oklab, #a855f7 30%, #181010);
+  --color-purple-600: #c084fc;
+  --color-purple-700: #d8b4fe;
+  --color-purple-800: #d8b4fe;
+  --color-purple-900: color-mix(in oklab, #d8b4fe 70%, #ffffff);
+  --color-violet-50: color-mix(in oklab, #8b5cf6 10%, #181010);
+  --color-violet-100: color-mix(in oklab, #8b5cf6 18%, #181010);
+  --color-violet-200: color-mix(in oklab, #8b5cf6 30%, #181010);
+  --color-violet-600: #a78bfa;
+  --color-violet-700: #c4b5fd;
+  --color-violet-800: #c4b5fd;
+  --color-violet-900: color-mix(in oklab, #c4b5fd 70%, #ffffff);
+  --color-indigo-50: color-mix(in oklab, #6366f1 10%, #181010);
+  --color-indigo-100: color-mix(in oklab, #6366f1 18%, #181010);
+  --color-indigo-200: color-mix(in oklab, #6366f1 30%, #181010);
+  --color-indigo-600: #818cf8;
+  --color-indigo-700: #a5b4fc;
+  --color-indigo-800: #a5b4fc;
+  --color-indigo-900: color-mix(in oklab, #a5b4fc 70%, #ffffff);
+  --color-emerald-50: color-mix(in oklab, #10b981 10%, #181010);
+  --color-emerald-100: color-mix(in oklab, #10b981 18%, #181010);
+  --color-emerald-200: color-mix(in oklab, #10b981 30%, #181010);
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #6ee7b7;
+  --color-emerald-900: color-mix(in oklab, #6ee7b7 70%, #ffffff);
+  --color-sky-50: color-mix(in oklab, #0ea5e9 10%, #181010);
+  --color-sky-100: color-mix(in oklab, #0ea5e9 18%, #181010);
+  --color-sky-200: color-mix(in oklab, #0ea5e9 30%, #181010);
+  --color-sky-600: #38bdf8;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #7dd3fc;
+  --color-sky-900: color-mix(in oklab, #7dd3fc 70%, #ffffff);
+  --color-teal-50: color-mix(in oklab, #14b8a6 10%, #181010);
+  --color-teal-100: color-mix(in oklab, #14b8a6 18%, #181010);
+  --color-teal-200: color-mix(in oklab, #14b8a6 30%, #181010);
+  --color-teal-600: #2dd4bf;
+  --color-teal-700: #5eead4;
+  --color-teal-800: #5eead4;
+  --color-teal-900: color-mix(in oklab, #5eead4 70%, #ffffff);
+  --color-pink-50: color-mix(in oklab, #ec4899 10%, #181010);
+  --color-pink-100: color-mix(in oklab, #ec4899 18%, #181010);
+  --color-pink-200: color-mix(in oklab, #ec4899 30%, #181010);
+  --color-pink-600: #f472b6;
+  --color-pink-700: #f9a8d4;
+  --color-pink-800: #f9a8d4;
+  --color-pink-900: color-mix(in oklab, #f9a8d4 70%, #ffffff);
+  --color-rose-50: color-mix(in oklab, #f43f5e 10%, #181010);
+  --color-rose-100: color-mix(in oklab, #f43f5e 18%, #181010);
+  --color-rose-200: color-mix(in oklab, #f43f5e 30%, #181010);
+  --color-rose-600: #fb7185;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fda4af;
+  --color-rose-900: color-mix(in oklab, #fda4af 70%, #ffffff);
+  --color-fuchsia-50: color-mix(in oklab, #d946ef 10%, #181010);
+  --color-fuchsia-100: color-mix(in oklab, #d946ef 18%, #181010);
+  --color-fuchsia-200: color-mix(in oklab, #d946ef 30%, #181010);
+  --color-fuchsia-600: #e879f9;
+  --color-fuchsia-700: #f0abfc;
+  --color-fuchsia-800: #f0abfc;
+  --color-fuchsia-900: color-mix(in oklab, #f0abfc 70%, #ffffff);
+  --color-cyan-50: color-mix(in oklab, #06b6d4 10%, #181010);
+  --color-cyan-100: color-mix(in oklab, #06b6d4 18%, #181010);
+  --color-cyan-200: color-mix(in oklab, #06b6d4 30%, #181010);
+  --color-cyan-600: #22d3ee;
+  --color-cyan-700: #67e8f9;
+  --color-cyan-800: #67e8f9;
+  --color-cyan-900: color-mix(in oklab, #67e8f9 70%, #ffffff);
+  --color-lime-50: color-mix(in oklab, #84cc16 10%, #181010);
+  --color-lime-100: color-mix(in oklab, #84cc16 18%, #181010);
+  --color-lime-200: color-mix(in oklab, #84cc16 30%, #181010);
+  --color-lime-600: #a3e635;
+  --color-lime-700: #bef264;
+  --color-lime-800: #bef264;
+  --color-lime-900: color-mix(in oklab, #bef264 70%, #ffffff);
+}
+
+/* Cards and inputs are "white" in light mode; in dark mode they take the email templates' surface. */
+.dark .bg-white {
+  background-color: var(--surface);
+}
+.dark .bg-white\/95,
+.dark .bg-white\/90,
+.dark .bg-white\/80 {
+  background-color: color-mix(in oklab, var(--surface) 92%, transparent);
+}
+.dark .hover\:bg-white:hover {
+  background-color: var(--surface-raised);
+}
+.dark .text-black {
+  color: var(--ink);
+}
+.dark .shadow,
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl {
+  --tw-shadow-color: rgb(0 0 0 / 0.6);
+}
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: var(--surface);
+  color: var(--ink);
+}
+.dark ::placeholder {
+  color: #7d6b60;
+}
+
+html,
+body {
+  background: var(--page);
+  color: var(--ink);
+}
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+* {
+  scrollbar-color: color-mix(in oklab, var(--ink) 25%, transparent) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 @keyframes fade-in {
@@ -24,30 +273,41 @@ body {
   to { opacity: 1; }
 }
 
-@keyframes slide-up {
-  from { 
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 @keyframes fade-out {
   from { opacity: 1; }
   to { opacity: 0; }
 }
 
-@keyframes slide-down {
-  from { 
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
-  to { 
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
     opacity: 0;
     transform: translateY(20px) scale(0.95);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -65,4 +325,13 @@ body {
 
 .animate-slide-down {
   animation: slide-down 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

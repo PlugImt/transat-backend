@@ -1,5 +1,7 @@
+import type { PanelAccess } from "./access";
 import type {
   AdminItem,
+  AdminQueuedEntry,
   AdminWaitlist,
   CancelReservationRequest,
   CancelReservationResult,
@@ -13,6 +15,7 @@ import type {
   ActiveUsersPoint,
   ActivityHeatmapRange,
   ActivityHourPoint,
+  AppVersionStat,
   BassineScore,
   BassineScoreHistory,
   Club,
@@ -113,6 +116,13 @@ function asArray<T>(data: T[] | null | undefined): T[] {
 export const authApi = {
   login: async (email: string, password: string) => {
     const response = await api.post("/auth/login", { email, password });
+    return response.data;
+  },
+  /** What this account may open in the panel: everything for administrators, a few sections for some roles. */
+  access: async (token: string): Promise<PanelAccess> => {
+    const response = await request<PanelAccess>("GET", "/admin/access", undefined, undefined, {
+      Authorization: `Bearer ${token}`,
+    });
     return response.data;
   },
   verify: async (token: string) => {
@@ -266,6 +276,30 @@ export const notificationsApi = {
     const response = await api.post("/admin/notifications/send", request);
     return response.data;
   },
+  appVersions: async (): Promise<AppVersionStat[]> => {
+    const response = await api.get("/admin/notifications/app-versions");
+    return asArray<AppVersionStat>(response.data?.versions);
+  },
+  /** Stores an image on Transat's public storage and returns its https address. */
+  uploadImage: async (file: File): Promise<string> => {
+    const form = new FormData();
+    form.append("file", file);
+    const token = localStorage.getItem("adminToken");
+    const response = await fetch(new URL("upload", `${API_BASE_URL.replace(/\/+$/, "")}/`), {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || typeof data?.url !== "string") {
+      throw new Error(data?.error ?? "Échec de l'envoi de l'image");
+    }
+    return data.url;
+  },
+  recent: async (limit = 8): Promise<PushMessageSummary[]> => {
+    const response = await api.get("/admin/notifications/messages", { params: { limit } });
+    return asArray<PushMessageSummary>(response.data?.messages);
+  },
   message: async (id: number): Promise<PushMessageSummary> => {
     const response = await api.get(`/admin/notifications/messages/${id}`);
     return response.data;
@@ -347,6 +381,10 @@ export interface ReservationTreeItem {
   club_id?: number;
   club_name?: string;
   parent_id?: number;
+  /** Hidden from the app, with everything inside it. */
+  hidden?: boolean;
+  /** An enclosing category is hidden, which hides this one too. */
+  hidden_by_parent?: boolean;
   children?: ReservationTreeItem[];
   items?: ReservationItem[];
 }
@@ -358,7 +396,8 @@ export interface CreateCategoryRequest {
 }
 
 export interface UpdateCategoryRequest {
-  name: string;
+  name?: string;
+  hidden?: boolean;
 }
 
 export interface CreateItemRequest {
@@ -495,6 +534,10 @@ export const reservationApi = {
     });
     return { ...response.data, entries: asArray(response.data?.entries) };
   },
+  getAllWaitlists: async (): Promise<AdminQueuedEntry[]> => {
+    const response = await api.get("/admin/reservations/waitlists");
+    return asArray(response.data?.entries);
+  },
   removeWaitlistEntry: async (id: number): Promise<{ message: string; next_notified: boolean }> => {
     const response = await api.delete(`/admin/reservations/waitlist/${id}`);
     return response.data;
@@ -515,6 +558,7 @@ export const photoReportsApi = {
   list: async (filter: PhotoReportsFilter): Promise<PhotoReportsPage> => {
     const response = await api.get("/admin/photos/reports", {
       params: {
+        status: filter.status || undefined,
         reason: filter.reason || undefined,
         delivery: filter.delivery || undefined,
         limit: filter.limit,
@@ -525,6 +569,14 @@ export const photoReportsApi = {
   },
   get: async (id: number): Promise<PhotoReport> => {
     const response = await api.get(`/admin/photos/reports/${id}`);
+    return response.data;
+  },
+  decide: async (
+    id: number,
+    decision: "approve" | "reject",
+    note: string,
+  ): Promise<PhotoReport> => {
+    const response = await api.post(`/admin/photos/reports/${id}/decision`, { decision, note });
     return response.data;
   },
   retry: async (id: number): Promise<{ retried: number }> => {

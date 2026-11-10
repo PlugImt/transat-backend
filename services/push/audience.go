@@ -129,6 +129,12 @@ func (p *Pipeline) resolve(ctx context.Context, q queryer, aud Audience, categor
 			if aud.GraduationYear != 0 {
 				where.WriteString(" AND n.graduation_year = " + arg(aud.GraduationYear))
 			}
+		case models.AudienceAppVersion:
+			// The condition is on the device: only the outdated devices of a user are kept.
+			where.WriteString(" AND d.installation_id IS NOT NULL AND app_version_key(d.app_version) < app_version_key(" + arg(aud.BelowVersion) + ")")
+			if aud.Platform != "" {
+				where.WriteString(" AND d.platform = " + arg(strings.ToLower(aud.Platform)))
+			}
 		case models.AudienceAll:
 		default:
 			return Resolution{}, fmt.Errorf("unknown audience type %q", aud.Type)
@@ -147,7 +153,7 @@ func (p *Pipeline) resolve(ctx context.Context, q queryer, aud Audience, categor
 		FROM newf n
 		LEFT JOIN languages l ON l.id_languages = n.language
 		LEFT JOIN devices d ON d.user_email = n.email
-		WHERE TRUE`+where.String()+`
+		WHERE n.email <> 'deleted-account@transat.invalid'`+where.String()+`
 		ORDER BY n.email, d.installation_id`, args...)
 	if err != nil {
 		return Resolution{}, fmt.Errorf("resolve audience: %w", err)

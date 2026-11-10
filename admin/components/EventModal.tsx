@@ -119,7 +119,7 @@ export default function EventModal({ isOpen, onClose, event, onSave }: EventModa
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-900/30 backdrop-blur-[2px] flex items-center justify-center z-50 animate-fade-in">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center z-50 animate-fade-in">
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto animate-slide-up">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-900">

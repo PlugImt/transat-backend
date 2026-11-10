@@ -9,6 +9,7 @@ import (
 	reportHandler "github.com/plugimt/transat-backend/handlers/photoreport"
 	photosHandler "github.com/plugimt/transat-backend/handlers/photos"
 	"github.com/plugimt/transat-backend/middlewares"
+	reportService "github.com/plugimt/transat-backend/services/photoreport"
 	"github.com/plugimt/transat-backend/services/photos"
 	"github.com/plugimt/transat-backend/utils"
 )
@@ -32,12 +33,18 @@ func SetupPhotosRoutes(router fiber.Router, db *sql.DB, sync *photos.SyncService
 	group.Post("/reports", reports.Submit)
 	group.Get("/:id", handler.GetPhoto)
 
+	// Reports are reviewed by administrators and by the Club Photo's owners. Declared before the admin-only
+	// group, whose middleware would otherwise answer first.
+	review := router.Group("/admin/photos/reports",
+		middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail, middlewares.AdminOrRolesMiddleware(db, reportService.PhotoClubRole))
+	review.Get("", reports.List)
+	review.Get("/:id", reports.Get)
+	review.Post("/:id/decision", reports.Decide)
+	review.Post("/:id/retry", reports.Retry)
+
 	admin := router.Group("/admin/photos",
 		middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail, middlewares.AdminAuthMiddleware(db))
 	admin.Get("/sync", handler.GetSyncStatus)
 	admin.Post("/sync", handler.TriggerSync)
-	admin.Get("/reports", reports.List)
-	admin.Get("/reports/:id", reports.Get)
-	admin.Post("/reports/:id/retry", reports.Retry)
 	admin.Put("/albums/:id/club", reports.SetAlbumClub)
 }

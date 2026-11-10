@@ -75,6 +75,14 @@ export const useAdminWaitlist = (
     enabled: itemId !== undefined && (options?.enabled ?? true),
   });
 
+/** Everyone waiting, every item and slot together; refreshed every minute like the rest of the screen. */
+export const useAllWaitlists = () =>
+  useQuery({
+    queryKey: [KEY, "waitlists"],
+    queryFn: reservationApi.getAllWaitlists,
+    refetchInterval: 60_000,
+  });
+
 export const useAdminCancelReservation = () => {
   const refresh = useRefreshReservations();
   return useMutation({ mutationFn: reservationApi.cancel, onSettled: refresh });

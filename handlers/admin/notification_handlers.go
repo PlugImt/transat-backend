@@ -56,7 +56,9 @@ func (h *AdminHandler) SendNotification(c *fiber.Ctx) error {
 		"users":         recipients.Users,
 		"devices":       len(recipients.Tokens),
 		"withoutDevice": recipients.WithoutDevice,
-		"sent":          false,
+		// The same people, by name, for the panel.
+		"withoutDeviceNames": h.unreachablePeople(c.UserContext(), recipients.WithoutDevice),
+		"sent":               false,
 	}
 	if req.DryRun {
 		return c.JSON(result)

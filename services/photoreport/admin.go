@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/lib/pq"
@@ -36,6 +37,11 @@ type Report struct {
 	RecipientsSent   int        `json:"recipients_sent"`
 	RecipientsFailed int        `json:"recipients_failed"`
 	Deliveries       []Delivery `json:"deliveries,omitempty"`
+	// pending until someone decides; approved means the photo was removed, rejected that it stays.
+	Status       string     `json:"status"`
+	DecidedAt    *time.Time `json:"decided_at"`
+	DecidedBy    *string    `json:"decided_by"`
+	DecisionNote string     `json:"decision_note"`
 }
 
 type Reporter struct {
@@ -57,6 +63,7 @@ type Delivery struct {
 }
 
 type ListFilter struct {
+	Status   string // empty = all
 	Reason   string // empty = all
 	Delivery string // empty = all
 	Limit    int
@@ -82,18 +89,26 @@ const reportSelect = `
 	SELECT id_photo_reports, created_at, reason, comment, photo_id, photo_name, photo_url, photo_available,
 	       album_id, album_title, album_url, club_id, club_name,
 	       reporter_id, reporter_public_id::text, reporter_name, reporter_email, reporter_graduation_year, reporter_formation,
-	       delivery_status, total, sent, failed`
+	       delivery_status, total, sent, failed, status, decided_at, decided_by, decision_note`
 
 func scanReport(s interface{ Scan(...any) error }, extra ...any) (Report, error) {
 	var r Report
 	var album, club, year sql.NullInt64
-	var public, email sql.NullString
+	var public, email, decidedBy sql.NullString
+	var decidedAt sql.NullTime
 	dest := append([]any{&r.ID, &r.CreatedAt, &r.Reason, &r.Comment, &r.PhotoID, &r.PhotoName, &r.PhotoURL, &r.PhotoAvailable,
 		&album, &r.AlbumTitle, &r.AlbumURL, &club, &r.ClubName,
 		&r.Reporter.ID, &public, &r.Reporter.Name, &email, &year, &r.Reporter.Formation,
-		&r.DeliveryStatus, &r.Recipients, &r.RecipientsSent, &r.RecipientsFailed}, extra...)
+		&r.DeliveryStatus, &r.Recipients, &r.RecipientsSent, &r.RecipientsFailed,
+		&r.Status, &decidedAt, &decidedBy, &r.DecisionNote}, extra...)
 	if err := s.Scan(dest...); err != nil {
 		return r, err
+	}
+	if decidedAt.Valid {
+		r.DecidedAt = &decidedAt.Time
+	}
+	if decidedBy.Valid {
+		r.DecidedBy = &decidedBy.String
 	}
 	if album.Valid {
 		r.AlbumID = &album.Int64
@@ -121,9 +136,9 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]Report, int, error)
 	}
 	rows, err := s.db.QueryContext(ctx, reportSelect+`, count(*) OVER()
 		FROM r
-		WHERE ($2 = '' OR reason = $2) AND ($3 = '' OR delivery_status = $3)
+		WHERE ($2 = '' OR reason = $2) AND ($3 = '' OR delivery_status = $3) AND ($6 = '' OR status = $6)
 		ORDER BY created_at DESC, id_photo_reports DESC
-		LIMIT $4 OFFSET $5`, MaxAttempts, f.Reason, f.Delivery, f.Limit, f.Offset)
+		LIMIT $4 OFFSET $5`, MaxAttempts, f.Reason, f.Delivery, f.Limit, f.Offset, f.Status)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -190,4 +205,119 @@ func (s *Service) SetAlbumClub(ctx context.Context, albumID int64, clubID *int64
 		return ErrAlbumNotFound
 	}
 	return nil
+}
+
+// Counts gives the number of reports per status, for the tabs of the admin panel.
+func (s *Service) Counts(ctx context.Context) (map[string]int, error) {
+	out := map[string]int{"pending": 0, "approved": 0, "rejected": 0}
+	rows, err := s.db.QueryContext(ctx, `SELECT status, count(*) FROM photo_reports GROUP BY status`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var st string
+		var n int
+		if err := rows.Scan(&st, &n); err != nil {
+			return nil, err
+		}
+		out[st] = n
+	}
+	return out, rows.Err()
+}
+
+// Decision is the reviewer's answer to a report.
+type Decision string
+
+const (
+	DecisionApprove Decision = "approve"
+	DecisionReject  Decision = "reject"
+)
+
+var (
+	ErrAlreadyDecided     = errors.New("report already decided")
+	ErrRemovalUnavailable = errors.New("photo removal is not configured")
+	ErrInvalidDecision    = errors.New("invalid decision")
+)
+
+// PhotoRemover deletes a photo from Google Drive (to the drive's trash, which Drive empties after 30 days). It needs
+// a service account with write access; the photo sync's read-only account cannot do it.
+type PhotoRemover interface {
+	Trash(ctx context.Context, driveFileID string) error
+}
+
+// SetRemover enables approvals. Without it, reports can still be rejected.
+func (s *Service) SetRemover(r PhotoRemover) { s.remover = r }
+
+// CanRemove tells whether approving a report can delete its photo.
+func (s *Service) CanRemove() bool { return s.remover != nil }
+
+// Decide closes a pending report. Approving removes the photo from the Drive and hides it from the gallery at once,
+// and closes the other pending reports of the same photo with it. Rejecting leaves the photo untouched.
+func (s *Service) Decide(ctx context.Context, id int64, decision Decision, note, by string) (Report, error) {
+	note, err := CleanComment(note)
+	if err != nil {
+		return Report{}, err
+	}
+	if decision != DecisionApprove && decision != DecisionReject {
+		return Report{}, ErrInvalidDecision
+	}
+	if decision == DecisionApprove && s.remover == nil {
+		return Report{}, ErrRemovalUnavailable
+	}
+
+	var status, photoID string
+	err = s.db.QueryRowContext(ctx, `SELECT status, photo_id FROM photo_reports WHERE id_photo_reports = $1`, id).Scan(&status, &photoID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Report{}, ErrReportNotFound
+	}
+	if err != nil {
+		return Report{}, err
+	}
+	if status != "pending" {
+		return Report{}, ErrAlreadyDecided
+	}
+
+	if decision == DecisionApprove {
+		// Drive first: if it refuses, nothing is recorded and the reviewer can try again.
+		if err := s.remover.Trash(ctx, photoID); err != nil {
+			return Report{}, fmt.Errorf("remove photo from drive: %w", err)
+		}
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Report{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	newStatus := "rejected"
+	if decision == DecisionApprove {
+		newStatus = "approved"
+	}
+	res, err := tx.ExecContext(ctx, `UPDATE photo_reports SET status = $2, decided_at = now(), decided_by = $3, decision_note = $4
+		WHERE id_photo_reports = $1 AND status = 'pending'`, id, newStatus, by, note)
+	if err != nil {
+		return Report{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Report{}, ErrAlreadyDecided
+	}
+	if decision == DecisionApprove {
+		if _, err := tx.ExecContext(ctx, `UPDATE photo_reports SET status = 'approved', decided_at = now(), decided_by = $2,
+			decision_note = $3 WHERE photo_id = $1 AND status = 'pending'`,
+			photoID, by, fmt.Sprintf("Photo supprimée via le signalement #%d", id)); err != nil {
+			return Report{}, err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE photos SET deleted_at = now() WHERE drive_file_id = $1 AND deleted_at IS NULL`, photoID); err != nil {
+			return Report{}, err
+		}
+		// The gallery's response caches are keyed by this version.
+		if _, err := tx.ExecContext(ctx, `UPDATE photo_sync_state SET data_version = data_version + 1 WHERE id = 1`); err != nil {
+			return Report{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return Report{}, err
+	}
+	return s.Get(ctx, id)
 }

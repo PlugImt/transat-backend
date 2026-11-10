@@ -21,6 +21,7 @@ import (
 	photoboothHandler "github.com/plugimt/transat-backend/handlers/photobooth"
 	reportHandler "github.com/plugimt/transat-backend/handlers/photoreport"
 	restaurantHandler "github.com/plugimt/transat-backend/handlers/restaurant"
+	userHandlers "github.com/plugimt/transat-backend/handlers/user"
 	"github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/internal/config"
 	"github.com/plugimt/transat-backend/internal/database"
@@ -28,6 +29,7 @@ import (
 	"github.com/plugimt/transat-backend/routes"
 	"github.com/plugimt/transat-backend/scheduler"
 	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/services/accounts"
 	devicesService "github.com/plugimt/transat-backend/services/devices"
 	photoboothService "github.com/plugimt/transat-backend/services/photobooth"
 	"github.com/plugimt/transat-backend/services/photoreport"
@@ -176,6 +178,17 @@ func main() {
 
 	// Reports are stored before any email is sent; this job retries the ones the email service refused.
 	photoReportService := photoreport.NewService(db, emailService, os.Getenv("ADMIN_PANEL_URL"))
+	// Approving a report deletes the photo: that needs a Drive account with write access (the photo sync's is
+	// read-only). PHOTOS_WRITE_CREDENTIALS_JSON, else the photobooth's account, which manages the same drive.
+	if creds := firstEnv("PHOTOS_WRITE_CREDENTIALS_JSON", "PHOTOBOOTH_DRIVE_CREDENTIALS_JSON"); creds != "" {
+		if writer, err := photoboothService.NewDriveClient(context.Background(), creds); err != nil {
+			log.Printf("Warning: photo deletion from reports disabled: %v", err)
+		} else {
+			photoReportService.SetRemover(writer)
+		}
+	} else {
+		log.Println("Info: ℹ️ Photo deletion from reports disabled: PHOTOS_WRITE_CREDENTIALS_JSON is not set")
+	}
 	photoReports := reportHandler.NewHandler(photoReportService)
 	if _, err := c.AddFunc("@every 5m", func() {
 		if _, err := photoReportService.DeliverDue(context.Background()); err != nil {
@@ -233,6 +246,19 @@ func main() {
 
 	// API Group --- NEW ROUTES
 	routes.SetupAuthRoutes(app, db, jwtSecret, emailService, discordService)
+	// Account deletion (on request and after 5 years without activity) removes or anonymises everything of a user.
+	accountService := accounts.NewService(db, r2Service)
+	userHandlers.Accounts = accountService
+	if _, err := c.AddFunc("@daily", func() {
+		report, err := accountService.PurgeInactive(context.Background(), emailService)
+		if err != nil {
+			log.Printf("Inactive accounts job failed: %v", err)
+		} else if report.Warned > 0 || report.Deleted > 0 {
+			log.Printf("Inactive accounts: %d warned, %d deleted", report.Warned, report.Deleted)
+		}
+	}); err != nil {
+		log.Printf("Inactive accounts scheduling failed: %v", err)
+	}
 	routes.SetupUserRoutes(app, db, notificationService)
 	routes.SetupDeviceRoutes(app, devicesHandler.NewHandler(devicesService.NewService(db, deviceConfig)))
 	routes.SetupTraqRoutes(app, db)
@@ -247,10 +273,11 @@ func main() {
 	routes.SetupEventRoutes(app, db, eventHandler)
 	routes.SetupReservationRoutes(app, db, reservationDiscordService, reservationService)
 	routes.SetupBassineRoutes(app, db)
+	routes.SetupAccessRoutes(app, db)
 	routes.SetupPhotosRoutes(app, db, photosSync, photoReports)
 	routes.SetupPhotoboothRoutes(app, photobooth)
 	routes.SetupProfileRoutes(app, db, r2Service)
-	adminGroup := routes.SetupAdminRoutes(app, db, notificationService)
+	adminGroup := routes.SetupAdminRoutes(app, db, notificationService, accountService)
 	routes.SetupAdminReservationRoutes(adminGroup, db, reservationDiscordService, reservationService)
 
 	app.Get(middlewares.HealthPath, func(c *fiber.Ctx) error {
@@ -260,4 +287,14 @@ func main() {
 	// Start Server
 	log.Printf("Server starting on port %s", cfg.Port)
 	log.Fatal(app.Listen(":" + cfg.Port))
+}
+
+// firstEnv returns the first non-empty environment variable among names.
+func firstEnv(names ...string) string {
+	for _, n := range names {
+		if v := strings.TrimSpace(os.Getenv(n)); v != "" {
+			return v
+		}
+	}
+	return ""
 }

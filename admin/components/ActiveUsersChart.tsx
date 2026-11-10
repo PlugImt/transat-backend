@@ -53,20 +53,20 @@ export default function ActiveUsersChart({ data, period }: ActiveUsersChartProps
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
         <XAxis
           dataKey="date"
           tickFormatter={(d) => formatTick(d, period)}
-          stroke="#6b7280"
+          stroke="var(--chart-axis)"
           fontSize={12}
           minTickGap={24}
         />
-        <YAxis stroke="#6b7280" fontSize={12} width={40} allowDecimals={false} />
+        <YAxis stroke="var(--chart-axis)" fontSize={12} width={40} allowDecimals={false} />
         <Tooltip
           labelFormatter={(label) => formatLabel(String(label), period)}
           formatter={(value) => [value, "Utilisateurs actifs"]}
           contentStyle={{
-            backgroundColor: "#fff",
+            backgroundColor: "var(--surface)", color: "var(--ink)",
             border: "1px solid #e5e7eb",
             borderRadius: "6px",
             fontSize: "12px",

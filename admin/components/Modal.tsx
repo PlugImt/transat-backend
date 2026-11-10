@@ -9,7 +9,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  maxWidth?: "sm" | "md" | "lg" | "xl";
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "4xl";
 }
 
 export default function Modal({ isOpen, onClose, title, children, maxWidth = "md" }: ModalProps) {
@@ -18,6 +18,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = "md
     md: "sm:max-w-md",
     lg: "sm:max-w-lg",
     xl: "sm:max-w-xl",
+    "4xl": "sm:max-w-4xl",
   };
 
   return (
@@ -32,7 +33,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = "md
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </TransitionChild>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -47,7 +48,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = "md
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
               <DialogPanel
-                className={`w-full ${maxWidthClasses[maxWidth]} transform overflow-hidden rounded-lg bg-white p-4 sm:p-6 text-left align-middle shadow-xl transition-all`}
+                className={`w-full ${maxWidthClasses[maxWidth]} transform overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 text-left align-middle shadow-xl transition-all`}
               >
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <DialogTitle as="h3" className="text-lg sm:text-xl font-bold text-gray-900">

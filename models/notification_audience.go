@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -14,7 +15,14 @@ const (
 	AudienceUsers  AudienceType = "users"
 	// AudienceCohort targets a formation (FIL, FISE...), a graduation year, or both.
 	AudienceCohort AudienceType = "cohort"
+	// AudienceAppVersion targets the devices running an app older than BelowVersion (to ask them to update).
+	// Only those devices are notified, not the users' other, up-to-date devices.
+	AudienceAppVersion AudienceType = "app_version"
 )
+
+var appVersionRe = regexp.MustCompile(`^[0-9]{1,4}(\.[0-9]{1,4}){0,3}$`)
+
+var audiencePlatforms = map[string]bool{"": true, "ios": true, "android": true}
 
 var audienceCampuses = map[string]bool{"NANTES": true, "BREST": true, "RENNES": true}
 
@@ -34,6 +42,9 @@ type NotificationAudience struct {
 	Emails         []string     `json:"emails,omitempty"`
 	Formation      string       `json:"formation,omitempty"`
 	GraduationYear int          `json:"graduationYear,omitempty"`
+	// BelowVersion and Platform go with AudienceAppVersion; an empty platform means every platform.
+	BelowVersion string `json:"belowVersion,omitempty"`
+	Platform     string `json:"platform,omitempty"`
 }
 
 func (a NotificationAudience) Validate() error {
@@ -60,6 +71,13 @@ func (a NotificationAudience) Validate() error {
 		}
 		if a.GraduationYear != 0 && (a.GraduationYear < minGraduationYear || a.GraduationYear > maxGraduationYear) {
 			return fmt.Errorf("graduationYear out of range")
+		}
+	case AudienceAppVersion:
+		if !appVersionRe.MatchString(a.BelowVersion) {
+			return fmt.Errorf("audience app_version requires a belowVersion such as 2.4.0")
+		}
+		if !audiencePlatforms[strings.ToLower(a.Platform)] {
+			return fmt.Errorf("unknown platform %q", a.Platform)
 		}
 	default:
 		return fmt.Errorf("unknown audience type %q", a.Type)

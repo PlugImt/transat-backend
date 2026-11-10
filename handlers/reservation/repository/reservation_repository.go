@@ -220,14 +220,15 @@ func (r *ReservationRepository) GetCategoryList(IDCategoryParent *int, ClubID *i
 	query := "SELECT id_reservation_category, name FROM reservation_category"
 	args := []interface{}{}
 
+	// Hidden categories (and what they contain) are left out of the app.
 	if IDCategoryParent != nil {
-		query += " WHERE id_parent_category = $1;"
+		query += " WHERE id_parent_category = $1 AND id_reservation_category NOT IN (SELECT id FROM reservation_hidden_categories);"
 		args = append(args, *IDCategoryParent)
 	} else if ClubID != nil {
-		query += " WHERE id_clubs = $1 AND id_parent_category IS NULL;"
+		query += " WHERE id_clubs = $1 AND id_parent_category IS NULL AND id_reservation_category NOT IN (SELECT id FROM reservation_hidden_categories);"
 		args = append(args, *ClubID)
 	} else {
-		query += " WHERE id_parent_category IS NULL;"
+		query += " WHERE id_parent_category IS NULL AND id_reservation_category NOT IN (SELECT id FROM reservation_hidden_categories);"
 	}
 
 	rows, err := r.DB.Query(query, args...)
@@ -288,7 +289,7 @@ func (r *ReservationRepository) GetItemList(IDCategoryParent *int, ClubID *int) 
 	args := []interface{}{}
 
 	if IDCategoryParent != nil {
-		query += " WHERE re.status = 'active' AND id_reservation_category = $1;"
+		query += " WHERE re.status = 'active' AND id_reservation_category = $1 AND id_reservation_category NOT IN (SELECT id FROM reservation_hidden_categories);"
 		args = append(args, *IDCategoryParent)
 	} else if ClubID != nil {
 		query += " WHERE re.status = 'active' AND re.id_clubs = $1 AND id_reservation_category IS NULL;"
@@ -569,7 +570,8 @@ func (r *ReservationRepository) CreateReservation(item models.ReservationManagem
 	var res models.ReservationItem
 
 	var status string
-	if err := r.DB.QueryRow(`SELECT status FROM reservation_element WHERE id_reservation_element = $1`, IDItem).Scan(&status); err != nil {
+	// Inactive as well when one of its categories is hidden.
+	if err := r.DB.QueryRow(`SELECT reservation_item_status($1)`, IDItem).Scan(&status); err != nil {
 		return res, err
 	}
 	if status != "active" {
@@ -842,7 +844,7 @@ func (r *ReservationRepository) SearchItemsAndCategories(search string) ([]model
 	catQuery := `
         SELECT id_reservation_category, name
         FROM reservation_category
-        WHERE LOWER(name) LIKE $1
+        WHERE LOWER(name) LIKE $1 AND id_reservation_category NOT IN (SELECT id FROM reservation_hidden_categories)
         ORDER BY name ASC;
     `
 	catRows, err := r.DB.Query(catQuery, like)
@@ -878,7 +880,9 @@ func (r *ReservationRepository) SearchItemsAndCategories(search string) ([]model
         FROM reservation_element re
         LEFT JOIN reservation r ON r.id_reservation_element = re.id_reservation_element AND re.slot = FALSE AND r.end_date IS NULL
         LEFT JOIN newf n ON n.email = r.email
-        WHERE re.status = 'active' AND (LOWER(re.name) LIKE $1 OR LOWER(COALESCE(re.description,'')) LIKE $1 OR LOWER(COALESCE(re.location,'')) LIKE $1)
+        WHERE re.status = 'active'
+          AND (re.id_reservation_category IS NULL OR re.id_reservation_category NOT IN (SELECT id FROM reservation_hidden_categories))
+          AND (LOWER(re.name) LIKE $1 OR LOWER(COALESCE(re.description,'')) LIKE $1 OR LOWER(COALESCE(re.location,'')) LIKE $1)
         ORDER BY re.name ASC;
     `
 	itemRows, err := r.DB.Query(itemQuery, like)

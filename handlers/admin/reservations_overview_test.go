@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/plugimt/transat-backend/services/accounts"
 	"net/http"
 	"net/url"
 	"strings"
@@ -70,7 +71,7 @@ func newReservationsAPI(t *testing.T) *rsvAPI {
 	svc := reservations.New(db, ns, mail)
 	svc.SetBackground(func(f func()) { f() })
 	a.app = fiber.New()
-	adminGroup := routes.SetupAdminRoutes(a.app, db, ns)
+	adminGroup := routes.SetupAdminRoutes(a.app, db, ns, accounts.NewService(db, nil))
 	routes.SetupAdminReservationRoutes(adminGroup, db, nil, svc)
 	routes.SetupReservationRoutes(a.app, db, nil, svc)
 

@@ -134,12 +134,15 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 	utils.LogHeader("📊 Get Dashboard Statistics")
 
 	type DashboardStats struct {
-		TotalUsers      int                      `json:"totalUsers"`
-		UnverifiedUsers int                      `json:"unverifiedUsers"`
-		TotalEvents     int                      `json:"totalEvents"`
-		TotalClubs      int                      `json:"totalClubs"`
-		UserGrowth      []map[string]interface{} `json:"userGrowth"`
-		ActiveUsers     struct {
+		TotalUsers      int `json:"totalUsers"`
+		UnverifiedUsers int `json:"unverifiedUsers"`
+		TotalEvents     int `json:"totalEvents"`
+		TotalClubs      int `json:"totalClubs"`
+		// UsersWithoutNotifications: accounts with no active device that can receive a push (never allowed the
+		// notifications, refused them, or never opened the app on a phone).
+		UsersWithoutNotifications int                      `json:"usersWithoutNotifications"`
+		UserGrowth                []map[string]interface{} `json:"userGrowth"`
+		ActiveUsers               struct {
 			DAU int `json:"dau"`
 			WAU int `json:"wau"`
 			MAU int `json:"mau"`
@@ -150,10 +153,20 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 
 	var stats DashboardStats
 
-	userCountQuery := `SELECT COUNT(*) FROM newf`
+	userCountQuery := `SELECT COUNT(*) FROM newf WHERE email <> 'deleted-account@transat.invalid'`
 	err := h.db.QueryRow(userCountQuery).Scan(&stats.TotalUsers)
 	if err != nil {
 		utils.LogMessage(utils.LevelError, "Failed to get total users count")
+		utils.LogLineKeyValue(utils.LevelError, "Error", err)
+	}
+
+	if err := h.db.QueryRow(`
+		SELECT COUNT(*) FROM newf n
+		WHERE n.email <> 'deleted-account@transat.invalid'
+		  AND NOT EXISTS (SELECT 1 FROM devices d WHERE d.user_email = n.email AND d.status = 'active'
+		                  AND d.push_token IS NOT NULL AND COALESCE(d.permission_status, '') <> 'denied')`).
+		Scan(&stats.UsersWithoutNotifications); err != nil {
+		utils.LogMessage(utils.LevelError, "Failed to count users without notifications")
 		utils.LogLineKeyValue(utils.LevelError, "Error", err)
 	}
 
@@ -185,8 +198,8 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 	growthQuery := `
 		WITH dates AS (
 			SELECT generate_series(
-				(SELECT MIN(DATE(creation_date)) FROM newf),
-				(SELECT MAX(DATE(creation_date)) FROM newf),
+				(SELECT MIN(DATE(creation_date)) FROM newf WHERE email <> 'deleted-account@transat.invalid'),
+				(SELECT MAX(DATE(creation_date)) FROM newf WHERE email <> 'deleted-account@transat.invalid'),
 				interval '1 day'
 			)::date AS date
 		)
@@ -196,7 +209,7 @@ func (h *StatisticsHandler) GetDashboardStatistics(c *fiber.Ctx) error {
 			SUM(COUNT(n.*)) OVER (ORDER BY d.date ASC) as cumulativeCount
 		FROM dates d
 		LEFT JOIN newf n
-			ON DATE(n.creation_date) = d.date
+			ON DATE(n.creation_date) = d.date AND n.email <> 'deleted-account@transat.invalid'
 		GROUP BY d.date
 		ORDER BY d.date ASC;
 	`

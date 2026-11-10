@@ -9,6 +9,7 @@ interface StatsCardsProps {
   onShowOverdue: (days: 1 | 5 | 7) => void;
   onShowActive: () => void;
   onShowCancelled: () => void;
+  onShowWaitlists: () => void;
 }
 
 function Card({
@@ -50,7 +51,12 @@ function Card({
   );
 }
 
-export function StatsCards({ onShowOverdue, onShowActive, onShowCancelled }: StatsCardsProps) {
+export function StatsCards({
+  onShowOverdue,
+  onShowActive,
+  onShowCancelled,
+  onShowWaitlists,
+}: StatsCardsProps) {
   const { data } = useReservationStats();
 
   if (!data) {
@@ -98,6 +104,7 @@ export function StatsCards({ onShowOverdue, onShowActive, onShowCancelled }: Sta
         icon={<BellRing className="h-4 w-4" />}
         label="Files d'attente"
         value={data.waitlist_entries}
+        onClick={onShowWaitlists}
         hint={
           data.waitlist_awaiting_response > 0
             ? `${data.waitlist_awaiting_response} en attente de réponse`

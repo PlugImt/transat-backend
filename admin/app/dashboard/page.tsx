@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  BellOff,
   Building,
   Calendar,
   CircleAlert,
@@ -202,13 +203,24 @@ export default function DashboardPage() {
       color: "text-purple-600",
       bgColor: "bg-purple-50",
     },
+    {
+      title: "Sans notifications",
+      value: nf.format(stats?.usersWithoutNotifications || 0),
+      hint:
+        totalUsers > 0
+          ? `${pf.format(((stats?.usersWithoutNotifications || 0) / totalUsers) * 100)} % des comptes`
+          : undefined,
+      icon: BellOff,
+      color: "text-amber-600",
+      bgColor: "bg-amber-50",
+    },
   ];
 
   return (
     <div className="p-6 space-y-8">
       <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3 xl:grid-cols-5">
         {statCards.map((stat) => (
           <StatCard key={stat.title} {...stat} />
         ))}

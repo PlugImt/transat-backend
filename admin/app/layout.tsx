@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "react-hot-toast";
 import Layout from "@/components/Layout";
 import QueryProvider from "@/components/QueryProvider";
+import { themeBootScript } from "@/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,7 +33,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
+      <head>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: constant script that picks the theme before paint */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <QueryProvider>
           <Layout>{children}</Layout>
@@ -41,13 +46,14 @@ export default function RootLayout({
             toastOptions={{
               duration: 4000,
               style: {
-                background: "#363636",
-                color: "#fff",
+                background: "var(--toast-bg)",
+                color: "var(--toast-text)",
+                borderRadius: "12px",
               },
               success: {
                 duration: 3000,
                 iconTheme: {
-                  primary: "#10b981",
+                  primary: "#4ade80",
                   secondary: "#fff",
                 },
               },

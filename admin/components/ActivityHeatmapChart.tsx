@@ -19,15 +19,11 @@ const DAY_LABELS: Record<number, string> = {
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAYS = [1, 2, 3, 4, 5, 6, 7];
 
-// Interpole entre violet clair et violet soutenu selon l'intensité (0-1)
+// Mélange l'orange Transat avec le fond de la case selon l'intensité (0-1) : lisible en clair comme en sombre.
 function cellColor(ratio: number) {
-  if (ratio <= 0) return "#f3f4f6";
-  const start = { r: 237, g: 233, b: 254 };
-  const end = { r: 91, g: 33, b: 182 };
-  const r = Math.round(start.r + (end.r - start.r) * ratio);
-  const g = Math.round(start.g + (end.g - start.g) * ratio);
-  const b = Math.round(start.b + (end.b - start.b) * ratio);
-  return `rgb(${r}, ${g}, ${b})`;
+  if (ratio <= 0) return "var(--heat-empty)";
+  const pct = Math.round(15 + 85 * Math.min(1, ratio));
+  return `color-mix(in oklab, #ec7f32 ${pct}%, var(--heat-empty))`;
 }
 
 export default function ActivityHeatmapChart({ data }: ActivityHeatmapChartProps) {

@@ -51,6 +51,8 @@ export interface ClubWithResponsible extends Club {
 export interface DashboardStats {
   totalUsers: number;
   unverifiedUsers: number;
+  /** Accounts no push can reach: notifications refused, or the app never opened on a phone. */
+  usersWithoutNotifications?: number;
   totalEvents: number;
   totalClubs: number;
   userGrowth: { date: string; count: number; cumulativeCount: number }[];
@@ -192,7 +194,9 @@ export type NotificationAudience =
   | { type: "club"; clubId: number }
   | { type: "campus"; campus: string }
   | { type: "users"; emails: string[] }
-  | { type: "cohort"; formation?: string; graduationYear?: number };
+  | { type: "cohort"; formation?: string; graduationYear?: number }
+  /** Devices running an app older than belowVersion (only those devices are notified). */
+  | { type: "app_version"; belowVersion: string; platform?: "ios" | "android" };
 
 export type NotificationCategory =
   | "RESTAURANT"
@@ -213,6 +217,8 @@ export interface SendNotificationRequest {
   audience: NotificationAudience;
   service?: NotificationCategory;
   navigation?: NotificationNavigation;
+  /** Public https image shown in the notification (Android large picture, iOS attachment). */
+  imageUrl?: string;
   dryRun?: boolean;
 }
 
@@ -220,6 +226,8 @@ export interface NotificationRecipients {
   users: number;
   devices: number;
   withoutDevice: string[];
+  /** The same people as withoutDevice, by name. */
+  withoutDeviceNames?: string[];
   sent: boolean;
   // Set when the message was queued for the delivery worker; `id` follows it.
   queued?: boolean;
@@ -229,7 +237,14 @@ export interface NotificationRecipients {
 // Delivery diagnostics of one queued message: counts and codes only.
 export interface PushMessageSummary {
   id: number;
+  kind?: string;
+  category?: string;
   status: string;
+  createdBy?: string;
+  createdAt?: string;
+  completedAt?: string;
+  users?: number;
+  eligibleDevices?: number;
   deliveries: Record<string, number>;
   errors?: Record<string, number>;
 }
@@ -250,7 +265,7 @@ export interface PhotoReportReporter {
 
 export interface PhotoReportDelivery {
   email: string;
-  role: "club_owner" | "admin";
+  role: "club_owner" | "photo_club" | "admin";
   status: "pending" | "sending" | "sent" | "failed";
   attempts: number;
   sent_at: string | null;
@@ -280,16 +295,34 @@ export interface PhotoReport {
   recipients_failed: number;
   // Only on the detail response.
   deliveries?: PhotoReportDelivery[];
+  status: PhotoReportStatus;
+  decided_at: string | null;
+  decided_by: string | null;
+  decision_note: string;
 }
 
 export interface PhotoReportsPage {
   reports: PhotoReport[];
   total: number;
+  counts: Record<PhotoReportStatus, number>;
+  /** False when the server cannot delete photos from Drive: reports can then only be rejected. */
+  can_remove: boolean;
 }
 
+export type PhotoReportStatus = "pending" | "approved" | "rejected";
+
 export interface PhotoReportsFilter {
+  status?: PhotoReportStatus | "";
   reason?: PhotoReportReason | "";
   delivery?: PhotoReportDeliveryStatus | "";
   limit: number;
   offset: number;
+}
+
+export interface AppVersionStat {
+  version: string;
+  platform: "ios" | "android" | string;
+  devices: number;
+  users: number;
+  lastSeen: string | null;
 }

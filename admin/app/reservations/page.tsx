@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, FolderTree, ListChecks, Package } from "lucide-react";
+import { CalendarDays, FolderTree, Hourglass, ListChecks, Package } from "lucide-react";
 import { useState } from "react";
 import { CatalogueTab } from "@/components/reservations/CatalogueTab";
 import { CategoryTree } from "@/components/reservations/CategoryTree";
@@ -9,15 +9,17 @@ import { ItemFormModal } from "@/components/reservations/ItemFormModal";
 import { PlanningView } from "@/components/reservations/PlanningView";
 import { ReservationsList } from "@/components/reservations/ReservationsList";
 import { StatsCards } from "@/components/reservations/StatsCards";
+import { WaitlistOverview } from "@/components/reservations/WaitlistOverview";
 import { useClubs, useReservationTree } from "@/lib/hooks";
 import { useReservationCatalogue } from "@/lib/reservationHooks";
 import type { AdminItem, ReservationFilters } from "@/lib/reservationTypes";
 
-type Tab = "catalogue" | "reservations" | "planning" | "categories";
+type Tab = "catalogue" | "reservations" | "waitlists" | "planning" | "categories";
 
 const TABS: { id: Tab; label: string; icon: typeof Package }[] = [
   { id: "catalogue", label: "Catalogue", icon: Package },
   { id: "reservations", label: "Réservations", icon: ListChecks },
+  { id: "waitlists", label: "Files d'attente", icon: Hourglass },
   { id: "planning", label: "Planning", icon: CalendarDays },
   { id: "categories", label: "Catégories", icon: FolderTree },
 ];
@@ -58,6 +60,7 @@ export default function ReservationsPage() {
         onShowActive={() => showReservations({ status: "active", kind: "loan" })}
         onShowOverdue={(days) => showReservations({ status: "overdue", overdue_days: days })}
         onShowCancelled={() => showReservations({ status: "cancelled" })}
+        onShowWaitlists={() => setTab("waitlists")}
       />
 
       <div className="border-b border-gray-200">
@@ -96,6 +99,7 @@ export default function ReservationsPage() {
           onOpenItem={setDrawerItemId}
         />
       )}
+      {tab === "waitlists" && <WaitlistOverview onOpenItem={setDrawerItemId} />}
       {tab === "planning" && <PlanningView items={items} onOpenItem={setDrawerItemId} />}
       {tab === "categories" && <CategoryTree onOpenItem={setDrawerItemId} />}
 

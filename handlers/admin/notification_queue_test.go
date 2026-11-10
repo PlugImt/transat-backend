@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/plugimt/transat-backend/services/accounts"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -70,7 +71,7 @@ func newAPI(t *testing.T, withPipeline bool) *api {
 		ns.SetPipeline(a.pipeline)
 	}
 	a.app = fiber.New()
-	routes.SetupAdminRoutes(a.app, db, ns)
+	routes.SetupAdminRoutes(a.app, db, ns, accounts.NewService(db, nil))
 
 	a.exec(`INSERT INTO roles (name) VALUES ('ADMIN') ON CONFLICT (name) DO NOTHING`)
 	a.user("admin@x.test", 1)
