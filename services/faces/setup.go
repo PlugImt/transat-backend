@@ -16,7 +16,8 @@ const defaultModel = "buffalo_l"
 // FromEnv builds the service from:
 //   - FACES_ML_URL: the machine-learning container on the private network (e.g. http://face-ml.railway.internal:3003).
 //     Unset, the feature is off (the app hides it) and nothing is processed;
-//   - FACES_SCOPE_FOLDERS: comma-separated Drive folder IDs; only photos under them are scanned (all when unset);
+//   - FACES_SCOPE_FOLDERS: comma-separated Drive folder IDs; only photos under them are scanned (all when unset,
+//     production only: another Railway environment without it scans nothing);
 //   - FACES_MODEL (buffalo_l), FACES_MAX_DISTANCE (0.5), FACES_MIN_SCORE (0.7), FACES_SCAN_CONCURRENCY (2);
 //   - GOOGLE_DRIVE_CREDENTIALS_JSON, the photo sync's read-only account, to read the photos.
 //
@@ -36,6 +37,12 @@ func FromEnv(ctx context.Context, db *sql.DB) *Service {
 	}
 	if len(cfg.ScopeFolders) > 0 {
 		log.Printf("Info: ℹ️ Face recognition limited to Drive folders %v", cfg.ScopeFolders)
+	}
+	// Scanning the whole gallery is a production-only cost: any other Railway environment (dev, PR previews) must
+	// name its folders, otherwise it scans nothing.
+	if env := os.Getenv("RAILWAY_ENVIRONMENT_NAME"); env != "" && env != "production" && len(cfg.ScopeFolders) == 0 {
+		log.Printf("Warning: face recognition will not scan photos in %q: FACES_SCOPE_FOLDERS is required outside production", env)
+		cfg.ScanDisabled = true
 	}
 
 	mlURL := os.Getenv("FACES_ML_URL")
@@ -59,6 +66,9 @@ func FromEnv(ctx context.Context, db *sql.DB) *Service {
 		}
 	} else {
 		log.Println("Info: ℹ️ Face recognition will not scan photos: GOOGLE_DRIVE_CREDENTIALS_JSON is not set")
+	}
+	if cfg.ScanDisabled {
+		images = nil
 	}
 	return NewService(db, ml, images, cfg)
 }

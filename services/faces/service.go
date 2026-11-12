@@ -56,6 +56,8 @@ type Config struct {
 	// ScopeFolders limits scanning to these Drive folders and everything below them (FACES_SCOPE_FOLDERS).
 	// Empty: the whole gallery.
 	ScopeFolders []string
+	// ScanDisabled: selfies and albums still work, but no photo is scanned (see FromEnv).
+	ScanDisabled bool
 }
 
 func DefaultConfig() Config {

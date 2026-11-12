@@ -71,7 +71,8 @@ railway variable set 'FACES_ML_URL=http://${{face-ml.RAILWAY_PRIVATE_DOMAIN}}:30
 - API variables:
   - `FACES_ML_URL` (required, the feature is off without it);
   - `FACES_SCOPE_FOLDERS`: comma-separated Drive folder IDs; only photos in them and their sub-folders are
-    scanned. Unset: the whole gallery. `dev` is limited to one test folder;
+    scanned. Unset: the whole gallery, in `production` only; any other Railway environment without it scans
+    nothing (`RAILWAY_ENVIRONMENT_NAME`). `dev` is limited to one test folder;
   - optional: `FACES_MAX_DISTANCE` (0.5; lower = stricter), `FACES_MIN_SCORE` (0.7),
     `FACES_SCAN_CONCURRENCY` (2), `FACES_MODEL` (`buffalo_l`).
    - It reuses `GOOGLE_DRIVE_CREDENTIALS_JSON`, the photo sync's read-only account.
