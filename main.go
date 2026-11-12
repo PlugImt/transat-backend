@@ -31,6 +31,7 @@ import (
 	"github.com/plugimt/transat-backend/services"
 	"github.com/plugimt/transat-backend/services/accounts"
 	devicesService "github.com/plugimt/transat-backend/services/devices"
+	facesService "github.com/plugimt/transat-backend/services/faces"
 	photoboothService "github.com/plugimt/transat-backend/services/photobooth"
 	"github.com/plugimt/transat-backend/services/photoreport"
 	photosService "github.com/plugimt/transat-backend/services/photos"
@@ -158,6 +159,10 @@ func main() {
 		photosSync.Schedule(c)
 	}
 
+	// Face recognition ("my photos"): opt-in, photos read from Drive, models on the face-ml service.
+	faceService := facesService.FromEnv(context.Background(), db)
+	faceService.Start(context.Background(), 5*time.Minute)
+
 	// Photobooth: booth uploads into the Photos drive and permanent share links.
 	var photobooth *photoboothHandler.Handler
 	if svc, verifier, err := photoboothService.FromEnv(context.Background(), db); err != nil {
@@ -278,6 +283,7 @@ func main() {
 	routes.SetupBassineRoutes(app, db)
 	routes.SetupAccessRoutes(app, db)
 	routes.SetupPhotosRoutes(app, db, photosSync, photoReports)
+	routes.SetupFacesRoutes(app, db, faceService)
 	routes.SetupPhotoboothRoutes(app, photobooth)
 	routes.SetupProfileRoutes(app, db, r2Service)
 	adminGroup := routes.SetupAdminRoutes(app, db, notificationService, accountService)

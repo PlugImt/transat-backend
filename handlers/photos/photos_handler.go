@@ -311,6 +311,24 @@ func (h *PhotosHandler) GetGallery(c *fiber.Ctx) error {
 	})
 }
 
+// GetMyPhotos handles GET /photos/me?cursor=&limit=: the photos where face recognition found the caller.
+// Per user, so never in the shared cache.
+func (h *PhotosHandler) GetMyPhotos(c *fiber.Ctx) error {
+	email, _ := c.Locals("email").(string)
+	if email == "" {
+		return fail(c, fiber.StatusUnauthorized, "Unauthorized", nil)
+	}
+	cursor, err := parsePhotoCursor(c.Query("cursor"))
+	if err != nil {
+		return fail(c, fiber.StatusBadRequest, "Invalid cursor", nil)
+	}
+	limit := limitParam(c, defaultLimit, maxLimit)
+	return h.serveDirect(c, 0, func(ctx context.Context) (any, error) {
+		rows, err := h.repo.MyPhotos(ctx, email, cursor, limit+1)
+		return photosResponse(rows, limit), err
+	})
+}
+
 // GetAlbums handles GET /photos/albums?cursor=&limit= (newest event first).
 func (h *PhotosHandler) GetAlbums(c *fiber.Ctx) error {
 	cursor, err := parseAlbumCursor(c.Query("cursor"))

@@ -114,6 +114,17 @@ func (r *PhotosRepository) AlbumPhotos(ctx context.Context, albumID int64, after
 		ORDER BY p.sort_at DESC, p.drive_file_id DESC LIMIT $3`, after, limit, albumID)
 }
 
+// MyPhotos lists the gallery photos where face recognition found the user (and the user did not reject),
+// newest first. Same visibility rules as the gallery.
+func (r *PhotosRepository) MyPhotos(ctx context.Context, email string, after *PhotoCursor, limit int) ([]PhotoRow, error) {
+	return r.photos(ctx, `SELECT `+photoColumns+`
+		WHERE p.deleted_at IS NULL AND p.duplicate_of IS NULL AND p.media_type <> 'other' AND NOT p.is_cover
+		  AND EXISTS (SELECT 1 FROM face_matches m
+		              WHERE m.email = $4 AND m.drive_file_id = p.drive_file_id AND m.rejected_at IS NULL)
+		  AND ($1::timestamptz IS NULL OR (p.sort_at, p.drive_file_id) < ($1, $2))
+		ORDER BY p.sort_at DESC, p.drive_file_id DESC LIMIT $3`, after, limit, email)
+}
+
 func (r *PhotosRepository) photos(ctx context.Context, q string, after *PhotoCursor, limit int, extra ...any) ([]PhotoRow, error) {
 	var ts any
 	id := ""
