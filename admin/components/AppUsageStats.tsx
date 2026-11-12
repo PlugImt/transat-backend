@@ -15,6 +15,8 @@ import type { AppUsageStats as Stats } from "@/lib/types";
 const nf = new Intl.NumberFormat("fr-FR");
 const pf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
 
+const plural = (n: number, one: string, many: string) => `${nf.format(n)} ${n > 1 ? many : one}`;
+
 const PLATFORM_LABEL: Record<string, string> = { ios: "iOS", android: "Android" };
 const PLATFORM_COLOR: Record<string, string> = { ios: "bg-gray-800", android: "bg-green-600" };
 
@@ -63,7 +65,8 @@ function DevicesSection({ devices }: { devices: Stats["devices"] }) {
           <div className="flex items-baseline justify-between">
             <h3 className="text-base font-medium text-gray-900">iOS / Android</h3>
             <span className="text-sm text-gray-500">
-              {nf.format(total)} appareils · {nf.format(devices.users)} personnes
+              {plural(total, "appareil", "appareils")} ·{" "}
+              {plural(devices.users, "personne", "personnes")}
             </span>
           </div>
           {total === 0 ? (
@@ -95,7 +98,8 @@ function DevicesSection({ devices }: { devices: Stats["devices"] }) {
                       </span>
                       <span className="text-gray-500">
                         {" "}
-                        · {nf.format(p.devices)} appareils · {nf.format(p.users)} personnes
+                        · {plural(p.devices, "appareil", "appareils")} ·{" "}
+                        {plural(p.users, "personne", "personnes")}
                       </span>
                     </span>
                   </li>
@@ -164,7 +168,7 @@ function FacesSection({ faces }: { faces: Stats["faces"] }) {
         <Card
           title="Personnes inscrites"
           value={nf.format(faces.users_enabled)}
-          hint={`${nf.format(faces.users_with_selfie)} avec un selfie`}
+          hint={plural(faces.users_with_selfie, "avec un selfie", "avec un selfie")}
           icon={UserCheck}
           color="text-blue-600"
         />

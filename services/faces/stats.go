@@ -32,7 +32,8 @@ func (s *Service) AdminStats(ctx context.Context) (AdminStats, error) {
 		SELECT (SELECT count(*) FROM face_consents),
 		       (SELECT count(DISTINCT email) FROM face_references),
 		       (SELECT count(*) FROM face_matches WHERE rejected_at IS NOT NULL),
-		       (SELECT count(*) FROM photo_faces)`).
+		       (SELECT count(*) FROM photo_faces f JOIN photos p ON p.drive_file_id = f.drive_file_id
+		        WHERE `+inScope(1)+`)`, s.scopeParam()).
 		Scan(&st.UsersEnabled, &st.UsersWithSelfie, &st.RejectedMatches, &st.FacesFound); err != nil {
 		return st, err
 	}
