@@ -16,6 +16,7 @@ import {
 import { useMemo, useState } from "react";
 import ActiveUsersChart from "@/components/ActiveUsersChart";
 import ActivityHeatmapChart from "@/components/ActivityHeatmapChart";
+import AppUsageStats from "@/components/AppUsageStats";
 import UserGrowthChart from "@/components/UserGrowthChart";
 import {
   useActiveUsersOverTime,
@@ -412,6 +413,8 @@ export default function DashboardPage() {
           </div>
         </section>
       )}
+
+      <AppUsageStats />
 
       {apiGlobal && (
         <section>

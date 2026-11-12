@@ -397,3 +397,36 @@ func TestScanIsLimitedToScopeFolders(t *testing.T) {
 		t.Fatalf("library progress must count the scope only: %+v", st)
 	}
 }
+
+func TestAdminStats(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	for _, u := range []string{"alice@imt.fr", "bob@imt.fr", "carol@imt.fr"} {
+		e.user(u)
+	}
+	e.photo("PH-ALICE-001", 30, on(alice, 0.1), on(stranger, 0.5))
+	e.photo("PH-ALICE-002", 20, on(alice, 0.1))
+	e.photo("PH-BOB-00001", 10, on(bob, 0.1))
+	e.photo("GONE-PHOTO-1", 5, on(alice, 0.1)) // Drive has no image: skipped, counts as analysed
+	e.enrol("alice@imt.fr", alice)
+	e.enrol("bob@imt.fr", bob)
+	if err := e.svc.Consent(ctx, "carol@imt.fr", ConsentVersion); err != nil { // opted in, no selfie yet
+		t.Fatal(err)
+	}
+	e.tick()
+	if err := e.svc.Reject(ctx, "bob@imt.fr", "PH-BOB-00001"); err != nil {
+		t.Fatal(err)
+	}
+	e.photo("NEW-PHOTO-01", 1, on(alice, 0.1)) // not scanned yet
+
+	st, err := e.svc.AdminStats(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := AdminStats{Available: true, UsersEnabled: 3, UsersWithSelfie: 2, UsersWithPhotos: 1, AveragePhotosByUser: 1,
+		RejectedMatches: 1, PhotosTotal: 5, PhotosAnalysed: 4, PhotosPending: 1, FacesFound: 4}
+	st.LastScanAt = nil
+	if st != want {
+		t.Fatalf("stats\n got %+v\nwant %+v", st, want)
+	}
+}

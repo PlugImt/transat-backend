@@ -220,6 +220,14 @@ export const useDashboardStats = () => {
   });
 };
 
+export const useAppUsageStats = () => {
+  return useQuery({
+    queryKey: ["app-usage-stats"],
+    queryFn: statsApi.getAppUsage,
+    refetchInterval: 60_000,
+  });
+};
+
 export const useGlobalApiStats = () => {
   return useQuery({
     queryKey: ["api-stats-global"],

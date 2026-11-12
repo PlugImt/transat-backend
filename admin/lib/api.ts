@@ -15,6 +15,7 @@ import type {
   ActiveUsersPoint,
   ActivityHeatmapRange,
   ActivityHourPoint,
+  AppUsageStats,
   AppVersionStat,
   BassineScore,
   BassineScoreHistory,
@@ -261,6 +262,10 @@ export const statsApi = {
   getActivityHeatmap: async (range: ActivityHeatmapRange): Promise<ActivityHourPoint[]> => {
     const response = await api.get("/statistics/activity-heatmap", { params: { range } });
     return asArray<ActivityHourPoint>(response.data?.data);
+  },
+  getAppUsage: async (): Promise<AppUsageStats> => {
+    const response = await api.get("/statistics/app");
+    return response.data;
   },
 };
 

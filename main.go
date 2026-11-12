@@ -274,7 +274,7 @@ func main() {
 	routes.SetupRestaurantRoutes(app, restHandler)
 	routes.SetupClubRoutes(app, db, clubsHandler)
 	routes.SetupPlanningRoutes(app, db)
-	routes.SetupStatisticsRoutes(app, db, statisticsService)
+	routes.SetupStatisticsRoutes(app, db, statisticsService, faceService)
 	routes.SetupWashingMachineRoutes(app)
 	routes.SetupWeatherRoutes(app, weatherHandler)
 	routes.SetupBusDepartureRoutes(app, gtfsService)

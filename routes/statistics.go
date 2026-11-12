@@ -8,10 +8,11 @@ import (
 	"github.com/plugimt/transat-backend/handlers/statistics"
 	"github.com/plugimt/transat-backend/middlewares"
 	"github.com/plugimt/transat-backend/services"
+	"github.com/plugimt/transat-backend/services/faces"
 )
 
 // SetupStatisticsRoutes configures routes for statistics
-func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *services.StatisticsService) {
+func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *services.StatisticsService, faceService *faces.Service) {
 	// Initialize Statistics Handler
 	statsHandler := statistics.NewStatisticsHandler(db, statisticsService)
 
@@ -25,4 +26,6 @@ func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *s
 	statsGroup.Get("/dashboard", statsHandler.GetDashboardStatistics)
 	statsGroup.Get("/active-users", statsHandler.GetActiveUsersOverTime)
 	statsGroup.Get("/activity-heatmap", statsHandler.GetActivityHeatmap)
+	// Platforms and app versions in use, face recognition usage.
+	statsGroup.Get("/app", statistics.NewAppStatsHandler(db, faceService).Get)
 }

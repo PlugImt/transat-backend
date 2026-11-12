@@ -326,3 +326,30 @@ export interface AppVersionStat {
   users: number;
   lastSeen: string | null;
 }
+
+export interface FaceRecognitionStats {
+  available: boolean;
+  users_enabled: number;
+  users_with_selfie: number;
+  users_with_photos: number;
+  average_photos_by_user: number;
+  rejected_matches: number;
+  photos_total: number;
+  photos_analysed: number;
+  photos_failed: number;
+  photos_pending: number;
+  faces_found: number;
+  last_scan_at: string | null;
+  scoped: boolean;
+}
+
+export interface AppUsageStats {
+  devices: {
+    active_window_days: number;
+    devices: number;
+    users: number;
+    platforms: { platform: "ios" | "android"; devices: number; users: number }[];
+    versions: { platform: "ios" | "android"; version: string; devices: number; users: number }[];
+  };
+  faces: FaceRecognitionStats;
+}
