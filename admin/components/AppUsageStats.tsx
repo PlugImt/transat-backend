@@ -164,7 +164,7 @@ function FacesSection({ faces }: { faces: Stats["faces"] }) {
             ? "Analyse limitée aux dossiers de test (FACES_SCOPE_FOLDERS)."
             : "Analyse de toute la galerie."}
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-6 mb-6">
         <Card
           title="Personnes inscrites"
           value={nf.format(faces.users_enabled)}
