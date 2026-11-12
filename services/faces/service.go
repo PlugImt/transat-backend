@@ -13,8 +13,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // ConsentVersion identifies the consent text the app shows. Changing the text means bumping it: users who agreed
@@ -50,6 +53,9 @@ type Config struct {
 	ScanBatch       int
 	ScanConcurrency int
 	TickBudget      time.Duration
+	// ScopeFolders limits scanning to these Drive folders and everything below them (FACES_SCOPE_FOLDERS).
+	// Empty: the whole gallery.
+	ScopeFolders []string
 }
 
 func DefaultConfig() Config {
@@ -100,6 +106,25 @@ type Status struct {
 // eligiblePhotos is the gallery's own visibility rule, restricted to images with a thumbnail.
 const eligiblePhotos = `p.deleted_at IS NULL AND p.duplicate_of IS NULL AND p.media_type = 'image' AND NOT p.is_cover AND p.has_thumbnail`
 
+// inScope keeps the photos under the configured folders, given as the text[] parameter n (NULL: no limit).
+func inScope(n int) string {
+	return fmt.Sprintf(`($%[1]d::text[] IS NULL OR p.folder_id IN (
+		WITH RECURSIVE tree AS (
+			SELECT drive_folder_id FROM photo_folders WHERE drive_folder_id = ANY($%[1]d) AND deleted_at IS NULL
+			UNION
+			SELECT f.drive_folder_id FROM photo_folders f JOIN tree t ON f.parent_drive_id = t.drive_folder_id
+			WHERE f.deleted_at IS NULL)
+		SELECT drive_folder_id FROM tree))`, n)
+}
+
+// scopeParam is the parameter inScope expects.
+func (s *Service) scopeParam() any {
+	if len(s.cfg.ScopeFolders) == 0 {
+		return nil
+	}
+	return pq.Array(s.cfg.ScopeFolders)
+}
+
 func (s *Service) Status(ctx context.Context, email string) (Status, error) {
 	st := Status{Available: s.Available(), CurrentConsentVersion: ConsentVersion, MaxReferences: MaxReferences}
 	var version sql.NullString
@@ -131,7 +156,7 @@ func (s *Service) Status(ctx context.Context, email string) (Status, error) {
 		if err := s.db.QueryRowContext(ctx, `
 			SELECT count(*), count(s.drive_file_id) FROM photos p
 			LEFT JOIN face_photo_scans s ON s.drive_file_id = p.drive_file_id AND s.model = $1 AND s.status <> 'failed'
-			WHERE `+eligiblePhotos, model).Scan(&st.LibraryTotal, &st.LibraryScanned); err != nil {
+			WHERE `+eligiblePhotos+` AND `+inScope(2), model, s.scopeParam()).Scan(&st.LibraryTotal, &st.LibraryScanned); err != nil {
 			return st, err
 		}
 	}

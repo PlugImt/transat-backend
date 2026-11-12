@@ -51,19 +51,31 @@ flowchart LR
 
 ## 3. Deploying on Railway
 
-1. **New service `face-ml`** in the same project/environment as the API: *GitHub repo* `transat-backend`,
-   *Root directory* `deploy/face-ml` (it builds `deploy/face-ml/Dockerfile`, health check `/ping`).
-   - Add a **volume** mounted on `/cache`, about 1 GB, so the models are downloaded only once.
-   - **Do not** generate a public domain: the service is only reachable on the private network.
-   - Resources: measured ~400 MB RAM with buffalo_l loaded (allow 1 GB), 1–2 vCPU. Models (~415 MB) unload
-     after 10 idle minutes (`MACHINE_LEARNING_MODEL_TTL`).
-   - The image is pinned to `IMMICH_VERSION=v3.4.0`, the version the real-model test passed with.
-2. **API service variables**:
-   - `FACES_ML_URL=http://${{face-ml.RAILWAY_PRIVATE_DOMAIN}}:3003`
-   - optional: `FACES_MAX_DISTANCE` (0.5; lower = stricter), `FACES_MIN_SCORE` (0.7),
-     `FACES_SCAN_CONCURRENCY` (2), `FACES_MODEL` (`buffalo_l`).
+The `face-ml` service runs the public image directly; nothing to build. Set up on `dev` with the Railway CLI
+(from a directory linked to the target environment with `railway link --project <id> --environment <id>`):
+
+```
+railway add --service face-ml --image ghcr.io/immich-app/immich-machine-learning:v3.4.0 \
+  --variables "IMMICH_HOST=::" --variables "IMMICH_PORT=3003" \
+  --variables "MACHINE_LEARNING_CACHE_FOLDER=/cache" --variables "MACHINE_LEARNING_WORKERS=1" \
+  --variables "MACHINE_LEARNING_MODEL_TTL=600"
+railway volume --service face-ml add --mount-path /cache
+railway variable set 'FACES_ML_URL=http://${{face-ml.RAILWAY_PRIVATE_DOMAIN}}:3003' \
+  'FACES_SCOPE_FOLDERS=<drive folder id>' --service "Transat API"
+```
+
+- No public domain: the service is only reachable on the private network.
+- The image is pinned to v3.4.0, the version the real-model test passed with. Bump it only after re-running it.
+- Resources: measured ~400 MB RAM with buffalo_l loaded, 1–2 vCPU while scanning. Models (~415 MB, in the
+  `/cache` volume) unload after 10 idle minutes (`MACHINE_LEARNING_MODEL_TTL`).
+- API variables:
+  - `FACES_ML_URL` (required, the feature is off without it);
+  - `FACES_SCOPE_FOLDERS`: comma-separated Drive folder IDs; only photos in them and their sub-folders are
+    scanned. Unset: the whole gallery. `dev` is limited to one test folder;
+  - optional: `FACES_MAX_DISTANCE` (0.5; lower = stricter), `FACES_MIN_SCORE` (0.7),
+    `FACES_SCAN_CONCURRENCY` (2), `FACES_MODEL` (`buffalo_l`).
    - It reuses `GOOGLE_DRIVE_CREDENTIALS_JSON`, the photo sync's read-only account.
-3. Deploy the API: migration `00052_faces.sql` creates the tables (plain Postgres, no extension needed).
+- Deploy the API: migration `00052_faces.sql` creates the tables (plain Postgres, no extension needed).
 
 Unset `FACES_ML_URL` and the feature is off: `GET /faces` answers `available: false` and the app hides it.
 

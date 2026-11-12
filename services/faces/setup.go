@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,7 @@ const defaultModel = "buffalo_l"
 // FromEnv builds the service from:
 //   - FACES_ML_URL: the machine-learning container on the private network (e.g. http://face-ml.railway.internal:3003).
 //     Unset, the feature is off (the app hides it) and nothing is processed;
+//   - FACES_SCOPE_FOLDERS: comma-separated Drive folder IDs; only photos under them are scanned (all when unset);
 //   - FACES_MODEL (buffalo_l), FACES_MAX_DISTANCE (0.5), FACES_MIN_SCORE (0.7), FACES_SCAN_CONCURRENCY (2);
 //   - GOOGLE_DRIVE_CREDENTIALS_JSON, the photo sync's read-only account, to read the photos.
 //
@@ -25,6 +27,15 @@ func FromEnv(ctx context.Context, db *sql.DB) *Service {
 	cfg.MinFaceScore = envFloat("FACES_MIN_SCORE", cfg.MinFaceScore)
 	if n, err := strconv.Atoi(os.Getenv("FACES_SCAN_CONCURRENCY")); err == nil && n > 0 && n <= 16 {
 		cfg.ScanConcurrency = n
+	}
+
+	for _, id := range strings.Split(os.Getenv("FACES_SCOPE_FOLDERS"), ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			cfg.ScopeFolders = append(cfg.ScopeFolders, id)
+		}
+	}
+	if len(cfg.ScopeFolders) > 0 {
+		log.Printf("Info: ℹ️ Face recognition limited to Drive folders %v", cfg.ScopeFolders)
 	}
 
 	mlURL := os.Getenv("FACES_ML_URL")

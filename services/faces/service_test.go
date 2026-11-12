@@ -361,3 +361,39 @@ func TestOnlyOneWorkerRunsAtATime(t *testing.T) {
 	}
 	_, _ = conn.ExecContext(context.Background(), unlockSQL, advisoryLockKey)
 }
+
+func TestScanIsLimitedToScopeFolders(t *testing.T) {
+	e := setup(t)
+	e.svc.cfg.ScopeFolders = []string{"ROOT-TEST-FOLDER"}
+	folder := func(id, parent string) {
+		e.exec(`INSERT INTO photo_folders (drive_folder_id, parent_drive_id, name, effective_name, web_url, kind, rule,
+			confidence, status, classifier_version, last_seen_run)
+			VALUES ($1, NULLIF($2, ''), $1, $1, 'u', 'event', 'R', 1, 'ok', 1, 1)`, id, parent)
+	}
+	folder("ROOT-TEST-FOLDER", "")
+	folder("EVENT-IN-SCOPE", "ROOT-TEST-FOLDER")
+	folder("OTHER-FOLDER-1", "")
+	e.photo("IN-SCOPE-PH1", 3, on(alice, 0.1))
+	e.photo("DEEP-SCOPE-P2", 2, on(alice, 0.1))
+	e.photo("OUT-SCOPE-PH", 1, on(alice, 0.1))
+	e.photo("NO-FOLDER-PH", 4, on(alice, 0.1))
+	e.exec(`UPDATE photos SET folder_id = 'ROOT-TEST-FOLDER' WHERE drive_file_id = 'IN-SCOPE-PH1'`)
+	e.exec(`UPDATE photos SET folder_id = 'EVENT-IN-SCOPE' WHERE drive_file_id = 'DEEP-SCOPE-P2'`)
+	e.exec(`UPDATE photos SET folder_id = 'OTHER-FOLDER-1' WHERE drive_file_id = 'OUT-SCOPE-PH'`)
+
+	if st := e.tick(); st.Scanned != 2 {
+		t.Fatalf("scanned %d photos, want the 2 under the scope folder: %+v", st.Scanned, st)
+	}
+	if n := e.count(`SELECT count(*) FROM face_photo_scans WHERE drive_file_id IN ('OUT-SCOPE-PH', 'NO-FOLDER-PH')`); n != 0 {
+		t.Fatalf("%d photos outside the scope were scanned", n)
+	}
+	e.user("alice@imt.fr")
+	e.enrol("alice@imt.fr", alice)
+	st, err := e.svc.Status(context.Background(), "alice@imt.fr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.LibraryTotal != 2 || st.LibraryScanned != 2 {
+		t.Fatalf("library progress must count the scope only: %+v", st)
+	}
+}

@@ -113,11 +113,11 @@ func (s *Service) scanBatch(ctx context.Context, stats *TickStats) (int, error) 
 		SELECT p.drive_file_id, p.md5, COALESCE(sc.attempts, 0), sc.status = 'failed' AND sc.model = $1 AND sc.md5 = p.md5
 		FROM photos p
 		LEFT JOIN face_photo_scans sc ON sc.drive_file_id = p.drive_file_id
-		WHERE `+eligiblePhotos+`
+		WHERE `+eligiblePhotos+` AND `+inScope(4)+`
 		  AND (sc.drive_file_id IS NULL OR sc.model <> $1 OR sc.md5 <> p.md5
 		       OR (sc.status = 'failed' AND sc.attempts < $3 AND sc.scanned_at < now() - interval '1 hour'))
 		ORDER BY sc.drive_file_id IS NULL DESC, p.sort_at DESC, p.drive_file_id
-		LIMIT $2`, model, s.cfg.ScanBatch, maxScanAttempts)
+		LIMIT $2`, model, s.cfg.ScanBatch, maxScanAttempts, s.scopeParam())
 	if err != nil {
 		return 0, err
 	}
