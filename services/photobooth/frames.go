@@ -117,7 +117,9 @@ func validateFrameLayouts(layouts []FrameLayout) error {
 
 // CreateFrameSession opens an upload link for the booth's layouts. Older links of the same booth stay valid until
 // they expire.
-func (s *Service) CreateFrameSession(ctx context.Context, device, eventName string, layouts []FrameLayout) (FrameSession, error) {
+// eventID names the admin-panel event the booth is showing (0 when the event exists only on the booth): the frames
+// sent to the link are then also filed in that event. An unknown id is ignored, the link still works.
+func (s *Service) CreateFrameSession(ctx context.Context, device, eventName string, eventID int64, layouts []FrameLayout) (FrameSession, error) {
 	name := CleanEventName(eventName)
 	if name == "" {
 		return FrameSession{}, invalid("event name is required")
@@ -138,8 +140,9 @@ func (s *Service) CreateFrameSession(ctx context.Context, device, eventName stri
 	}
 	expires := s.now().Add(FrameSessionTTL)
 	var id int64
-	if err := s.db.QueryRowContext(ctx, `INSERT INTO photobooth_frame_sessions (device_key_id, token, event_name, layouts, expires_at)
-		VALUES ($1, $2, $3, $4, $5) RETURNING id`, device, token, name, raw, expires).Scan(&id); err != nil {
+	if err := s.db.QueryRowContext(ctx, `INSERT INTO photobooth_frame_sessions (device_key_id, token, event_name, layouts, expires_at, event_id)
+		VALUES ($1, $2, $3, $4, $5, (SELECT id FROM photobooth_events WHERE id = $6)) RETURNING id`,
+		device, token, name, raw, expires, eventID).Scan(&id); err != nil {
 		return FrameSession{}, err
 	}
 	return FrameSession{ID: id, URL: s.shareBaseURL + "/frames/" + token, ExpiresAt: expires}, nil
@@ -191,30 +194,32 @@ func (s *Service) CloseFrameSession(ctx context.Context, device string, sessionI
 	return err
 }
 
-func (s *Service) openFrameSession(ctx context.Context, token string) (int64, PublicFrameSession, error) {
+// openFrameSession returns a live link's id, the admin-panel event it files frames in (0 if none) and its page.
+func (s *Service) openFrameSession(ctx context.Context, token string) (int64, int64, PublicFrameSession, error) {
 	var out PublicFrameSession
 	if !shareTokenRe.MatchString(token) {
-		return 0, out, errNotFound
+		return 0, 0, out, errNotFound
 	}
 	var id int64
+	var eventID sql.NullInt64
 	var raw []byte
-	err := s.db.QueryRowContext(ctx, `SELECT id, event_name, layouts, expires_at FROM photobooth_frame_sessions
-		WHERE token = $1 AND expires_at > $2`, token, s.now()).Scan(&id, &out.EventName, &raw, &out.ExpiresAt)
+	err := s.db.QueryRowContext(ctx, `SELECT id, event_id, event_name, layouts, expires_at FROM photobooth_frame_sessions
+		WHERE token = $1 AND expires_at > $2`, token, s.now()).Scan(&id, &eventID, &out.EventName, &raw, &out.ExpiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, out, errNotFound
+		return 0, 0, out, errNotFound
 	}
 	if err != nil {
-		return 0, out, err
+		return 0, 0, out, err
 	}
 	if err := json.Unmarshal(raw, &out.Layouts); err != nil {
-		return 0, out, err
+		return 0, 0, out, err
 	}
-	return id, out, nil
+	return id, eventID.Int64, out, nil
 }
 
 // PublicFrameSession is the upload page's view of a live link.
 func (s *Service) PublicFrameSession(ctx context.Context, token string) (PublicFrameSession, error) {
-	id, out, err := s.openFrameSession(ctx, token)
+	id, _, out, err := s.openFrameSession(ctx, token)
 	if err != nil {
 		return out, err
 	}
@@ -235,9 +240,10 @@ func (s *Service) PublicFrameSession(ctx context.Context, token string) (PublicF
 	return out, rows.Err()
 }
 
-// UploadFrame stores the frame of one layout: a PNG with the layout's shape (any size; the booth scales it).
+// UploadFrame stores the frame of one layout: a PNG with the layout's shape (any size; the booth scales it). A link
+// opened for an admin-panel event also files it in that event.
 func (s *Service) UploadFrame(ctx context.Context, token, layoutType string, data []byte) (FrameUpload, error) {
-	id, session, err := s.openFrameSession(ctx, token)
+	id, eventID, session, err := s.openFrameSession(ctx, token)
 	if err != nil {
 		return FrameUpload{}, err
 	}
@@ -250,6 +256,25 @@ func (s *Service) UploadFrame(ctx context.Context, token, layoutType string, dat
 	if layout == nil {
 		return FrameUpload{}, errNotFound
 	}
+	u, err := checkFrame(*layout, data)
+	if err != nil {
+		return FrameUpload{}, err
+	}
+	err = s.db.QueryRowContext(ctx, `INSERT INTO photobooth_frame_uploads (session_id, layout_type, png, sha256, width, height)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (session_id, layout_type) DO UPDATE
+		SET png = EXCLUDED.png, sha256 = EXCLUDED.sha256, width = EXCLUDED.width, height = EXCLUDED.height, uploaded_at = now()
+		RETURNING uploaded_at`, id, layoutType, data, u.SHA256, u.Width, u.Height).Scan(&u.UploadedAt)
+	if err != nil || eventID == 0 {
+		return u, err
+	}
+	// The link only offers the layouts switched on at the booth: a layout new to the event starts switched on.
+	_, err = s.storeEventFrame(ctx, eventID, u, data, true)
+	return u, err
+}
+
+// checkFrame accepts a PNG with the layout's shape, at least half its size; the booth scales it to the canvas.
+func checkFrame(layout FrameLayout, data []byte) (FrameUpload, error) {
 	if len(data) > MaxFrameBytes {
 		return FrameUpload{}, errFrameTooLarge
 	}
@@ -270,13 +295,7 @@ func (s *Service) UploadFrame(ctx context.Context, token, layoutType string, dat
 		return FrameUpload{}, invalid("the image is too large: export it at %d×%d px", layout.Width, layout.Height)
 	}
 	sum := sha256.Sum256(data)
-	u := FrameUpload{LayoutType: layoutType, SHA256: hex.EncodeToString(sum[:]), Width: cfg.Width, Height: cfg.Height, Size: len(data)}
-	err = s.db.QueryRowContext(ctx, `INSERT INTO photobooth_frame_uploads (session_id, layout_type, png, sha256, width, height)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (session_id, layout_type) DO UPDATE
-		SET png = EXCLUDED.png, sha256 = EXCLUDED.sha256, width = EXCLUDED.width, height = EXCLUDED.height, uploaded_at = now()
-		RETURNING uploaded_at`, id, layoutType, data, u.SHA256, cfg.Width, cfg.Height).Scan(&u.UploadedAt)
-	return u, err
+	return FrameUpload{LayoutType: layout.Type, SHA256: hex.EncodeToString(sum[:]), Width: cfg.Width, Height: cfg.Height, Size: len(data)}, nil
 }
 
 // PurgeFrameSessions removes links (and their images) an hour after they expired, the booth having had time to

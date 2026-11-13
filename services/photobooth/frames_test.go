@@ -32,7 +32,7 @@ func testLayouts() []FrameLayout {
 func TestFramesTravelFromTheLinkToTheBooth(t *testing.T) {
 	svc, _ := setup(t)
 	ctx := context.Background()
-	session, err := svc.CreateFrameSession(ctx, "booth-1", "Soirée Égypte", testLayouts())
+	session, err := svc.CreateFrameSession(ctx, "booth-1", "Soirée Égypte", 0, testLayouts())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,14 +100,14 @@ func TestFrameSessionsRejectBadGeometry(t *testing.T) {
 	ctx := context.Background()
 	bad := testLayouts()
 	bad[0].Photos[0].W = 5000
-	if _, err := svc.CreateFrameSession(ctx, "booth-1", "Gala", bad); status(err) != 400 {
+	if _, err := svc.CreateFrameSession(ctx, "booth-1", "Gala", 0, bad); status(err) != 400 {
 		t.Fatalf("zone outside the canvas: %v", err)
 	}
 	dup := append(testLayouts(), testLayouts()[0])
-	if _, err := svc.CreateFrameSession(ctx, "booth-1", "Gala", dup); status(err) != 400 {
+	if _, err := svc.CreateFrameSession(ctx, "booth-1", "Gala", 0, dup); status(err) != 400 {
 		t.Fatalf("repeated layout: %v", err)
 	}
-	if _, err := svc.CreateFrameSession(ctx, "booth-1", "  ", testLayouts()); status(err) != 400 {
+	if _, err := svc.CreateFrameSession(ctx, "booth-1", "  ", 0, testLayouts()); status(err) != 400 {
 		t.Fatalf("no event name: %v", err)
 	}
 }

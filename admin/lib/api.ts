@@ -32,6 +32,10 @@ import type {
   PhotoAlbumsFilter,
   PhotoAlbumsPage,
   PhotoboothApproveResult,
+  PhotoboothEvent,
+  PhotoboothEventFrame,
+  PhotoboothEventSettings,
+  PhotoboothLayoutCatalog,
   PhotoboothPendingFolder,
   PhotoboothPendingPicture,
   PhotoReport,
@@ -645,6 +649,53 @@ export const photoboothReviewApi = {
   },
   picturePath: (id: number, size: "thumb" | "preview") =>
     `/admin/photobooth/pictures/${id}?size=${size}`,
+};
+
+/** Events prepared for the photobooth: the booths download their settings, layouts and frames. */
+export const photoboothEventsApi = {
+  catalog: async (): Promise<PhotoboothLayoutCatalog> => {
+    const response = await api.get<PhotoboothLayoutCatalog>("/admin/photobooth/layouts");
+    return response.data;
+  },
+  list: async (): Promise<PhotoboothEvent[]> => {
+    const response = await api.get<PhotoboothEvent[]>("/admin/photobooth/events");
+    return response.data ?? [];
+  },
+  create: async (settings: PhotoboothEventSettings): Promise<PhotoboothEvent> => {
+    const response = await api.post<PhotoboothEvent>("/admin/photobooth/events", settings);
+    return response.data;
+  },
+  update: async (id: number, settings: PhotoboothEventSettings): Promise<PhotoboothEvent> => {
+    const response = await api.put<PhotoboothEvent>(`/admin/photobooth/events/${id}`, settings);
+    return response.data;
+  },
+  remove: async (id: number) => {
+    await api.delete(`/admin/photobooth/events/${id}`);
+  },
+  /** Sends the frame (PNG) of one layout. */
+  uploadFrame: async (id: number, type: string, file: File): Promise<PhotoboothEventFrame> => {
+    const form = new FormData();
+    form.append("file", file, "frame.png");
+    const token = localStorage.getItem("adminToken");
+    const url = new URL(
+      `admin/photobooth/events/${id}/frames/${encodeURIComponent(type)}`,
+      `${API_BASE_URL.replace(/\/+$/, "")}/`,
+    );
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error ?? "L'envoi du fond a échoué");
+    return data as PhotoboothEventFrame;
+  },
+  removeFrame: async (id: number, type: string) => {
+    await api.delete(`/admin/photobooth/events/${id}/frames/${encodeURIComponent(type)}`);
+  },
+  /** For fetchAuthorizedImage; the hash only defeats the browser cache when the frame changes. */
+  framePath: (id: number, type: string, sha256: string) =>
+    `/admin/photobooth/events/${id}/frames/${encodeURIComponent(type)}?v=${sha256.slice(0, 12)}`,
 };
 
 /** Albums created from the Photos Drive: list them, hide or show them in the app and on transat.dev. */

@@ -14,8 +14,10 @@ import (
 const maxFrameSessionJSON = 64 << 10
 
 type frameSessionBody struct {
-	EventName string           `json:"event_name"`
-	Layouts   []pb.FrameLayout `json:"layouts"`
+	EventName string `json:"event_name"`
+	// EventID is the admin-panel event the booth shows, when it came from there.
+	EventID int64            `json:"event_id"`
+	Layouts []pb.FrameLayout `json:"layouts"`
 }
 
 // CreateFrameSession handles POST /photobooth/booth/frame-sessions: a link for the QR code of the admin panel.
@@ -27,7 +29,7 @@ func (h *Handler) CreateFrameSession(c *fiber.Ctx) error {
 	if err := json.Unmarshal(c.Body(), &b); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid JSON body"})
 	}
-	session, err := h.svc.CreateFrameSession(c.UserContext(), device(c), b.EventName, b.Layouts)
+	session, err := h.svc.CreateFrameSession(c.UserContext(), device(c), b.EventName, b.EventID, b.Layouts)
 	if err != nil {
 		return fail(c, err)
 	}

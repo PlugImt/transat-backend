@@ -27,6 +27,16 @@ func SetupPhotoboothRoutes(router fiber.Router, db *sql.DB, h *photoboothHandler
 	review.Post("/pending/:folder/approve", h.Approve)
 	review.Get("/pictures/:id", h.PendingPicture)
 	review.Delete("/pictures/:id", h.DeletePendingPicture)
+	// Events prepared for the booths: settings, layouts switched on, frames.
+	review.Get("/layouts", h.LayoutCatalog)
+	review.Get("/events", h.ListEvents)
+	review.Post("/events", h.CreateEvent)
+	review.Get("/events/:id", h.GetEvent)
+	review.Put("/events/:id", h.UpdateEvent)
+	review.Delete("/events/:id", h.DeleteEvent)
+	review.Get("/events/:id/frames/:type", h.EventFrame)
+	review.Put("/events/:id/frames/:type", h.UploadEventFrame)
+	review.Delete("/events/:id/frames/:type", h.DeleteEventFrame)
 
 	perBooth := limiter.New(limiter.Config{
 		Max:          600,
@@ -48,6 +58,10 @@ func SetupPhotoboothRoutes(router fiber.Router, db *sql.DB, h *photoboothHandler
 	booth.Get("/frame-sessions/:id", h.FrameSessionStatus)
 	booth.Get("/frame-sessions/:id/frames/:type", h.FrameImage)
 	booth.Delete("/frame-sessions/:id", h.CloseFrameSession)
+	// Events prepared in the admin panel, and the booth's layout catalog the panel draws templates from.
+	booth.Get("/events", h.BoothEvents)
+	booth.Get("/events/:id/frames/:type", h.EventFrame)
+	booth.Put("/layouts", h.PublishLayouts)
 
 	// Every visitor may come through the same proxy address: limit per link, not per address.
 	perShare := limiter.New(limiter.Config{

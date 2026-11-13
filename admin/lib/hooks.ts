@@ -15,6 +15,7 @@ import {
   menuApi,
   notificationsApi,
   photoAlbumsApi,
+  photoboothEventsApi,
   photoboothReviewApi,
   photoReportsApi,
   reservationApi,
@@ -32,6 +33,7 @@ import type {
   NotificationAudience,
   NotificationCategory,
   PhotoAlbumsFilter,
+  PhotoboothEventSettings,
   PhotoReportsFilter,
   SendNotificationRequest,
   TraqArticle,
@@ -680,6 +682,41 @@ export const useDeletePhotoboothPicture = () => {
       queryClient.invalidateQueries({ queryKey: ["photobooth-pending"] });
       queryClient.invalidateQueries({ queryKey: ["photobooth-pictures"] });
     },
+  });
+};
+
+// Photobooth events hooks
+export const usePhotoboothCatalog = () =>
+  useQuery({ queryKey: ["photobooth-catalog"], queryFn: photoboothEventsApi.catalog });
+
+export const usePhotoboothEvents = () =>
+  useQuery({ queryKey: ["photobooth-events"], queryFn: photoboothEventsApi.list });
+
+export const useSavePhotoboothEvent = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, settings }: { id: number | null; settings: PhotoboothEventSettings }) =>
+      id === null ? photoboothEventsApi.create(settings) : photoboothEventsApi.update(id, settings),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["photobooth-events"] }),
+  });
+};
+
+export const useDeletePhotoboothEvent = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: photoboothEventsApi.remove,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["photobooth-events"] }),
+  });
+};
+
+export const usePhotoboothFrame = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, type, file }: { id: number; type: string; file: File | null }) =>
+      file
+        ? photoboothEventsApi.uploadFrame(id, type, file).then(() => undefined)
+        : photoboothEventsApi.removeFrame(id, type),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["photobooth-events"] }),
   });
 };
 

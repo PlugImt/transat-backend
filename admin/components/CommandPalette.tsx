@@ -191,6 +191,14 @@ function CommandPalette() {
         action: () => router.push("/photobooth"),
         keywords: ["photobooth", "photos", "validation", "soirée", "approuver"],
       },
+      {
+        id: "nav-photobooth-events",
+        label: "Soirées photobooth",
+        description: "Préparer les événements, collages et fonds des tablettes du photobooth",
+        icon: Camera,
+        action: () => router.push("/photobooth/events"),
+        keywords: ["photobooth", "événement", "collage", "fond", "cadre", "gabarit", "tablette"],
+      },
 
       // Actions
       {

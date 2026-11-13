@@ -385,6 +385,64 @@ export interface PhotoboothApproveResult {
   moved: number;
 }
 
+/** A rectangle of a photobooth layout, in canvas pixels; shot numbers the photo shown in it (1 = first). */
+export interface PhotoboothZone {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  shot?: number;
+}
+
+/** One layout ("collage") as the booth's app prints it, published by the booths. */
+export interface PhotoboothLayout {
+  type: string;
+  title: string;
+  width: number;
+  height: number;
+  title_zone?: PhotoboothZone;
+  photos: PhotoboothZone[];
+  enabled_by_default: boolean;
+}
+
+export type PhotoboothAspect = "RATIO_4_3" | "RATIO_3_2" | "RATIO_16_9";
+
+export interface PhotoboothLayoutCatalog {
+  aspects: Partial<Record<PhotoboothAspect, PhotoboothLayout[]>>;
+  updated_at: string | null;
+  device?: string;
+}
+
+export interface PhotoboothEventSettings {
+  name: string;
+  date: string; // yyyy-mm-dd
+  photo_aspect: PhotoboothAspect;
+  countdown_seconds: number;
+  max_prints_per_session: number;
+  allow_retakes: boolean;
+  digital_share: boolean;
+  attract_slideshow: boolean;
+  mirror_live_preview: boolean;
+  enabled_layouts: string[];
+}
+
+export interface PhotoboothEventFrame {
+  sha256: string;
+  width: number;
+  height: number;
+  size: number;
+  uploaded_at: string;
+}
+
+export interface PhotoboothEvent extends PhotoboothEventSettings {
+  id: number;
+  /** Layouts ever touched: switched on, or holding a frame. */
+  layouts: { type: string; enabled: boolean; frame: PhotoboothEventFrame | null }[];
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Photo albums (auto-created from the Photos Drive)
 export type PhotoAlbumStatus = "shown" | "hidden" | "review";
 
