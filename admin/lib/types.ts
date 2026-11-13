@@ -425,3 +425,15 @@ export interface PhotoAlbumsFilter {
   status: PhotoAlbumStatus | "";
   page: number;
 }
+
+/** One batch of approving every pending photo report. */
+export interface ApproveAllResult {
+  /** Photos removed from Drive and the app in this batch. */
+  photos: number;
+  /** Reports closed in this batch (a photo's other reports close with it). */
+  approved: number;
+  /** Reports Drive refused: still pending, to skip in the next batches. */
+  failed: number[];
+  /** Pending reports still to do; call again while above zero. */
+  remaining: number;
+}

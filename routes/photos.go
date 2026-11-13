@@ -69,6 +69,7 @@ func SetupPhotosRoutes(router fiber.Router, db *sql.DB, sync *photos.SyncService
 	review := router.Group("/admin/photos/reports",
 		middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail, middlewares.AdminOrRolesMiddleware(db, reportService.PhotoManagerRoles...))
 	review.Get("", reports.List)
+	review.Post("/approve-all", reports.ApproveAll)
 	review.Get("/:id", reports.Get)
 	review.Post("/:id/decision", reports.Decide)
 	review.Post("/:id/retry", reports.Retry)

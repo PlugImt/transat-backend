@@ -361,3 +361,20 @@ func TestPhotoManagersReviewReportsAndReceiveThem(t *testing.T) {
 		t.Fatalf("club link as photo manager: %d", r.status)
 	}
 }
+
+func TestApproveAllIsForReviewersOnly(t *testing.T) {
+	a := newAPI(t)
+	a.report("student@x.test", "appears_in_photo", "c")
+	for who, want := range map[string]int{"": 401, "student@x.test": 403} {
+		if got := a.call(http.MethodPost, "/admin/photos/reports/approve-all", who, map[string]any{}); got.status != want {
+			t.Fatalf("approve-all as %q: %d, want %d", who, got.status, want)
+		}
+	}
+	// No Drive writer configured in this API: the reviewer is told, nothing is decided.
+	if got := a.call(http.MethodPost, "/admin/photos/reports/approve-all", "owner@x.test", map[string]any{}); got.status != 503 {
+		t.Fatalf("approve-all without Drive writer: %d %s", got.status, got.body)
+	}
+	if got := a.call(http.MethodPost, "/admin/photos/reports/approve-all", "admin@x.test", map[string]any{"reason": "x"}); got.status != 400 {
+		t.Fatalf("approve-all with a bad reason: %d", got.status)
+	}
+}

@@ -1,9 +1,24 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, CircleCheck, CircleX, Clock, Flag, Inbox } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  CheckCheck,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  CircleX,
+  Clock,
+  Flag,
+  Inbox,
+  Loader2,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import Modal from "@/components/Modal";
 import PhotoReportModal from "@/components/PhotoReportModal";
 import { PhotoPreview } from "@/components/photoReports/PhotoPreview";
+import { photoReportsApi } from "@/lib/api";
 import { usePhotoReports } from "@/lib/hooks";
 import { formatDateTime, REASON_LABELS, STATUS_LABELS } from "@/lib/photoReports";
 import type { PhotoReport, PhotoReportReason, PhotoReportStatus } from "@/lib/types";
@@ -28,6 +43,7 @@ export default function PhotoReportsPage() {
   const [reason, setReason] = useState<PhotoReportReason | "">("");
   const [offset, setOffset] = useState(0);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [approveAllOpen, setApproveAllOpen] = useState(false);
 
   const { data, isLoading, isError, isFetching } = usePhotoReports({
     status,
@@ -51,6 +67,9 @@ export default function PhotoReportsPage() {
   };
 
   const last = Math.min(offset + PAGE_SIZE, total);
+  const canRemove = data?.can_remove ?? true;
+  // On the pending tab, total counts the reports the current reason filter shows: what "approve all" would take.
+  const pendingShown = status === "pending" ? total : 0;
 
   return (
     <div className="mx-auto max-w-7xl p-6 lg:p-8">
@@ -64,22 +83,40 @@ export default function PhotoReportsPage() {
             laisse en ligne.
           </p>
         </div>
-        <select
-          value={reason}
-          onChange={(e) => {
-            setReason(e.target.value as PhotoReportReason | "");
-            setOffset(0);
-          }}
-          className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
-          aria-label="Filtrer par motif"
-        >
-          <option value="">Tous les motifs</option>
-          {Object.entries(REASON_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          {status === "pending" && pendingShown > 0 && (
+            <button
+              type="button"
+              onClick={() => setApproveAllOpen(true)}
+              disabled={!canRemove}
+              title={
+                canRemove
+                  ? "Approuver tous les signalements en attente affichés"
+                  : "La suppression de photos n'est pas configurée sur le serveur"
+              }
+              className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <CheckCheck className="h-4 w-4" />
+              Tout approuver ({pendingShown})
+            </button>
+          )}
+          <select
+            value={reason}
+            onChange={(e) => {
+              setReason(e.target.value as PhotoReportReason | "");
+              setOffset(0);
+            }}
+            className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+            aria-label="Filtrer par motif"
+          >
+            <option value="">Tous les motifs</option>
+            {Object.entries(REASON_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
       </header>
 
       <div
@@ -192,10 +229,13 @@ export default function PhotoReportsPage() {
         </div>
       )}
 
-      <PhotoReportModal
-        reportId={openId}
-        onClose={closeModal}
-        canRemove={data?.can_remove ?? true}
+      <PhotoReportModal reportId={openId} onClose={closeModal} canRemove={canRemove} />
+
+      <ApproveAllModal
+        isOpen={approveAllOpen}
+        onClose={() => setApproveAllOpen(false)}
+        reason={reason}
+        count={pendingShown}
       />
     </div>
   );
@@ -236,5 +276,173 @@ function ReportCard({ report, onOpen }: { report: PhotoReport; onOpen: () => voi
         </div>
       </div>
     </button>
+  );
+}
+
+type ApprovePhase = "confirm" | "running" | "done";
+
+/**
+ * Approves every pending report the list shows (all, or those of the selected reason). Each approval deletes a
+ * photo from Drive, so the server works in batches of a few seconds; this keeps calling it and shows the progress.
+ */
+function ApproveAllModal({
+  isOpen,
+  onClose,
+  reason,
+  count,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  reason: PhotoReportReason | "";
+  count: number;
+}) {
+  const queryClient = useQueryClient();
+  const [phase, setPhase] = useState<ApprovePhase>("confirm");
+  const [progress, setProgress] = useState({ approved: 0, photos: 0, failed: 0, remaining: 0 });
+  const [error, setError] = useState<string | null>(null);
+  const stop = useRef(false);
+  // The count when the run started: the list refreshes underneath while it goes.
+  const [target, setTarget] = useState(count);
+
+  useEffect(() => {
+    if (isOpen) {
+      setPhase("confirm");
+      setProgress({ approved: 0, photos: 0, failed: 0, remaining: 0 });
+      setError(null);
+      setTarget(count);
+    }
+  }, [isOpen, count]);
+
+  const run = async () => {
+    stop.current = false;
+    setPhase("running");
+    setError(null);
+    const skip: number[] = [];
+    let approved = 0;
+    let photos = 0;
+    try {
+      for (;;) {
+        const r = await photoReportsApi.approveAll(reason, skip);
+        approved += r.approved;
+        photos += r.photos;
+        skip.push(...r.failed);
+        setProgress({ approved, photos, failed: skip.length, remaining: r.remaining });
+        queryClient.invalidateQueries({ queryKey: ["photo-reports"] });
+        // Done, stopped, or a batch that moved nothing (it would loop forever).
+        if (r.remaining === 0 || stop.current || (r.approved === 0 && r.failed.length === 0)) break;
+      }
+    } catch {
+      setError("Le serveur n'a pas pu terminer. Les signalements déjà approuvés le restent.");
+    }
+    queryClient.invalidateQueries({ queryKey: ["photo-reports"] });
+    queryClient.invalidateQueries({ queryKey: ["photo-report"] });
+    setPhase("done");
+    if (approved > 0)
+      toast.success(
+        `${approved} signalement${approved > 1 ? "s" : ""} approuvé${approved > 1 ? "s" : ""}`,
+      );
+  };
+
+  const done = progress.approved + progress.failed;
+  const percent = target > 0 ? Math.min(100, Math.round((done / target) * 100)) : 0;
+  const scope = reason ? `« ${REASON_LABELS[reason]} »` : "en attente";
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      // Closing mid-run would hide a destructive job that keeps going: stop it first.
+      onClose={phase === "running" ? () => {} : onClose}
+      title="Tout approuver"
+    >
+      {phase === "confirm" && (
+        <div className="space-y-4 text-sm text-gray-600">
+          <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <p>
+              Les <strong>{count}</strong> signalements {scope} vont être approuvés : chaque photo
+              signalée est supprimée du Drive et de l'application. Le Drive la garde 30 jours dans
+              sa corbeille.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              onClick={run}
+              className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700"
+            >
+              <CheckCheck className="h-4 w-4" />
+              Approuver les {count} signalements
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase !== "confirm" && (
+        <div className="space-y-4 text-sm text-gray-600">
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-2 font-medium text-gray-900">
+                {phase === "running" && <Loader2 className="h-4 w-4 animate-spin" />}
+                {phase === "running" ? "Approbation en cours…" : "Terminé"}
+              </span>
+              <span>
+                {done} / {target}
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+              <div
+                className="h-full rounded-full bg-red-600 transition-[width] duration-500"
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+          </div>
+          <ul className="space-y-1">
+            <li>
+              {progress.approved} signalement{progress.approved > 1 ? "s" : ""} approuvé
+              {progress.approved > 1 ? "s" : ""}, {progress.photos} photo
+              {progress.photos > 1 ? "s" : ""} supprimée{progress.photos > 1 ? "s" : ""}
+            </li>
+            {progress.failed > 0 && (
+              <li className="text-amber-700">
+                {progress.failed} refusé{progress.failed > 1 ? "s" : ""} par le Drive : ils restent
+                en attente, à reprendre un par un.
+              </li>
+            )}
+            {phase === "done" && progress.remaining > 0 && !error && (
+              <li className="text-amber-700">{progress.remaining} restent en attente.</li>
+            )}
+          </ul>
+          {error && <p className="rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
+          <div className="flex justify-end">
+            {phase === "running" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  stop.current = true;
+                }}
+                className="rounded-xl border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Arrêter après ce lot
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+              >
+                Fermer
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

@@ -185,6 +185,39 @@ func (h *Handler) Decide(c *fiber.Ctx) error {
 	return c.JSON(report)
 }
 
+type approveAllRequest struct {
+	Reason string  `json:"reason"`
+	Skip   []int64 `json:"skip"`
+}
+
+// approveAllBudget keeps one call well inside the server's write timeout; the panel calls again until done.
+const approveAllBudget = 9 * time.Second
+
+// ApproveAll handles POST /admin/photos/reports/approve-all {reason?, skip?}: approves pending reports (all, or of
+// one reason) until the call's time budget runs out. "remaining" says whether to call again.
+func (h *Handler) ApproveAll(c *fiber.Ctx) error {
+	email, _ := c.Locals("email").(string)
+	var body approveAllRequest
+	if len(c.Body()) > 0 {
+		if err := c.BodyParser(&body); err != nil {
+			return fail(c, fiber.StatusBadRequest, "Invalid request body", nil)
+		}
+	}
+	if len(body.Skip) > 1000 {
+		return fail(c, fiber.StatusBadRequest, "Too many reports to skip", nil)
+	}
+	res, err := h.svc.ApproveAll(c.Context(), body.Reason, email, body.Skip, approveAllBudget)
+	switch {
+	case errors.Is(err, service.ErrInvalidReason):
+		return fail(c, fiber.StatusBadRequest, "Invalid report reason", nil)
+	case errors.Is(err, service.ErrRemovalUnavailable):
+		return fail(c, fiber.StatusServiceUnavailable, "Photo deletion is not configured on the server", nil)
+	case err != nil:
+		return fail(c, fiber.StatusInternalServerError, "Could not approve the reports", err)
+	}
+	return c.JSON(res)
+}
+
 type albumClubRequest struct {
 	ClubID *int64 `json:"club_id"`
 }

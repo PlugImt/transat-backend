@@ -321,3 +321,82 @@ func (s *Service) Decide(ctx context.Context, id int64, decision Decision, note,
 	}
 	return s.Get(ctx, id)
 }
+
+// ApproveAllResult is how far one call of ApproveAll went.
+type ApproveAllResult struct {
+	// Photos removed from the Drive and the app during this call.
+	Photos int `json:"photos"`
+	// Reports closed during this call: a photo's other pending reports close with it.
+	Approved int `json:"approved"`
+	// Reports Drive refused to act on; they stay pending and are skipped by the next calls given them back.
+	Failed []int64 `json:"failed"`
+	// Pending reports still matching the filter, the failed and skipped ones excepted: call again while above zero.
+	Remaining int `json:"remaining"`
+}
+
+// ApproveAll approves the pending reports (of one reason when reason is not empty), oldest first, until budget
+// runs out: every approval deletes a photo on Drive, so a large backlog takes several calls. Reports whose ids are
+// in skip (the failures of earlier calls) are left alone, so a photo Drive keeps refusing cannot stall the rest.
+func (s *Service) ApproveAll(ctx context.Context, reason, by string, skip []int64, budget time.Duration) (ApproveAllResult, error) {
+	out := ApproveAllResult{Failed: []int64{}}
+	if reason != "" {
+		if _, err := ParseReason(reason); err != nil {
+			return out, err
+		}
+	}
+	if s.remover == nil {
+		return out, ErrRemovalUnavailable
+	}
+	excluded := append([]int64{}, skip...)
+	pending := func() ([]int64, error) {
+		rows, err := s.db.QueryContext(ctx, `SELECT id_photo_reports FROM photo_reports
+			WHERE status = 'pending' AND ($1 = '' OR reason = $1) AND NOT (id_photo_reports = ANY($2))
+			ORDER BY created_at, id_photo_reports`, reason, pq.Array(excluded))
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		var ids []int64
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				return nil, err
+			}
+			ids = append(ids, id)
+		}
+		return ids, rows.Err()
+	}
+
+	ids, err := pending()
+	if err != nil {
+		return out, err
+	}
+	before := len(ids)
+	deadline := time.Now().Add(budget)
+	note := "Approuvé avec « Tout approuver »"
+	for _, id := range ids {
+		if time.Now().After(deadline) || ctx.Err() != nil {
+			break
+		}
+		_, err := s.Decide(ctx, id, DecisionApprove, note, by)
+		switch {
+		case err == nil:
+			out.Photos++
+		case errors.Is(err, ErrAlreadyDecided):
+			// Closed with an earlier report of the same photo.
+		case errors.Is(err, ErrRemovalUnavailable):
+			return out, err
+		default:
+			out.Failed = append(out.Failed, id)
+			excluded = append(excluded, id)
+		}
+	}
+
+	left, err := pending()
+	if err != nil {
+		return out, err
+	}
+	out.Remaining = len(left)
+	out.Approved = before - len(out.Failed) - out.Remaining
+	return out, nil
+}

@@ -15,6 +15,7 @@ import type {
   ActiveUsersPoint,
   ActivityHeatmapRange,
   ActivityHourPoint,
+  ApproveAllResult,
   AppUsageStats,
   AppVersionStat,
   BassineScore,
@@ -34,6 +35,7 @@ import type {
   PhotoboothPendingFolder,
   PhotoboothPendingPicture,
   PhotoReport,
+  PhotoReportReason,
   PhotoReportsFilter,
   PhotoReportsPage,
   PushMessageSummary,
@@ -592,6 +594,14 @@ export const photoReportsApi = {
   },
   retry: async (id: number): Promise<{ retried: number }> => {
     const response = await api.post(`/admin/photos/reports/${id}/retry`);
+    return response.data;
+  },
+  /** One batch of "approve all": call again with the failed ids in skip while remaining > 0. */
+  approveAll: async (reason: PhotoReportReason | "", skip: number[]): Promise<ApproveAllResult> => {
+    const response = await api.post<ApproveAllResult>("/admin/photos/reports/approve-all", {
+      reason,
+      skip,
+    });
     return response.data;
   },
   // A null clubId removes the link: reports of that album then go to administrators only.
