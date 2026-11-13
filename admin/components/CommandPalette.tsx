@@ -9,6 +9,7 @@ import {
   Calendar,
   Camera,
   Flag,
+  Images,
   LogOut,
   Plus,
   Search,
@@ -165,6 +166,14 @@ function CommandPalette() {
         icon: Bell,
         action: () => router.push("/notifications"),
         keywords: ["notifications", "push", "envoyer", "message", "annonce"],
+      },
+      {
+        id: "nav-photo-albums",
+        label: "Albums photo",
+        description: "Masquer un album ou copier son lien transat.dev",
+        icon: Images,
+        action: () => router.push("/photo-albums"),
+        keywords: ["photos", "albums", "galerie", "masquer", "lien", "partage"],
       },
       {
         id: "nav-photo-reports",

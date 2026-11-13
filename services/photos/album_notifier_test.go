@@ -215,6 +215,9 @@ func TestNestedHiddenAndUnpublishedAlbumsAreNotAnnounced(t *testing.T) {
 	e.album("CHILD", "Finale", "published", 20, parentID)
 	e.album("REVIEW", "Dossier à vérifier", "needs_review", 20, nil)
 	e.album("HIDDEN", "Caché", "hidden", 20, nil)
+	// Hidden by an administrator: the classifier published it, nobody may see it.
+	e.album("ADMIN-HIDDEN", "Masqué", "published", 20, nil)
+	e.exec(`UPDATE photo_albums SET hidden = TRUE WHERE root_folder_id = 'ADMIN-HIDDEN'`)
 	e.exec(`INSERT INTO photo_albums (root_folder_id, title, raw_folder_name, drive_url, visibility, confidence, rule, last_seen_run, photo_count, deleted_at)
 		VALUES ('GONE', 'Supprimé', 'Supprimé', 'u', 'published', 1, 'R', 1, 9, now())`)
 

@@ -384,3 +384,44 @@ export interface PhotoboothApproveResult {
   merged: boolean;
   moved: number;
 }
+
+// Photo albums (auto-created from the Photos Drive)
+export type PhotoAlbumStatus = "shown" | "hidden" | "review";
+
+export interface PhotoAlbum {
+  id: number;
+  parent_id: number | null;
+  title: string;
+  event_date: string | null;
+  academic_year: string;
+  category: string;
+  photo_count: number;
+  /** The classifier's decision: only "published" albums can be shown. */
+  visibility: "published" | "needs_review" | "hidden";
+  /** Hidden by an administrator or the Club Photo, whatever the classifier says. */
+  hidden: boolean;
+  hidden_at: string | null;
+  hidden_by: string | null;
+  first_taken_at: string | null;
+  /** Visible in the app and on transat.dev. */
+  shown: boolean;
+  /** The album's transat.dev page (answers only while the album is shown). */
+  share_url: string;
+  /** Cover image for the panel, relative to the API (needs the panel's token). */
+  cover_path: string | null;
+  drive_url: string;
+}
+
+export interface PhotoAlbumsPage {
+  albums: PhotoAlbum[];
+  counts: { all: number; shown: number; hidden: number; review: number };
+  page: number;
+  page_size: number;
+  total: number;
+}
+
+export interface PhotoAlbumsFilter {
+  q: string;
+  status: PhotoAlbumStatus | "";
+  page: number;
+}

@@ -32,8 +32,9 @@ const (
 	notifyRetryBase     = 10 * time.Minute
 )
 
-// available is when an album shows up in the app: published and holding at least one photo.
-const available = `a.visibility = 'published' AND a.deleted_at IS NULL AND a.photo_count > 0`
+// available is when an album shows up in the app: published, not hidden by an administrator and holding at least
+// one photo.
+const available = `a.visibility = 'published' AND a.deleted_at IS NULL AND NOT a.hidden AND a.photo_count > 0`
 
 // AlbumNotifier announces new event albums once, using the albums the sync already indexed: it never talks to
 // Google Drive. Its state lives in PostgreSQL (photo_album_notifications), so a restart, a retry or a second

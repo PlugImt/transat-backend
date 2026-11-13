@@ -18,7 +18,7 @@ func SetupStatisticsRoutes(router fiber.Router, db *sql.DB, statisticsService *s
 
 	// Toutes les routes de statistiques nécessitent un JWT admin
 	// The dashboard is also open to the Club Photo's owners, who review photo reports.
-	statsGroup := router.Group("/statistics", middlewares.JWTMiddleware, middlewares.AdminOrRolesMiddleware(db, photoreport.PhotoClubRole))
+	statsGroup := router.Group("/statistics", middlewares.JWTMiddleware, middlewares.AdminOrRolesMiddleware(db, photoreport.PhotoManagerRoles...))
 
 	statsGroup.Get("/endpoints", statsHandler.GetEndpointStatistics)
 	statsGroup.Get("/global", statsHandler.GetGlobalStatistics)

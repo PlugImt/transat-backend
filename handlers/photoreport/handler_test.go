@@ -61,7 +61,7 @@ func newAPI(t *testing.T) *api {
 	middlewares.InitJWTMiddleware(db)
 	m := &mailer{}
 	app := fiber.New()
-	routes.SetupPhotosRoutes(app, db, nil, reportHandler.NewHandler(service.NewService(db, m, "")))
+	routes.SetupPhotosRoutes(app, db, nil, nil, reportHandler.NewHandler(service.NewService(db, m, "")))
 	a := &api{t: t, db: db, app: app, m: m}
 
 	a.user("owner@x.test", "NEWF", "clubphoto_respo")
@@ -340,4 +340,24 @@ func TestReportsAreForAdministratorsAndThePhotoClubOnly(t *testing.T) {
 	before := a.m.count()
 	a.report("admin@x.test", "poor_quality", "after unlink")
 	a.waitMails(before + 2)
+}
+
+func TestPhotoManagersReviewReportsAndReceiveThem(t *testing.T) {
+	a := newAPI(t)
+	a.user("manager@x.test", "NEWF", service.PhotoManagerRole)
+	a.report("student@x.test", "appears_in_photo", "c")
+	// The Club Photo's owner, the photo manager and the administrator.
+	a.waitMails(3)
+	a.m.mu.Lock()
+	got := strings.Join(a.m.to, ",")
+	a.m.mu.Unlock()
+	if !strings.Contains(got, "manager@x.test") {
+		t.Fatalf("the photo manager was not emailed: %s", got)
+	}
+	if r := a.call(http.MethodGet, "/admin/photos/reports", "manager@x.test", nil); r.status != 200 {
+		t.Fatalf("reports as photo manager: %d", r.status)
+	}
+	if r := a.call(http.MethodPut, "/admin/photos/albums/1/club", "manager@x.test", map[string]any{"club_id": nil}); r.status != 403 {
+		t.Fatalf("club link as photo manager: %d", r.status)
+	}
 }

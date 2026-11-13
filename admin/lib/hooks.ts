@@ -14,6 +14,7 @@ import {
   eventsApi,
   menuApi,
   notificationsApi,
+  photoAlbumsApi,
   photoboothReviewApi,
   photoReportsApi,
   reservationApi,
@@ -30,6 +31,7 @@ import type {
   Event,
   NotificationAudience,
   NotificationCategory,
+  PhotoAlbumsFilter,
   PhotoReportsFilter,
   SendNotificationRequest,
   TraqArticle,
@@ -677,6 +679,25 @@ export const useDeletePhotoboothPicture = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["photobooth-pending"] });
       queryClient.invalidateQueries({ queryKey: ["photobooth-pictures"] });
+    },
+  });
+};
+
+// Photo albums hooks
+export const usePhotoAlbums = (filter: PhotoAlbumsFilter) =>
+  useQuery({
+    queryKey: ["photo-albums", filter],
+    queryFn: () => photoAlbumsApi.list(filter),
+    placeholderData: keepPreviousData,
+  });
+
+export const useSetAlbumHidden = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, hidden }: { id: number; hidden: boolean }) =>
+      photoAlbumsApi.setHidden(id, hidden),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["photo-albums"] });
     },
   });
 };

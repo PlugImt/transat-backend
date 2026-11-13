@@ -27,6 +27,9 @@ import type {
   MenuItem,
   MenuItemReview,
   NotificationRecipients,
+  PhotoAlbum,
+  PhotoAlbumsFilter,
+  PhotoAlbumsPage,
   PhotoboothApproveResult,
   PhotoboothPendingFolder,
   PhotoboothPendingPicture,
@@ -632,4 +635,18 @@ export const photoboothReviewApi = {
   },
   picturePath: (id: number, size: "thumb" | "preview") =>
     `/admin/photobooth/pictures/${id}?size=${size}`,
+};
+
+/** Albums created from the Photos Drive: list them, hide or show them in the app and on transat.dev. */
+export const photoAlbumsApi = {
+  list: async (filter: PhotoAlbumsFilter): Promise<PhotoAlbumsPage> => {
+    const response = await api.get<PhotoAlbumsPage>("/admin/photos/albums", {
+      params: { q: filter.q || undefined, status: filter.status || undefined, page: filter.page },
+    });
+    return response.data;
+  },
+  setHidden: async (id: number, hidden: boolean): Promise<PhotoAlbum> => {
+    const response = await api.put<PhotoAlbum>(`/admin/photos/albums/${id}/hidden`, { hidden });
+    return response.data;
+  },
 };

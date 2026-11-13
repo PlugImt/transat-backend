@@ -21,7 +21,7 @@ func SetupPhotoboothRoutes(router fiber.Router, db *sql.DB, h *photoboothHandler
 	// The booth's pictures reach the app only once an administrator or the Club Photo approves them. Declared
 	// before the admin-only "/admin" group, whose middleware would otherwise answer first.
 	review := router.Group("/admin/photobooth",
-		middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail, middlewares.AdminOrRolesMiddleware(db, photoreport.PhotoClubRole))
+		middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail, middlewares.AdminOrRolesMiddleware(db, photoreport.PhotoManagerRoles...))
 	review.Get("/pending", h.ListPending)
 	review.Get("/pending/:folder/pictures", h.PendingPictures)
 	review.Post("/pending/:folder/approve", h.Approve)

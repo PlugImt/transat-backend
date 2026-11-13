@@ -10,6 +10,7 @@ import {
   Camera,
   Flag,
   Gamepad2,
+  Images,
   LogOut,
   Menu,
   Monitor,
@@ -39,6 +40,7 @@ const MENU = [
   { href: "/traq", label: "Traq", icon: Beer },
   { href: "/games", label: "Jeux", icon: Gamepad2 },
   { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/photo-albums", label: "Albums photo", icon: Images },
   { href: "/photo-reports", label: "Signalements photos", icon: Flag },
   { href: "/photobooth", label: "Photobooth", icon: Camera },
 ];

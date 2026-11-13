@@ -72,12 +72,20 @@ type AlbumRow struct {
 	LastTakenAt  sql.NullTime
 }
 
-// visibleAlbum yields the album id only when that album is published: photos of albums under review stay in the
+// shownAlbum is when an album appears anywhere: published by the classifier, not deleted, not hidden by an
+// administrator. It applies to the album aliased "a".
+const shownAlbum = `a.visibility = 'published' AND a.deleted_at IS NULL AND NOT a.hidden`
+
+// notInHiddenAlbum keeps the photos of an album an administrator hid out of every listing; photos of albums under
+// review stay in the gallery, without their album.
+const notInHiddenAlbum = `NOT COALESCE(a.hidden, FALSE)`
+
+// photoColumns yields the album id only when that album is shown: photos of albums under review stay in the
 // gallery but never expose them.
 const photoColumns = `
 	p.drive_file_id, p.media_type, p.width, p.height, p.sort_at,
-	CASE WHEN a.visibility = 'published' AND a.deleted_at IS NULL THEN a.id_photo_albums END,
-	CASE WHEN a.visibility = 'published' AND a.deleted_at IS NULL THEN a.title END,
+	CASE WHEN ` + shownAlbum + ` THEN a.id_photo_albums END,
+	CASE WHEN ` + shownAlbum + ` THEN a.title END,
 	COALESCE(p.album_id, 0),
 	p.has_thumbnail, p.web_url
 	FROM photos p
@@ -99,6 +107,7 @@ func albumKeyOf(c *PhotoCursor) int64 {
 func (r *PhotosRepository) Gallery(ctx context.Context, after *PhotoCursor, limit int) ([]PhotoRow, error) {
 	return r.photos(ctx, `SELECT `+photoColumns+`
 		WHERE p.deleted_at IS NULL AND p.duplicate_of IS NULL AND p.media_type <> 'other' AND NOT p.is_cover
+		  AND `+notInHiddenAlbum+`
 		  AND ($1::timestamptz IS NULL OR (p.sort_at, COALESCE(p.album_id, 0), p.drive_file_id) < ($1, $4::bigint, $2))
 		ORDER BY p.sort_at DESC, COALESCE(p.album_id, 0) DESC, p.drive_file_id DESC LIMIT $3`,
 		after, limit, albumKeyOf(after))
@@ -108,7 +117,7 @@ func (r *PhotosRepository) Gallery(ctx context.Context, after *PhotoCursor, limi
 // Uses idx_photos_album backwards.
 func (r *PhotosRepository) AlbumPhotos(ctx context.Context, albumID int64, after *PhotoCursor, limit int) ([]PhotoRow, error) {
 	return r.photos(ctx, `SELECT `+photoColumns+`
-		WHERE p.album_id = $4 AND p.deleted_at IS NULL AND p.media_type <> 'other' AND NOT p.is_cover
+		WHERE p.album_id = $4 AND `+shownAlbum+` AND p.deleted_at IS NULL AND p.media_type <> 'other' AND NOT p.is_cover
 		  AND (p.duplicate_of IS NULL OR NOT p.album_duplicate)
 		  AND ($1::timestamptz IS NULL OR (p.sort_at, p.drive_file_id) < ($1, $2))
 		ORDER BY p.sort_at DESC, p.drive_file_id DESC LIMIT $3`, after, limit, albumID)
@@ -119,6 +128,7 @@ func (r *PhotosRepository) AlbumPhotos(ctx context.Context, albumID int64, after
 func (r *PhotosRepository) MyPhotos(ctx context.Context, email string, after *PhotoCursor, limit int) ([]PhotoRow, error) {
 	return r.photos(ctx, `SELECT `+photoColumns+`
 		WHERE p.deleted_at IS NULL AND p.duplicate_of IS NULL AND p.media_type <> 'other' AND NOT p.is_cover
+		  AND `+notInHiddenAlbum+`
 		  AND EXISTS (SELECT 1 FROM face_matches m
 		              WHERE m.email = $4 AND m.drive_file_id = p.drive_file_id AND m.rejected_at IS NULL)
 		  AND ($1::timestamptz IS NULL OR (p.sort_at, p.drive_file_id) < ($1, $2))
@@ -153,16 +163,16 @@ func (r *PhotosRepository) Photo(ctx context.Context, id string) (PhotoDetail, e
 	var d PhotoDetail
 	err := r.db.QueryRowContext(ctx, `
 		SELECT p.drive_file_id, p.media_type, p.width, p.height, p.sort_at,
-		       CASE WHEN a.visibility = 'published' AND a.deleted_at IS NULL THEN a.id_photo_albums END,
+		       CASE WHEN `+shownAlbum+` THEN a.id_photo_albums END,
 		       p.has_thumbnail, p.web_url,
 		       p.name, p.mime_type, p.size_bytes, p.taken_at, p.taken_at_source,
 		       COALESCE(f.web_url, ''), COALESCE(f.logical_path, ''), COALESCE(f.section_path, ''),
-		       CASE WHEN a.visibility = 'published' AND a.deleted_at IS NULL THEN a.title END,
-		       CASE WHEN a.visibility = 'published' AND a.deleted_at IS NULL THEN a.drive_url END
+		       CASE WHEN `+shownAlbum+` THEN a.title END,
+		       CASE WHEN `+shownAlbum+` THEN a.drive_url END
 		FROM photos p
 		LEFT JOIN photo_albums a ON a.id_photo_albums = p.album_id
 		LEFT JOIN photo_folders f ON f.drive_folder_id = p.folder_id
-		WHERE p.drive_file_id = $1 AND p.deleted_at IS NULL`, id).
+		WHERE p.drive_file_id = $1 AND p.deleted_at IS NULL AND `+notInHiddenAlbum, id).
 		Scan(&d.ID, &d.MediaType, &d.Width, &d.Height, &d.SortAt, &d.AlbumID, &d.HasThumbnail, &d.DriveURL,
 			&d.Name, &d.MimeType, &d.SizeBytes, &d.TakenAt, &d.TakenSource,
 			&d.FolderURL, &d.FolderPath, &d.Section, &d.AlbumTitle, &d.AlbumURL)
@@ -180,7 +190,7 @@ func (r *PhotosRepository) Albums(ctx context.Context, after *AlbumCursor, limit
 		ts, id = after.SortDate, after.ID
 	}
 	rows, err := r.db.QueryContext(ctx, `SELECT `+albumColumns+`
-		WHERE visibility = 'published' AND deleted_at IS NULL AND photo_count > 0
+		WHERE visibility = 'published' AND deleted_at IS NULL AND NOT hidden AND photo_count > 0
 		  AND ($1::date IS NULL OR (sort_date, id_photo_albums) < ($1, $2))
 		ORDER BY sort_date DESC, id_photo_albums DESC LIMIT $3`, ts, id, limit)
 	if err != nil {
@@ -201,7 +211,7 @@ func (r *PhotosRepository) Albums(ctx context.Context, after *AlbumCursor, limit
 
 func (r *PhotosRepository) Album(ctx context.Context, id int64) (AlbumRow, error) {
 	return scanAlbum(r.db.QueryRowContext(ctx, `SELECT `+albumColumns+`
-		WHERE id_photo_albums = $1 AND visibility = 'published' AND deleted_at IS NULL`, id))
+		WHERE id_photo_albums = $1 AND visibility = 'published' AND deleted_at IS NULL AND NOT hidden`, id))
 }
 
 func scanAlbum(s interface{ Scan(...any) error }) (AlbumRow, error) {

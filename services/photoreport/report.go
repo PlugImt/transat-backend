@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/lib/pq"
 	"strings"
 	"time"
 	"unicode"
@@ -67,6 +68,13 @@ const defaultClubName = "Club Photo"
 
 // PhotoClubRole marks the Club Photo's owners: they receive every report and review them in the admin panel.
 var PhotoClubRole = clubRoleName(defaultClubName)
+
+// PhotoManagerRole is the photo managers' own role ("responsable des photos"), held without owning the Club Photo.
+const PhotoManagerRole = "photo_respo"
+
+// PhotoManagerRoles are the roles that look after every photo: they receive every report and manage reports, the
+// photobooth and the albums in the admin panel.
+var PhotoManagerRoles = []string{PhotoManagerRole, PhotoClubRole}
 
 // Service stores reports and delivers them. A nil mailer keeps every report pending until one is configured.
 type Service struct {
@@ -318,7 +326,7 @@ func resolveRecipients(ctx context.Context, tx *sql.Tx, clubID sql.NullInt64, cl
 			UNION ALL
 			SELECT nr.email, 'photo_club', 1
 			FROM newf_roles nr JOIN roles r ON r.id_roles = nr.id_roles
-			WHERE r.name = $2
+			WHERE r.name = ANY($2)
 			UNION ALL
 			SELECT nr.email, 'admin', 2
 			FROM newf_roles nr JOIN roles r ON r.id_roles = nr.id_roles
@@ -326,7 +334,7 @@ func resolveRecipients(ctx context.Context, tx *sql.Tx, clubID sql.NullInt64, cl
 		) x
 		JOIN newf n ON n.email = x.email
 		LEFT JOIN languages l ON l.id_languages = n.language
-		ORDER BY n.email, x.prio`, ownerRole, PhotoClubRole)
+		ORDER BY n.email, x.prio`, ownerRole, pq.Array(PhotoManagerRoles))
 	if err != nil {
 		return nil, err
 	}

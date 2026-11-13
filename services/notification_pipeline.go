@@ -120,7 +120,7 @@ func (ns *NotificationService) queuePhotoAlbum(albumID int64, title string, even
 		Compose: func(lang string, l *i18n.Localizer) (string, string) {
 			return composePhotoAlbum(l, lang, title, eventDate)
 		},
-		Navigation: models.PhotoAlbumNavigation(albumID, truncateRunes(title, 120)),
+		Navigation: photoAlbumNavigation(albumID, title),
 	}); err != nil {
 		return PhotoAlbumDelivery{}, err
 	}

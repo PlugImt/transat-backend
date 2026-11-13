@@ -58,6 +58,14 @@ func (c *responseCache) currentVersion(ctx context.Context) (int64, error) {
 	return v.(int64), nil
 }
 
+// refresh makes the next request read data_version again, after a change made by this instance (other
+// instances see it within versionTTL).
+func (c *responseCache) refresh() {
+	c.mu.Lock()
+	c.verAt = time.Time{}
+	c.mu.Unlock()
+}
+
 // get returns the cached body for key, building it once even under concurrent identical requests.
 func (c *responseCache) get(ctx context.Context, key string, build func() ([]byte, error)) ([]byte, error) {
 	ver, err := c.currentVersion(ctx)

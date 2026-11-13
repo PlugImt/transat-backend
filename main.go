@@ -159,6 +159,14 @@ func main() {
 		photosSync.Schedule(c)
 	}
 
+	// Public album pages: images streamed from the private Drive with the sync's read-only account.
+	var photosMedia photosService.MediaSource
+	if m, err := photosService.MediaFromEnv(context.Background()); err != nil {
+		log.Printf("Warning: public album images disabled: %v", err)
+	} else if m != nil {
+		photosMedia = m
+	}
+
 	// Face recognition ("my photos"): opt-in, photos read from Drive, models on the face-ml service.
 	faceService := facesService.FromEnv(context.Background(), db)
 	faceService.Start(context.Background(), 5*time.Minute)
@@ -282,7 +290,7 @@ func main() {
 	routes.SetupReservationRoutes(app, db, reservationDiscordService, reservationService)
 	routes.SetupBassineRoutes(app, db)
 	routes.SetupAccessRoutes(app, db)
-	routes.SetupPhotosRoutes(app, db, photosSync, photoReports)
+	routes.SetupPhotosRoutes(app, db, photosSync, photosMedia, photoReports)
 	routes.SetupFacesRoutes(app, db, faceService)
 	routes.SetupPhotoboothRoutes(app, db, photobooth)
 	routes.SetupProfileRoutes(app, db, r2Service)

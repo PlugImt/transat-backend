@@ -47,12 +47,19 @@ func expand(template, id string, size int) string {
 type PhotosHandler struct {
 	repo  *repository.PhotosRepository
 	sync  *photos.SyncService // nil when Drive credentials are not configured
+	media photos.MediaSource  // nil when Drive credentials are not configured: public images answer 503
 	cache *responseCache
 }
 
 func NewPhotosHandler(db *sql.DB, sync *photos.SyncService) *PhotosHandler {
 	repo := repository.NewPhotosRepository(db)
 	return &PhotosHandler{repo: repo, sync: sync, cache: newResponseCache(repo.DataVersion)}
+}
+
+// WithMedia lets the public album pages stream images from Drive.
+func (h *PhotosHandler) WithMedia(media photos.MediaSource) *PhotosHandler {
+	h.media = media
+	return h
 }
 
 type photoDTO struct {
@@ -89,8 +96,11 @@ type photoDetailDTO struct {
 }
 
 type albumRef struct {
-	ID       int64  `json:"id"`
-	Title    string `json:"title"`
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+	// The album's page on transat.dev (opens the app when installed): the link to share.
+	ShareURL string `json:"share_url"`
+	// Kept for app versions that predate share_url.
 	DriveURL string `json:"drive_url"`
 }
 
@@ -105,7 +115,10 @@ type albumDTO struct {
 	CoverURL     *string    `json:"cover_url"`
 	FirstTakenAt *time.Time `json:"first_taken_at"`
 	LastTakenAt  *time.Time `json:"last_taken_at"`
-	// Always the event's own Drive folder, never a generic parent such as "Sports" or "Autres".
+	// The album's page on transat.dev (opens the app when installed): the link to share.
+	ShareURL string `json:"share_url"`
+	// Always the event's own Drive folder, never a generic parent such as "Sports" or "Autres". Kept for app
+	// versions that predate share_url, which shared it.
 	DriveURL string `json:"drive_url"`
 }
 
@@ -143,7 +156,7 @@ func toPhotoDTO(p repository.PhotoRow) photoDTO {
 func toAlbumDTO(a repository.AlbumRow) albumDTO {
 	d := albumDTO{
 		ID: a.ID, Title: a.Title, AcademicYear: a.AcademicYear, Category: a.Category, PhotoCount: a.PhotoCount,
-		DriveURL: a.DriveURL,
+		DriveURL: a.DriveURL, ShareURL: photos.AlbumShareURL(a.ID, a.Title),
 	}
 	if a.ParentID.Valid {
 		d.ParentID = &a.ParentID.Int64
@@ -404,7 +417,10 @@ func (h *PhotosHandler) GetPhoto(c *fiber.Ctx) error {
 			out.TakenAt = &d.TakenAt.Time
 		}
 		if d.AlbumID.Valid {
-			out.Album = &albumRef{ID: d.AlbumID.Int64, Title: d.AlbumTitle.String, DriveURL: d.AlbumURL.String}
+			out.Album = &albumRef{
+				ID: d.AlbumID.Int64, Title: d.AlbumTitle.String, DriveURL: d.AlbumURL.String,
+				ShareURL: photos.AlbumShareURL(d.AlbumID.Int64, d.AlbumTitle.String),
+			}
 		}
 		return out, nil
 	})

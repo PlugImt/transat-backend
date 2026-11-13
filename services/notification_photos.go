@@ -10,6 +10,7 @@ import (
 
 	appI18n "github.com/plugimt/transat-backend/i18n"
 	"github.com/plugimt/transat-backend/models"
+	"github.com/plugimt/transat-backend/services/photos"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
@@ -100,7 +101,7 @@ func (ns *NotificationService) NotifyNewPhotoAlbum(albumID int64, title string, 
 			NotificationTokens: byLang[lang],
 			Title:              heading,
 			Message:            message,
-			Navigation:         models.PhotoAlbumNavigation(albumID, truncateRunes(title, 120)),
+			Navigation:         photoAlbumNavigation(albumID, title),
 		})
 		delivery.Accepted += result.Accepted
 		delivery.Failed += result.Failed
@@ -148,4 +149,12 @@ func truncateRunes(s string, max int) string {
 		return s
 	}
 	return string(runes[:max-1]) + "…"
+}
+
+// photoAlbumNavigation opens the album in the app; its "url" param is the album's transat.dev page, for sharing
+// it from the notification, never its Drive folder.
+func photoAlbumNavigation(albumID int64, title string) *models.NavigationTarget {
+	nav := models.PhotoAlbumNavigation(albumID, truncateRunes(title, 120))
+	nav.Params["url"] = photos.AlbumShareURL(albumID, title)
+	return nav
 }

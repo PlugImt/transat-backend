@@ -9,9 +9,13 @@ import (
 	"github.com/plugimt/transat-backend/services/photoreport"
 )
 
+// photoSections are what the photo managers open: reports, the photobooth's review and the albums.
+var photoSections = []string{"dashboard", "photo-reports", "photobooth", "photo-albums"}
+
 // Panel sections a non-administrator may open, by role.
 var sectionsByRole = map[string][]string{
-	photoreport.PhotoClubRole: {"dashboard", "photo-reports", "photobooth"},
+	photoreport.PhotoManagerRole: photoSections,
+	photoreport.PhotoClubRole:    photoSections,
 }
 
 // SetupAccessRoutes exposes what the signed-in account may open in the admin panel. It must be declared before

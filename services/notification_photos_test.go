@@ -258,7 +258,8 @@ func TestNotificationContentIsLocalizedAndPrivate(t *testing.T) {
 
 	nav := fr["data"].(map[string]any)["navigation"].(map[string]any)
 	params := nav["params"].(map[string]any)
-	if nav["type"] != "photo_album" || nav["id"] != "42" || params["title"] != "Soirée de gala" {
+	if nav["type"] != "photo_album" || nav["id"] != "42" || params["title"] != "Soirée de gala" ||
+		params["url"] != "https://transat.dev/albums/42-soiree-de-gala" {
 		t.Fatalf("navigation = %v", nav)
 	}
 	raw, _ := json.Marshal(fr)
