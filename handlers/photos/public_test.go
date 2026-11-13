@@ -482,6 +482,10 @@ func TestAppAlbumResponsesCarryTheTransatLink(t *testing.T) {
 		if r.status != http.StatusOK || !strings.Contains(r.body, `"share_url":"`+want+`"`) {
 			t.Errorf("%s: %d %s", path, r.status, r.body)
 		}
+		// Older apps share drive_url when it is a Drive folder: it must never be one, so they share nothing.
+		if !strings.Contains(r.body, `"drive_url":"`+want+`"`) || strings.Contains(r.body, "drive.google.com/drive/folders") {
+			t.Errorf("%s exposes the album's Drive folder: %s", path, r.body)
+		}
 	}
 }
 

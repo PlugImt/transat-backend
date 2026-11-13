@@ -100,7 +100,8 @@ type albumRef struct {
 	Title string `json:"title"`
 	// The album's page on transat.dev (opens the app when installed): the link to share.
 	ShareURL string `json:"share_url"`
-	// Kept for app versions that predate share_url.
+	// Same as share_url: albums never expose their Drive folder. App versions that predate share_url only show
+	// a link here when it is a Drive folder, so they show none.
 	DriveURL string `json:"drive_url"`
 }
 
@@ -117,8 +118,8 @@ type albumDTO struct {
 	LastTakenAt  *time.Time `json:"last_taken_at"`
 	// The album's page on transat.dev (opens the app when installed): the link to share.
 	ShareURL string `json:"share_url"`
-	// Always the event's own Drive folder, never a generic parent such as "Sports" or "Autres". Kept for app
-	// versions that predate share_url, which shared it.
+	// Same as share_url: albums never expose their Drive folder. App versions that predate share_url share this
+	// only when it is a Drive folder, so they hide their share button instead of sharing a Drive link.
 	DriveURL string `json:"drive_url"`
 }
 
@@ -156,8 +157,9 @@ func toPhotoDTO(p repository.PhotoRow) photoDTO {
 func toAlbumDTO(a repository.AlbumRow) albumDTO {
 	d := albumDTO{
 		ID: a.ID, Title: a.Title, AcademicYear: a.AcademicYear, Category: a.Category, PhotoCount: a.PhotoCount,
-		DriveURL: a.DriveURL, ShareURL: photos.AlbumShareURL(a.ID, a.Title),
+		ShareURL: photos.AlbumShareURL(a.ID, a.Title),
 	}
+	d.DriveURL = d.ShareURL
 	if a.ParentID.Valid {
 		d.ParentID = &a.ParentID.Int64
 	}
@@ -418,9 +420,10 @@ func (h *PhotosHandler) GetPhoto(c *fiber.Ctx) error {
 		}
 		if d.AlbumID.Valid {
 			out.Album = &albumRef{
-				ID: d.AlbumID.Int64, Title: d.AlbumTitle.String, DriveURL: d.AlbumURL.String,
+				ID: d.AlbumID.Int64, Title: d.AlbumTitle.String,
 				ShareURL: photos.AlbumShareURL(d.AlbumID.Int64, d.AlbumTitle.String),
 			}
+			out.Album.DriveURL = out.Album.ShareURL
 		}
 		return out, nil
 	})
