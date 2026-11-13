@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/plugimt/transat-backend/services/photos"
 )
 
 const (
@@ -558,6 +560,11 @@ func (s *Service) OpenSharedFile(ctx context.Context, token string, fileID int64
 	if err != nil {
 		return SharedFile{}, err
 	}
+	return s.openDriveFile(ctx, driveID, name, size, previewSize)
+}
+
+// openDriveFile streams a picture from Drive: the original, or a preview at most previewSize pixels wide.
+func (s *Service) openDriveFile(ctx context.Context, driveID, name string, size int64, previewSize int) (SharedFile, error) {
 	if previewSize > 0 {
 		if info, err := s.drive.GetFile(ctx, driveID); err == nil {
 			if body, ct, err := s.drive.Thumbnail(ctx, info, previewSize); err == nil {
@@ -582,7 +589,8 @@ func (s *Service) OpenSharedFile(ctx context.Context, token string, fileID int64
 
 // ---- Drive folders --------------------------------------------------------------------------------------
 
-// resolveFolder finds, or creates, "<school year>/<YYYY.MM.DD - Event>/Photobooth" under the root folder.
+// resolveFolder finds, or creates, "<school year>/<YYYY.MM.DD - Event>/photobooth_temp" under the root folder.
+// Pictures always land in a pending folder, even when the event already has an approved "Photobooth" one.
 func (s *Service) resolveFolder(ctx context.Context, date time.Time, eventName string) (string, error) {
 	s.folderMu.Lock()
 	defer s.folderMu.Unlock()
@@ -592,7 +600,8 @@ func (s *Service) resolveFolder(ctx context.Context, date time.Time, eventName s
 	err := s.db.QueryRowContext(ctx, `SELECT photobooth_folder FROM photobooth_event_folders WHERE event_date = $1 AND event_key = $2`,
 		date, key).Scan(&cached)
 	if err == nil {
-		if info, err := s.drive.GetFile(ctx, cached); err == nil && !info.Trashed {
+		// Once approved (renamed) the folder is published: later pictures need a new pending folder.
+		if info, err := s.drive.GetFile(ctx, cached); err == nil && !info.Trashed && photos.IsPendingPhotoboothFolder(info.Name) {
 			return cached, nil
 		} else if err != nil && !errors.Is(err, ErrNotFound) {
 			return "", err
@@ -612,9 +621,7 @@ func (s *Service) resolveFolder(ctx context.Context, date time.Time, eventName s
 	if err != nil {
 		return "", err
 	}
-	boothID, err := s.childFolder(ctx, eventID, PhotoboothFolderName, func(n string) bool {
-		return NameKey(n) == NameKey(PhotoboothFolderName)
-	})
+	boothID, err := s.childFolder(ctx, eventID, PendingFolderName, photos.IsPendingPhotoboothFolder)
 	if err != nil {
 		return "", err
 	}

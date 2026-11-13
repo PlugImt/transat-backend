@@ -172,7 +172,7 @@ func syncAlbumMembership(ctx context.Context, tx *sql.Tx) error {
 
 type photoInput struct {
 	Item     DriveItem
-	FolderID string // "" when the file sits at the drive root or in an unknown folder
+	FolderID string // "" when the file sits at the drive root
 }
 
 type photoRow struct {
@@ -187,6 +187,12 @@ func buildRows(inputs []photoInput, idx folderIndex, now time.Time) []photoRow {
 	for _, in := range inputs {
 		m := in.Item
 		entry, known := idx[in.FolderID]
+		if in.FolderID != "" && !known {
+			// Every indexed folder is known after a structure rebuild: a file elsewhere sits in a folder kept out
+			// of the gallery (photobooth pictures awaiting approval) or in one too new to be indexed yet, which
+			// the next rebuild or reconciliation picks up.
+			continue
+		}
 		folder := ""
 		if known {
 			folder = in.FolderID

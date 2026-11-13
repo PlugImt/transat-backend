@@ -419,9 +419,13 @@ func (s *SyncService) applyChanges(ctx context.Context, changes []Change, run in
 		return err
 	}
 	var snap *Snapshot
+	var appeared []photoInput
 	if structural {
 		if snap, err = s.planStructure(ctx); err != nil {
 			return fmt.Errorf("structure: %w", err)
+		}
+		if appeared, err = s.filesOfAppearedFolders(ctx, snap); err != nil {
+			return fmt.Errorf("appeared folders: %w", err)
 		}
 	}
 
@@ -442,7 +446,7 @@ func (s *SyncService) applyChanges(ctx context.Context, changes []Change, run in
 		return err
 	}
 
-	var inputs []photoInput
+	inputs := appeared
 	var gone []string
 	for _, c := range changes {
 		switch {
@@ -481,6 +485,41 @@ func (s *SyncService) applyChanges(ctx context.Context, changes []Change, run in
 	}
 	return tx.Commit()
 }
+
+// filesOfAppearedFolders lists the files of folders the index did not know. The changes feed reports a renamed
+// folder but not the files it already held: without this, approving photobooth pictures (renaming
+// "photobooth_temp") would leave them out of the gallery until the next full reconciliation.
+func (s *SyncService) filesOfAppearedFolders(ctx context.Context, snap *Snapshot) ([]photoInput, error) {
+	known, err := loadFolderIndex(ctx, s.db)
+	if err != nil {
+		return nil, err
+	}
+	var out []photoInput
+	listed := 0
+	for _, f := range snap.Folders {
+		if _, ok := known[f.ID]; ok || f.ShortcutID != "" {
+			continue // shortcut targets are walked by the snapshot itself
+		}
+		if listed == maxAppearedFolders {
+			// A burst this large (a restored tree, a first sync) is left to the full reconciliation.
+			_, _ = s.db.ExecContext(ctx, `UPDATE photo_sync_state SET last_full_at = NULL WHERE id = 1`)
+			break
+		}
+		listed++
+		kids, err := s.api.ListChildren(ctx, f.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, k := range kids {
+			if !k.IsFolder() && !k.IsShortcut() && !k.Trashed {
+				out = append(out, photoInput{Item: k, FolderID: f.ID})
+			}
+		}
+	}
+	return out, nil
+}
+
+const maxAppearedFolders = 50
 
 // touchesStructure tells whether a batch creates, renames, moves or removes a folder or shortcut.
 func (s *SyncService) touchesStructure(ctx context.Context, changes []Change) (bool, error) {

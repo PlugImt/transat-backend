@@ -7,6 +7,7 @@ import {
   Building,
   Calendar,
   CalendarCheck,
+  Camera,
   Flag,
   Gamepad2,
   LogOut,
@@ -39,6 +40,7 @@ const MENU = [
   { href: "/games", label: "Jeux", icon: Gamepad2 },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/photo-reports", label: "Signalements photos", icon: Flag },
+  { href: "/photobooth", label: "Photobooth", icon: Camera },
 ];
 
 const THEMES: { id: ThemeChoice; label: string; icon: typeof Sun }[] = [

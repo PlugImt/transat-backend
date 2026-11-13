@@ -27,6 +27,9 @@ import type {
   MenuItem,
   MenuItemReview,
   NotificationRecipients,
+  PhotoboothApproveResult,
+  PhotoboothPendingFolder,
+  PhotoboothPendingPicture,
   PhotoReport,
   PhotoReportsFilter,
   PhotoReportsPage,
@@ -592,4 +595,41 @@ export const photoReportsApi = {
   setAlbumClub: async (albumId: number, clubId: number | null) => {
     await api.put(`/admin/photos/albums/${albumId}/club`, { club_id: clubId });
   },
+};
+
+/** Fetches an image that needs the panel's token (an <img> cannot send it): returns an object URL to revoke. */
+export const fetchAuthorizedImage = async (path: string, signal?: AbortSignal): Promise<string> => {
+  const url = new URL(path.replace(/^\/+/, ""), `${API_BASE_URL.replace(/\/+$/, "")}/`);
+  const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
+  const response = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    signal,
+  });
+  if (!response.ok) throw new Error(`Image request failed with status ${response.status}`);
+  return URL.createObjectURL(await response.blob());
+};
+
+/** Review of the photobooth's pictures before they reach the app. */
+export const photoboothReviewApi = {
+  pending: async (): Promise<PhotoboothPendingFolder[]> => {
+    const response = await api.get<PhotoboothPendingFolder[]>("/admin/photobooth/pending");
+    return response.data ?? [];
+  },
+  pictures: async (folderId: string): Promise<PhotoboothPendingPicture[]> => {
+    const response = await api.get<PhotoboothPendingPicture[]>(
+      `/admin/photobooth/pending/${encodeURIComponent(folderId)}/pictures`,
+    );
+    return response.data ?? [];
+  },
+  approve: async (folderId: string): Promise<PhotoboothApproveResult> => {
+    const response = await api.post<PhotoboothApproveResult>(
+      `/admin/photobooth/pending/${encodeURIComponent(folderId)}/approve`,
+    );
+    return response.data;
+  },
+  deletePicture: async (id: number) => {
+    await api.delete(`/admin/photobooth/pictures/${id}`);
+  },
+  picturePath: (id: number, size: "thumb" | "preview") =>
+    `/admin/photobooth/pictures/${id}?size=${size}`,
 };

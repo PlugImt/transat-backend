@@ -14,6 +14,7 @@ import {
   eventsApi,
   menuApi,
   notificationsApi,
+  photoboothReviewApi,
   photoReportsApi,
   reservationApi,
   reviewsApi,
@@ -638,6 +639,44 @@ export const useSetAlbumClub = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["photo-reports"] });
       queryClient.invalidateQueries({ queryKey: ["photo-report"] });
+    },
+  });
+};
+
+// Photobooth review hooks
+export const usePhotoboothPending = () =>
+  useQuery({
+    queryKey: ["photobooth-pending"],
+    queryFn: photoboothReviewApi.pending,
+    refetchInterval: 60_000,
+  });
+
+export const usePhotoboothPictures = (folderId: string | null) =>
+  useQuery({
+    queryKey: ["photobooth-pictures", folderId],
+    queryFn: () => photoboothReviewApi.pictures(folderId as string),
+    enabled: folderId !== null,
+    refetchInterval: 60_000,
+  });
+
+export const useApprovePhotobooth = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: photoboothReviewApi.approve,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["photobooth-pending"] });
+      queryClient.invalidateQueries({ queryKey: ["photobooth-pictures"] });
+    },
+  });
+};
+
+export const useDeletePhotoboothPicture = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: photoboothReviewApi.deletePicture,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["photobooth-pending"] });
+      queryClient.invalidateQueries({ queryKey: ["photobooth-pictures"] });
     },
   });
 };

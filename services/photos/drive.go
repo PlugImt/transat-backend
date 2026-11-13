@@ -196,6 +196,9 @@ func (c *DriveClient) list(ctx context.Context, op, q, token string, inDrive boo
 		Q(q).PageSize(pageSize).Fields("nextPageToken, files(" + itemFields + ")").Context(ctx)
 	if inDrive {
 		call = call.Corpora("drive").DriveId(c.driveID)
+	} else {
+		// Children of a folder in the shared drive (a folder just approved) as well as outside it (shortcuts).
+		call = call.Corpora("allDrives")
 	}
 	if token != "" {
 		call = call.PageToken(token)

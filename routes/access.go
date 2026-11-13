@@ -11,7 +11,7 @@ import (
 
 // Panel sections a non-administrator may open, by role.
 var sectionsByRole = map[string][]string{
-	photoreport.PhotoClubRole: {"dashboard", "photo-reports"},
+	photoreport.PhotoClubRole: {"dashboard", "photo-reports", "photobooth"},
 }
 
 // SetupAccessRoutes exposes what the signed-in account may open in the admin panel. It must be declared before

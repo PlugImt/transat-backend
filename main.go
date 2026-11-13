@@ -284,7 +284,7 @@ func main() {
 	routes.SetupAccessRoutes(app, db)
 	routes.SetupPhotosRoutes(app, db, photosSync, photoReports)
 	routes.SetupFacesRoutes(app, db, faceService)
-	routes.SetupPhotoboothRoutes(app, photobooth)
+	routes.SetupPhotoboothRoutes(app, db, photobooth)
 	routes.SetupProfileRoutes(app, db, r2Service)
 	adminGroup := routes.SetupAdminRoutes(app, db, notificationService, accountService)
 	routes.SetupAdminReservationRoutes(adminGroup, db, reservationDiscordService, reservationService)

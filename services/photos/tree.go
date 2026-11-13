@@ -85,6 +85,9 @@ func BuildSnapshot(ctx context.Context, items []DriveItem, driveID string, ext E
 
 	snap := &Snapshot{}
 	visited := map[string]bool{}
+	// Photobooth pictures awaiting approval: neither the folder nor anything inside it is indexed. Their files
+	// then belong to no known folder, which buildRows skips.
+	hidden := func(it DriveItem) bool { return IsPendingPhotoboothFolder(it.Name) }
 
 	var build func(it DriveItem, parentID, parentPath string) *Node
 	build = func(it DriveItem, parentID, parentPath string) *Node {
@@ -134,7 +137,7 @@ func BuildSnapshot(ctx context.Context, items []DriveItem, driveID string, ext E
 
 		sort.Slice(childItems, func(a, b int) bool { return childItems[a].Name < childItems[b].Name })
 		for _, c := range childItems {
-			if c.IsFolder() && visited[c.ID] {
+			if c.IsFolder() && visited[c.ID] || hidden(c) {
 				continue
 			}
 			node.Children = append(node.Children, build(c, node.ID, path))
@@ -146,6 +149,9 @@ func BuildSnapshot(ctx context.Context, items []DriveItem, driveID string, ext E
 	rootItems := childFolders[driveID]
 	sort.Slice(rootItems, func(a, b int) bool { return rootItems[a].Name < rootItems[b].Name })
 	for _, r := range rootItems {
+		if hidden(r) {
+			continue
+		}
 		roots = append(roots, build(r, "", ""))
 	}
 	// Files directly at the drive root belong to no folder but stay in the gallery.

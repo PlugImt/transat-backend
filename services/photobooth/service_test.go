@@ -25,12 +25,13 @@ type fakeDrive struct {
 	files    map[string]*FileInfo
 	sessions map[string]FileInfo
 	created  []string
+	trashed  map[string]bool // folders
 }
 
 func newFakeDrive(root string) *fakeDrive {
 	return &fakeDrive{
 		folders: map[string]Folder{root: {ID: root, Name: "root"}}, parentOf: map[string]string{},
-		files: map[string]*FileInfo{}, sessions: map[string]FileInfo{},
+		files: map[string]*FileInfo{}, sessions: map[string]FileInfo{}, trashed: map[string]bool{},
 	}
 }
 
@@ -53,7 +54,7 @@ func (d *fakeDrive) ListChildFolders(_ context.Context, parent string) ([]Folder
 	defer d.mu.Unlock()
 	var out []Folder
 	for id, p := range d.parentOf {
-		if p == parent {
+		if p == parent && !d.trashed[id] {
 			out = append(out, d.folders[id])
 		}
 	}
@@ -117,9 +118,55 @@ func (d *fakeDrive) GetFile(_ context.Context, id string) (FileInfo, error) {
 		return *f, nil
 	}
 	if f, ok := d.folders[id]; ok {
-		return FileInfo{ID: f.ID, Name: f.Name}, nil
+		return FileInfo{ID: f.ID, Name: f.Name, Parents: []string{d.parentOf[id]}, Trashed: d.trashed[id]}, nil
 	}
 	return FileInfo{}, ErrNotFound
+}
+
+func (d *fakeDrive) ListChildren(_ context.Context, parent string) ([]FileInfo, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var out []FileInfo
+	for id, p := range d.parentOf {
+		if p == parent && !d.trashed[id] {
+			out = append(out, FileInfo{ID: id, Name: d.folders[id].Name})
+		}
+	}
+	for _, f := range d.files {
+		if f.Parents[0] == parent && !f.Trashed {
+			out = append(out, *f)
+		}
+	}
+	return out, nil
+}
+
+func (d *fakeDrive) Rename(_ context.Context, id, name string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if f, ok := d.folders[id]; ok {
+		f.Name = name
+		d.folders[id] = f
+		return nil
+	}
+	if f, ok := d.files[id]; ok {
+		f.Name = name
+		return nil
+	}
+	return ErrNotFound
+}
+
+func (d *fakeDrive) Move(_ context.Context, id, _, to string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if _, ok := d.folders[id]; ok {
+		d.parentOf[id] = to
+		return nil
+	}
+	if f, ok := d.files[id]; ok {
+		f.Parents = []string{to}
+		return nil
+	}
+	return ErrNotFound
 }
 
 func (d *fakeDrive) Trash(_ context.Context, id string) error {
@@ -127,6 +174,9 @@ func (d *fakeDrive) Trash(_ context.Context, id string) error {
 	defer d.mu.Unlock()
 	if f, ok := d.files[id]; ok {
 		f.Trashed = true
+	}
+	if _, ok := d.folders[id]; ok {
+		d.trashed[id] = true
 	}
 	return nil
 }
@@ -225,7 +275,7 @@ func TestFolderIsCreatedOnceThenReused(t *testing.T) {
 	b.put(KindPhoto, 2, "p2")
 	other := booth{t, svc, d, "session-0002"}
 	other.put(KindPhoto, 1, "q1")
-	want := []string{"2026-2027", "2026.10.27 - Soirée Intégration", "Photobooth"}
+	want := []string{"2026-2027", "2026.10.27 - Soirée Intégration", "photobooth_temp"}
 	if fmt.Sprint(d.created) != fmt.Sprint(want) {
 		t.Fatalf("created folders %v, want %v", d.created, want)
 	}
@@ -236,7 +286,7 @@ func TestExistingFoldersAreUsed(t *testing.T) {
 	year := d.addFolder("rootfolder0001", "2026 - 2027")
 	d.addFolder(year, "2026.10.26 - Soirée Intégration")
 	ev := d.addFolder(year, "2026.10.27 - soiree integration")
-	pbID := d.addFolder(ev, "PhotoBooth")
+	pbID := d.addFolder(ev, "Photobooth_Temp")
 	b := booth{t, svc, d, "session-0001"}
 	res := b.put(KindPhoto, 1, "p1")
 	if len(d.created) != 0 {
@@ -244,7 +294,22 @@ func TestExistingFoldersAreUsed(t *testing.T) {
 	}
 	f, _ := d.ListChildFilesNamed(context.Background(), pbID, res.FileName)
 	if len(f) != 1 {
-		t.Fatal("photo not in the existing Photobooth folder")
+		t.Fatal("photo not in the existing photobooth_temp folder")
+	}
+}
+
+func TestPicturesNeverGoStraightIntoAnApprovedFolder(t *testing.T) {
+	svc, d := setup(t)
+	year := d.addFolder("rootfolder0001", "2026-2027")
+	ev := d.addFolder(year, "2026.10.27 - Soirée Intégration")
+	approved := d.addFolder(ev, "Photobooth")
+	b := booth{t, svc, d, "session-0001"}
+	res := b.put(KindPhoto, 1, "p1")
+	if f, _ := d.ListChildFilesNamed(context.Background(), approved, res.FileName); len(f) != 0 {
+		t.Fatal("a picture went straight into the published Photobooth folder")
+	}
+	if fmt.Sprint(d.created) != "[photobooth_temp]" {
+		t.Fatalf("created %v, want a pending folder", d.created)
 	}
 }
 

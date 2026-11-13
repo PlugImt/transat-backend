@@ -138,6 +138,52 @@ func (d *memDrive) Download(_ context.Context, id string) (io.ReadCloser, error)
 	return io.NopCloser(strings.NewReader(string(f.data))), nil
 }
 
+func (d *memDrive) ListChildren(_ context.Context, parent string) ([]pb.FileInfo, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var out []pb.FileInfo
+	for id, p := range d.parent {
+		if p == parent {
+			out = append(out, pb.FileInfo{ID: id, Name: d.folders[id].Name})
+		}
+	}
+	for _, f := range d.files {
+		if len(f.Parents) > 0 && f.Parents[0] == parent && !f.Trashed {
+			out = append(out, f.FileInfo)
+		}
+	}
+	return out, nil
+}
+
+func (d *memDrive) Rename(_ context.Context, id, name string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if f, ok := d.folders[id]; ok {
+		f.Name = name
+		d.folders[id] = f
+		return nil
+	}
+	if f, ok := d.files[id]; ok {
+		f.Name = name
+		return nil
+	}
+	return pb.ErrNotFound
+}
+
+func (d *memDrive) Move(_ context.Context, id, _, to string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if _, ok := d.folders[id]; ok {
+		d.parent[id] = to
+		return nil
+	}
+	if f, ok := d.files[id]; ok {
+		f.Parents = []string{to}
+		return nil
+	}
+	return pb.ErrNotFound
+}
+
 func (d *memDrive) Thumbnail(context.Context, pb.FileInfo, int) (io.ReadCloser, string, error) {
 	return nil, "", pb.ErrNotFound
 }
@@ -223,7 +269,7 @@ func main() {
 		}
 		return c.JSON(fiber.Map{"done": n})
 	})
-	routes.SetupPhotoboothRoutes(app, photoboothHandler.NewHandler(svc, pb.NewVerifier(keys)))
+	routes.SetupPhotoboothRoutes(app, db, photoboothHandler.NewHandler(svc, pb.NewVerifier(keys)))
 
 	// #nosec G706 -- local development tool: printing the generated key is its purpose
 	log.Printf("Booth key for the admin panel: booth-dev.%s", secret)

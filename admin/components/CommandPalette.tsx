@@ -7,6 +7,7 @@ import {
   Bell,
   Building,
   Calendar,
+  Camera,
   Flag,
   LogOut,
   Plus,
@@ -172,6 +173,14 @@ function CommandPalette() {
         icon: Flag,
         action: () => router.push("/photo-reports"),
         keywords: ["photos", "signalement", "report", "modération", "nsfw"],
+      },
+      {
+        id: "nav-photobooth",
+        label: "Photobooth",
+        description: "Valider les photos du photobooth avant leur publication",
+        icon: Camera,
+        action: () => router.push("/photobooth"),
+        keywords: ["photobooth", "photos", "validation", "soirée", "approuver"],
       },
 
       // Actions

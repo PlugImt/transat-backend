@@ -353,3 +353,34 @@ export interface AppUsageStats {
   };
   faces: FaceRecognitionStats;
 }
+
+/** An event's photobooth pictures awaiting approval (Drive folder "photobooth_temp"). */
+export interface PhotoboothPendingFolder {
+  folder_id: string;
+  event_name: string;
+  event_date: string; // yyyy-mm-dd
+  pictures: number;
+  shoots: number;
+  /** Shoots started within the last hour and not finished: guests may still be at the booth. */
+  open_shoots: number;
+  first_upload_at: string | null;
+  last_upload_at: string | null;
+  drive_url: string;
+}
+
+export interface PhotoboothPendingPicture {
+  id: number;
+  shoot_id: number;
+  kind: "photo" | "collage";
+  number: number;
+  name: string;
+  width: number | null;
+  height: number | null;
+  uploaded_at: string;
+}
+
+export interface PhotoboothApproveResult {
+  folder_id: string;
+  merged: boolean;
+  moved: number;
+}

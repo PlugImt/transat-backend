@@ -1,19 +1,33 @@
 package routes
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	photoboothHandler "github.com/plugimt/transat-backend/handlers/photobooth"
+	"github.com/plugimt/transat-backend/middlewares"
+	"github.com/plugimt/transat-backend/services/photoreport"
+	"github.com/plugimt/transat-backend/utils"
 )
 
 // SetupPhotoboothRoutes exposes the booth's private API (signed with a per-booth key, never a user token) and
 // the public share links. h is nil when the photobooth is not configured: the routes then do not exist.
-func SetupPhotoboothRoutes(router fiber.Router, h *photoboothHandler.Handler) {
+func SetupPhotoboothRoutes(router fiber.Router, db *sql.DB, h *photoboothHandler.Handler) {
 	if h == nil {
 		return
 	}
+	// The booth's pictures reach the app only once an administrator or the Club Photo approves them. Declared
+	// before the admin-only "/admin" group, whose middleware would otherwise answer first.
+	review := router.Group("/admin/photobooth",
+		middlewares.JWTMiddleware, utils.EnhanceSentryEventWithEmail, middlewares.AdminOrRolesMiddleware(db, photoreport.PhotoClubRole))
+	review.Get("/pending", h.ListPending)
+	review.Get("/pending/:folder/pictures", h.PendingPictures)
+	review.Post("/pending/:folder/approve", h.Approve)
+	review.Get("/pictures/:id", h.PendingPicture)
+	review.Delete("/pictures/:id", h.DeletePendingPicture)
+
 	perBooth := limiter.New(limiter.Config{
 		Max:          600,
 		Expiration:   time.Minute,

@@ -57,6 +57,11 @@ type Drive interface {
 	Trash(ctx context.Context, id string) error
 	Download(ctx context.Context, id string) (io.ReadCloser, error)
 	Thumbnail(ctx context.Context, info FileInfo, size int) (io.ReadCloser, string, error)
+	// ListChildren lists everything directly inside a folder (files and folders), trash excluded.
+	ListChildren(ctx context.Context, parentID string) ([]FileInfo, error)
+	Rename(ctx context.Context, id, name string) error
+	// Move puts a file or folder from one parent folder into another.
+	Move(ctx context.Context, id, fromParentID, toParentID string) error
 }
 
 // DriveClient writes into the shared Photos drive with a service account that is "Content manager" on it.
@@ -104,6 +109,42 @@ func (c *DriveClient) ListChildFilesNamed(ctx context.Context, parentID, name st
 	q := fmt.Sprintf("'%s' in parents and name = '%s' and trashed = false", quoteQ(parentID), quoteQ(name))
 	err := c.list(ctx, q, func(f *drive.File) { out = append(out, toInfo(f)) })
 	return out, err
+}
+
+func (c *DriveClient) ListChildren(ctx context.Context, parentID string) ([]FileInfo, error) {
+	var out []FileInfo
+	q := fmt.Sprintf("'%s' in parents and trashed = false", quoteQ(parentID))
+	err := c.list(ctx, q, func(f *drive.File) { out = append(out, toInfo(f)) })
+	return out, err
+}
+
+func (c *DriveClient) Rename(ctx context.Context, id, name string) error {
+	if !driveIDRe.MatchString(id) {
+		return ErrNotFound
+	}
+	err := retry(ctx, func() error {
+		_, err := c.svc.Files.Update(id, &drive.File{Name: name}).SupportsAllDrives(true).Fields("id").Context(ctx).Do()
+		return err
+	})
+	if isNotFound(err) {
+		return ErrNotFound
+	}
+	return err
+}
+
+func (c *DriveClient) Move(ctx context.Context, id, fromParentID, toParentID string) error {
+	if !driveIDRe.MatchString(id) {
+		return ErrNotFound
+	}
+	err := retry(ctx, func() error {
+		_, err := c.svc.Files.Update(id, &drive.File{}).AddParents(toParentID).RemoveParents(fromParentID).
+			SupportsAllDrives(true).Fields("id").Context(ctx).Do()
+		return err
+	})
+	if isNotFound(err) {
+		return ErrNotFound
+	}
+	return err
 }
 
 func (c *DriveClient) list(ctx context.Context, q string, each func(*drive.File)) error {

@@ -12,13 +12,18 @@ import (
 
 	_ "time/tzdata" // the container image may ship without a zone database
 
+	"github.com/plugimt/transat-backend/services/photos"
+
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 )
 
 const (
-	// PhotoboothFolderName is the sub-folder of an event folder that receives the booth's pictures.
+	// PendingFolderName is the sub-folder of an event folder that receives the booth's pictures. The gallery
+	// never indexes it: the pictures reach the app once an administrator or the Club Photo approves them.
+	PendingFolderName = photos.PendingPhotoboothFolder
+	// PhotoboothFolderName is what the pending folder becomes once approved.
 	PhotoboothFolderName = "Photobooth"
 	maxEventNameRunes    = 100
 )

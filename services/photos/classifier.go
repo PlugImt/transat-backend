@@ -119,6 +119,17 @@ var (
 	)
 )
 
+// PendingPhotoboothFolder is the name of the folder that receives a photobooth's pictures until an
+// administrator or the Club Photo approves them. It is never indexed, so its pictures stay out of the app; once
+// renamed (by the admin panel or by hand on Drive) it is indexed like any other folder.
+const PendingPhotoboothFolder = "photobooth_temp"
+
+// IsPendingPhotoboothFolder tells whether a folder holds photobooth pictures awaiting approval
+// ("photobooth_temp", whatever the case, accents or separator).
+func IsPendingPhotoboothFolder(name string) bool {
+	return strings.NewReplacer(" ", "_", "-", "_").Replace(normalize(name)) == PendingPhotoboothFolder
+}
+
 func set(values ...string) map[string]bool {
 	m := make(map[string]bool, len(values))
 	for _, v := range values {
