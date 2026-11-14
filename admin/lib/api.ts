@@ -38,6 +38,7 @@ import type {
   PhotoboothLayoutCatalog,
   PhotoboothPendingFolder,
   PhotoboothPendingPicture,
+  PhotoboothStats,
   PhotoReport,
   PhotoReportReason,
   PhotoReportsFilter,
@@ -653,6 +654,10 @@ export const photoboothReviewApi = {
 
 /** Events prepared for the photobooth: the booths download their settings, layouts and frames. */
 export const photoboothEventsApi = {
+  stats: async (): Promise<PhotoboothStats> => {
+    const response = await api.get<PhotoboothStats>("/admin/photobooth/stats");
+    return response.data;
+  },
   catalog: async (): Promise<PhotoboothLayoutCatalog> => {
     const response = await api.get<PhotoboothLayoutCatalog>("/admin/photobooth/layouts");
     return response.data;

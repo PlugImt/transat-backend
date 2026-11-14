@@ -37,6 +37,8 @@ func SetupPhotoboothRoutes(router fiber.Router, db *sql.DB, h *photoboothHandler
 	review.Get("/events/:id/frames/:type", h.EventFrame)
 	review.Put("/events/:id/frames/:type", h.UploadEventFrame)
 	review.Delete("/events/:id/frames/:type", h.DeleteEventFrame)
+	// Each evening's audience: sessions, QR codes scanned, album visitors.
+	review.Get("/stats", h.Stats)
 
 	perBooth := limiter.New(limiter.Config{
 		Max:          600,
@@ -76,4 +78,15 @@ func SetupPhotoboothRoutes(router fiber.Router, db *sql.DB, h *photoboothHandler
 	router.Get("/photobooth/frames/:token", perShare, h.GetFrameSession)
 	router.Post("/photobooth/frames/:token/:type", perShare, h.UploadFrame)
 	router.Get("/photobooth/shares/:token/files/:id", perShare, h.GetSharedFile)
+	// The site's pages report each opening of a share link or a public album, for the statistics.
+	router.Post("/photobooth/shares/:token/visits", perShare, h.ShareVisit)
+	perAlbum := limiter.New(limiter.Config{
+		Max:          600,
+		Expiration:   time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string { return "album-visit-" + c.Params("id") },
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "Too many requests."})
+		},
+	})
+	router.Post("/public/albums/:id/visits", perAlbum, h.AlbumVisit)
 }

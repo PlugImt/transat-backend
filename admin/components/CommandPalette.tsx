@@ -199,6 +199,14 @@ function CommandPalette() {
         action: () => router.push("/photobooth/events"),
         keywords: ["photobooth", "événement", "collage", "fond", "cadre", "gabarit", "tablette"],
       },
+      {
+        id: "nav-photobooth-stats",
+        label: "Stats photobooth",
+        description: "QR codes scannés et visiteurs des albums, soirée par soirée",
+        icon: Camera,
+        action: () => router.push("/photobooth/stats"),
+        keywords: ["photobooth", "statistiques", "qr code", "scan", "album", "visites", "audience"],
+      },
 
       // Actions
       {

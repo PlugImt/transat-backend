@@ -689,6 +689,13 @@ export const useDeletePhotoboothPicture = () => {
 export const usePhotoboothCatalog = () =>
   useQuery({ queryKey: ["photobooth-catalog"], queryFn: photoboothEventsApi.catalog });
 
+export const usePhotoboothStats = () =>
+  useQuery({
+    queryKey: ["photobooth-stats"],
+    queryFn: photoboothEventsApi.stats,
+    refetchInterval: 60_000,
+  });
+
 export const usePhotoboothEvents = () =>
   useQuery({ queryKey: ["photobooth-events"], queryFn: photoboothEventsApi.list });
 

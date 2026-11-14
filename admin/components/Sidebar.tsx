@@ -9,6 +9,7 @@ import {
   CalendarCheck,
   CalendarHeart,
   Camera,
+  ChartColumnIncreasing,
   Flag,
   Gamepad2,
   Images,
@@ -45,6 +46,7 @@ const MENU = [
   { href: "/photo-reports", label: "Signalements photos", icon: Flag },
   { href: "/photobooth", label: "Photobooth", icon: Camera },
   { href: "/photobooth/events", label: "Soirées photobooth", icon: CalendarHeart },
+  { href: "/photobooth/stats", label: "Stats photobooth", icon: ChartColumnIncreasing },
 ];
 
 const THEMES: { id: ThemeChoice; label: string; icon: typeof Sun }[] = [

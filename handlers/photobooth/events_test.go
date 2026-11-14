@@ -79,3 +79,45 @@ func TestBoothPublishesLayoutsAndFetchesEvents(t *testing.T) {
 		t.Fatalf("admin route without token: %d", res.StatusCode)
 	}
 }
+
+func TestPublicPagesReportVisits(t *testing.T) {
+	db := dbtest.Open(t)
+	svc := pb.NewService(db, nil, "root", "https://transat.dev/photobooth")
+	app := fiber.New()
+	routes.SetupPhotoboothRoutes(app, db, photoboothHandler.NewHandler(svc, pb.NewVerifier(map[string][]byte{"booth-1": secret})))
+
+	token := "tok_0123456789abcdefghijklmnopqrstuv"
+	if _, err := db.Exec(`INSERT INTO photobooth_shoots (device_key_id, client_session_id, event_name, event_date, drive_folder_id, status, share_token)
+		VALUES ('booth-1', 's1', 'Gala', '2026-03-27', 'f', 'finalized', $1)`, token); err != nil {
+		t.Fatal(err)
+	}
+	post := func(path, body string) int {
+		req := httptest.NewRequest("POST", path, bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		res, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.StatusCode
+	}
+	visitor := `{"visitor":"0b5e2c1a-7d3f-4e6a-9c1b-2f8d7e6a5b4c"}`
+	if code := post("/photobooth/shares/"+token+"/visits", visitor); code != 204 {
+		t.Fatalf("share visit: %d", code)
+	}
+	if code := post("/photobooth/shares/"+token+"/visits", `{"visitor":"x"}`); code != 400 {
+		t.Fatalf("bad visitor: %d", code)
+	}
+	if code := post("/photobooth/shares/tok_unknown0123456789abcdefghijklmnop/visits", visitor); code != 404 {
+		t.Fatalf("unknown share: %d", code)
+	}
+	if code := post("/public/albums/999-gala/visits", visitor); code != 404 {
+		t.Fatalf("unknown album: %d", code)
+	}
+	st, err := svc.Stats(t.Context())
+	if err != nil || len(st.Events) != 1 || st.Events[0].Scanners != 1 {
+		t.Fatalf("stats %+v %v", st, err)
+	}
+	if res, _ := app.Test(httptest.NewRequest("GET", "/admin/photobooth/stats", nil), -1); res.StatusCode != 401 {
+		t.Fatalf("stats without token: %d", res.StatusCode)
+	}
+}

@@ -495,3 +495,36 @@ export interface ApproveAllResult {
   /** Pending reports still to do; call again while above zero. */
   remaining: number;
 }
+
+/** The audience of one photobooth evening: its sessions, the QR codes scanned, the public album's visitors. */
+export interface PhotoboothEventStats {
+  date: string;
+  name: string;
+  event_id?: number;
+  sessions: number;
+  scanned_sessions: number;
+  scanners: number;
+  scan_views: number;
+  album_id?: number;
+  album_title?: string;
+  album_visitors: number;
+  album_views: number;
+}
+
+export interface PhotoboothStats {
+  events: PhotoboothEventStats[];
+  totals: {
+    events: number;
+    sessions: number;
+    scanned_sessions: number;
+    scanners: number;
+    scan_views: number;
+    album_visitors: number;
+    album_views: number;
+    avg_scanners_per_event: number;
+    avg_album_visitors_per_event: number;
+    scan_rate: number;
+    avg_scanners_per_session: number;
+  };
+  tracking_since?: string;
+}

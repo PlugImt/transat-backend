@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	pb "github.com/plugimt/transat-backend/services/photobooth"
@@ -195,4 +196,49 @@ func (h *Handler) PublishLayouts(c *fiber.Ctx) error {
 		return fail(c, err)
 	}
 	return c.JSON(fiber.Map{"ok": true})
+}
+
+// ---- Audience of the public pages -----------------------------------------------------------------------
+
+type visitBody struct {
+	Visitor string `json:"visitor"`
+}
+
+func (h *Handler) visit(c *fiber.Ctx, record func(visitor string) error) error {
+	var body visitBody
+	if len(c.Body()) > 1024 || json.Unmarshal(c.Body(), &body) != nil || !pb.ValidVisitor(body.Visitor) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid visitor"})
+	}
+	if err := record(body.Visitor); err != nil {
+		return fail(c, err)
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// ShareVisit handles POST /photobooth/shares/:token/visits: the share page was opened (the QR code was scanned).
+func (h *Handler) ShareVisit(c *fiber.Ctx) error {
+	return h.visit(c, func(v string) error { return h.svc.RecordShareVisit(c.UserContext(), c.Params("token"), v) })
+}
+
+// AlbumVisit handles POST /public/albums/:id/visits: the album's public page was opened.
+func (h *Handler) AlbumVisit(c *fiber.Ctx) error {
+	raw := c.Params("id")
+	if i := strings.IndexByte(raw, '-'); i > 0 {
+		raw = raw[:i]
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return notFound(c)
+	}
+	return h.visit(c, func(v string) error { return h.svc.RecordAlbumVisit(c.UserContext(), id, v) })
+}
+
+// Stats handles GET /admin/photobooth/stats: each evening's sessions, QR code scans and album visitors.
+func (h *Handler) Stats(c *fiber.Ctx) error {
+	stats, err := h.svc.Stats(c.UserContext())
+	if err != nil {
+		return fail(c, err)
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(stats)
 }
