@@ -3,6 +3,7 @@
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
+  Camera,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -18,9 +19,10 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { AlbumPhotoboothModal } from "@/components/photobooth/AlbumPhotobooth";
 import { fetchAuthorizedImage } from "@/lib/api";
-import { usePhotoAlbums, useSetAlbumHidden } from "@/lib/hooks";
-import type { PhotoAlbum, PhotoAlbumStatus } from "@/lib/types";
+import { usePhotoAlbums, usePhotoboothAlbumCounts, useSetAlbumHidden } from "@/lib/hooks";
+import type { PhotoAlbum, PhotoAlbumStatus, PhotoboothAlbumCount } from "@/lib/types";
 
 const TABS: { id: PhotoAlbumStatus | ""; label: string; icon: typeof Eye }[] = [
   { id: "", label: "Tous", icon: Images },
@@ -58,6 +60,20 @@ export default function PhotoAlbumsPage() {
 
   const { data, isLoading, isError, isFetching } = usePhotoAlbums({ q, status, page });
   const albums = data?.albums ?? [];
+  const { data: boothCounts = [] } = usePhotoboothAlbumCounts();
+  const booth = new Map(boothCounts.map((c) => [c.album_id, c]));
+  // The photobooth's pictures of one album; ?album=<id> opens it (links from the Photobooth page).
+  const [boothAlbum, setBoothAlbum] = useState<{ id: number; title: string } | null>(null);
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get("album"));
+    if (Number.isSafeInteger(id) && id > 0) setBoothAlbum({ id, title: "Album" });
+  }, []);
+  const boothTitle =
+    boothAlbum && (albums.find((a) => a.id === boothAlbum.id)?.title ?? boothAlbum.title);
+  const closeBooth = () => {
+    setBoothAlbum(null);
+    if (window.location.search) window.history.replaceState(null, "", window.location.pathname);
+  };
   const total = data?.total ?? 0;
   const pageSize = data?.page_size ?? 50;
   const first = (page - 1) * pageSize;
@@ -156,10 +172,20 @@ export default function PhotoAlbumsPage() {
             className="animate-rise"
             style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
           >
-            <AlbumCard album={album} />
+            <AlbumCard
+              album={album}
+              booth={booth.get(album.id)}
+              onPhotobooth={() => setBoothAlbum({ id: album.id, title: album.title })}
+            />
           </li>
         ))}
       </ul>
+
+      <AlbumPhotoboothModal
+        albumId={boothAlbum?.id ?? null}
+        title={boothTitle ?? ""}
+        onClose={closeBooth}
+      />
 
       {total > pageSize && (
         <div className="mt-6 flex items-center justify-between text-sm text-gray-600">
@@ -192,7 +218,15 @@ export default function PhotoAlbumsPage() {
   );
 }
 
-function AlbumCard({ album }: { album: PhotoAlbum }) {
+function AlbumCard({
+  album,
+  booth,
+  onPhotobooth,
+}: {
+  album: PhotoAlbum;
+  booth: PhotoboothAlbumCount | undefined;
+  onPhotobooth: () => void;
+}) {
   const setHidden = useSetAlbumHidden();
   const pending = setHidden.isPending;
 
@@ -253,6 +287,26 @@ function AlbumCard({ album }: { album: PhotoAlbum }) {
           {dateLabel(album)} · {album.photo_count} photo{album.photo_count > 1 ? "s" : ""}
         </p>
         {album.category && <p className="truncate text-xs text-gray-400">{album.category}</p>}
+        {booth && (
+          <button
+            type="button"
+            onClick={onPhotobooth}
+            className={`mt-1 flex items-center gap-1.5 self-start rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+              booth.pending > 0
+                ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            <Camera className="h-3.5 w-3.5" />
+            Photobooth :{" "}
+            {[
+              booth.pending > 0 && `${booth.pending} à approuver`,
+              booth.approved > 0 && `${booth.approved} publiée${booth.approved > 1 ? "s" : ""}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </button>
+        )}
         {album.hidden && album.hidden_by && (
           <p className="truncate text-xs text-gray-500" title={album.hidden_by}>
             Masqué par {album.hidden_by}

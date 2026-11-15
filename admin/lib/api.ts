@@ -31,6 +31,8 @@ import type {
   PhotoAlbum,
   PhotoAlbumsFilter,
   PhotoAlbumsPage,
+  PhotoboothAlbumCount,
+  PhotoboothAlbumFolder,
   PhotoboothApproveResult,
   PhotoboothEvent,
   PhotoboothEventFrame,
@@ -650,6 +652,17 @@ export const photoboothReviewApi = {
   },
   picturePath: (id: number, size: "thumb" | "preview") =>
     `/admin/photobooth/pictures/${id}?size=${size}`,
+  /** Per gallery album, the booth's pictures awaiting approval and approved. */
+  albumCounts: async (): Promise<PhotoboothAlbumCount[]> => {
+    const response = await api.get<PhotoboothAlbumCount[]>("/admin/photobooth/albums");
+    return response.data ?? [];
+  },
+  albumPictures: async (albumId: number): Promise<PhotoboothAlbumFolder[]> => {
+    const response = await api.get<PhotoboothAlbumFolder[]>(
+      `/admin/photobooth/albums/${albumId}/pictures`,
+    );
+    return response.data ?? [];
+  },
 };
 
 /** Events prepared for the photobooth: the booths download their settings, layouts and frames. */

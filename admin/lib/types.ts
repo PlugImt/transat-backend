@@ -366,6 +366,25 @@ export interface PhotoboothPendingFolder {
   first_upload_at: string | null;
   last_upload_at: string | null;
   drive_url: string;
+  /** The event prepared in the panel, and the gallery album of the event folder, when there are. */
+  event_id?: number;
+  album_id?: number;
+}
+
+/** A photobooth folder of a gallery album: awaiting approval, or approved (published in the album). */
+export interface PhotoboothAlbumFolder {
+  folder_id: string;
+  pending: boolean;
+  event_name: string;
+  event_date: string;
+  drive_url: string;
+  pictures: PhotoboothPendingPicture[];
+}
+
+export interface PhotoboothAlbumCount {
+  album_id: number;
+  pending: number;
+  approved: number;
 }
 
 export interface PhotoboothPendingPicture {

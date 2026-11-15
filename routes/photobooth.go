@@ -39,6 +39,9 @@ func SetupPhotoboothRoutes(router fiber.Router, db *sql.DB, h *photoboothHandler
 	review.Delete("/events/:id/frames/:type", h.DeleteEventFrame)
 	// Each evening's audience: sessions, QR codes scanned, album visitors.
 	review.Get("/stats", h.Stats)
+	// The booth's pictures seen from the gallery's albums (pending ones never reach the public pages).
+	review.Get("/albums", h.AlbumCounts)
+	review.Get("/albums/:id/pictures", h.AlbumPictures)
 
 	perBooth := limiter.New(limiter.Config{
 		Max:          600,

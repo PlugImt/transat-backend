@@ -188,7 +188,7 @@ function CommandPalette() {
         label: "Photobooth",
         description: "Valider les photos du photobooth avant leur publication",
         icon: Camera,
-        action: () => router.push("/photobooth"),
+        action: () => router.push("/photobooth?tab=review"),
         keywords: ["photobooth", "photos", "validation", "soirée", "approuver"],
       },
       {
@@ -196,7 +196,7 @@ function CommandPalette() {
         label: "Soirées photobooth",
         description: "Préparer les événements, collages et fonds des tablettes du photobooth",
         icon: Camera,
-        action: () => router.push("/photobooth/events"),
+        action: () => router.push("/photobooth"),
         keywords: ["photobooth", "événement", "collage", "fond", "cadre", "gabarit", "tablette"],
       },
       {
@@ -204,7 +204,7 @@ function CommandPalette() {
         label: "Stats photobooth",
         description: "QR codes scannés et visiteurs des albums, soirée par soirée",
         icon: Camera,
-        action: () => router.push("/photobooth/stats"),
+        action: () => router.push("/photobooth?tab=stats"),
         keywords: ["photobooth", "statistiques", "qr code", "scan", "album", "visites", "audience"],
       },
 

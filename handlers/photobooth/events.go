@@ -242,3 +242,26 @@ func (h *Handler) Stats(c *fiber.Ctx) error {
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	return c.JSON(stats)
 }
+
+// AlbumPictures handles GET /admin/photobooth/albums/:id/pictures: the booth's pictures of a gallery album, folder
+// by folder, awaiting approval or approved.
+func (h *Handler) AlbumPictures(c *fiber.Ctx) error {
+	id, ok := eventID(c)
+	if !ok {
+		return notFound(c)
+	}
+	folders, err := h.svc.AlbumPictures(c.UserContext(), id)
+	if err != nil {
+		return fail(c, err)
+	}
+	return c.JSON(folders)
+}
+
+// AlbumCounts handles GET /admin/photobooth/albums: per album, the booth pictures awaiting approval and approved.
+func (h *Handler) AlbumCounts(c *fiber.Ctx) error {
+	counts, err := h.svc.AlbumCounts(c.UserContext())
+	if err != nil {
+		return fail(c, err)
+	}
+	return c.JSON(counts)
+}

@@ -26,6 +26,11 @@ type PendingFolder struct {
 	FirstAt    *time.Time `json:"first_upload_at"`
 	LastAt     *time.Time `json:"last_upload_at"`
 	DriveURL   string     `json:"drive_url"`
+	// The event prepared in the admin panel and the gallery album of the event folder, when there are.
+	EventID *int64 `json:"event_id,omitempty"`
+	AlbumID *int64 `json:"album_id,omitempty"`
+
+	eventKey string
 }
 
 // PendingPicture is one picture of a pending folder.
@@ -53,7 +58,7 @@ const driveFolderURL = "https://drive.google.com/drive/folders/"
 // by hand on Drive is no longer pending and drops out of the list.
 func (s *Service) ListPending(ctx context.Context) ([]PendingFolder, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT ef.photobooth_folder, to_char(ef.event_date, 'YYYY-MM-DD'),
+		SELECT ef.photobooth_folder, to_char(ef.event_date, 'YYYY-MM-DD'), ef.event_key,
 		       COALESCE((SELECT sh.event_name FROM photobooth_shoots sh WHERE sh.drive_folder_id = ef.photobooth_folder
 		                 ORDER BY sh.id DESC LIMIT 1), ef.event_key),
 		       (SELECT COUNT(*) FROM photobooth_files f JOIN photobooth_shoots sh ON sh.id = f.shoot_id
@@ -74,7 +79,7 @@ func (s *Service) ListPending(ctx context.Context) ([]PendingFolder, error) {
 	for rows.Next() {
 		var p PendingFolder
 		var first, last sql.NullTime
-		if err := rows.Scan(&p.FolderID, &p.EventDate, &p.EventName, &p.Pictures, &p.Shoots, &p.OpenShoots, &first, &last); err != nil {
+		if err := rows.Scan(&p.FolderID, &p.EventDate, &p.eventKey, &p.EventName, &p.Pictures, &p.Shoots, &p.OpenShoots, &first, &last); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -104,7 +109,7 @@ func (s *Service) ListPending(ctx context.Context) ([]PendingFolder, error) {
 			out = append(out, p)
 		}
 	}
-	return out, nil
+	return out, s.linkPending(ctx, out)
 }
 
 // PendingPictures lists the pictures of a pending folder in upload order.

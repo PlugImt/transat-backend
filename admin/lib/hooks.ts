@@ -670,6 +670,7 @@ export const useApprovePhotobooth = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["photobooth-pending"] });
       queryClient.invalidateQueries({ queryKey: ["photobooth-pictures"] });
+      queryClient.invalidateQueries({ queryKey: ["photobooth-album"] });
     },
   });
 };
@@ -681,9 +682,25 @@ export const useDeletePhotoboothPicture = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["photobooth-pending"] });
       queryClient.invalidateQueries({ queryKey: ["photobooth-pictures"] });
+      queryClient.invalidateQueries({ queryKey: ["photobooth-album"] });
     },
   });
 };
+
+/** The booth's pictures seen from the gallery's albums. */
+export const usePhotoboothAlbumCounts = () =>
+  useQuery({
+    queryKey: ["photobooth-album", "counts"],
+    queryFn: photoboothReviewApi.albumCounts,
+    refetchInterval: 60_000,
+  });
+
+export const usePhotoboothAlbumPictures = (albumId: number | null) =>
+  useQuery({
+    queryKey: ["photobooth-album", albumId],
+    queryFn: () => photoboothReviewApi.albumPictures(albumId as number),
+    enabled: albumId !== null,
+  });
 
 // Photobooth events hooks
 export const usePhotoboothCatalog = () =>
