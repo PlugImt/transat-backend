@@ -184,6 +184,10 @@ type photoRow struct {
 
 func buildRows(inputs []photoInput, idx folderIndex, now time.Time) []photoRow {
 	rows := make([]photoRow, 0, len(inputs))
+	// A file can come twice in one batch (listed in a folder that just appeared and reported by the change
+	// feed): Postgres refuses an upsert touching the same row twice, which would block every later sync. The
+	// last occurrence wins, the change feed being appended after the listing.
+	pos := make(map[string]int, len(inputs))
 	for _, in := range inputs {
 		m := in.Item
 		entry, known := idx[in.FolderID]
@@ -212,6 +216,11 @@ func buildRows(inputs []photoInput, idx folderIndex, now time.Time) []photoRow {
 		if row.url == "" {
 			row.url = fmt.Sprintf(driveFileURL, m.ID)
 		}
+		if i, dup := pos[m.ID]; dup {
+			rows[i] = row
+			continue
+		}
+		pos[m.ID] = len(rows)
 		rows = append(rows, row)
 	}
 	return rows

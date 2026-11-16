@@ -135,12 +135,14 @@ func TestPendingPhotoboothFolderIsIndexedOnlyOnceRenamed(t *testing.T) {
 		t.Fatal("a picture uploaded into photobooth_temp was indexed")
 	}
 
-	// Approved (by the panel or by hand on Drive): the feed only reports the folder, its pictures follow.
+	// Approved (by the panel or by hand on Drive): the feed reports the folder, its pictures follow. A picture
+	// also reported by the feed in the same batch (uploaded or touched meanwhile) must not break the sync.
 	api.put(folder("pending00001", "event0000001", "Photobooth"), true)
+	api.put(photo("boothphoto03", "pending00001", "booth-3.jpg"), true)
 	if _, err := s.Run(ctx, ModeIncremental); err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []string{"boothphoto01", "boothphoto03"} {
+	for _, id := range []string{"boothphoto01", "boothphoto02", "boothphoto03"} {
 		if !visible(t, s, id) {
 			t.Fatalf("%s not indexed after the folder was approved", id)
 		}
